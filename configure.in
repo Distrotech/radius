@@ -12,7 +12,7 @@
 AC_REVISION($Revision$)
 AC_INIT(radiusd/radiusd.c)
 AC_CANONICAL_SYSTEM
-AM_INIT_AUTOMAKE(gnu-radius, 0.96)
+AM_INIT_AUTOMAKE(gnu-radius, 0.96.2)
 AM_CONFIG_HEADER(config.h)
 
 ## * Available linguas
@@ -625,6 +625,12 @@ if test x$BUILD_CLIENT = xyes; then
 		AC_MSG_WARN([GUILE not installed. Won't build nas.scm])
 	fi
 fi
+
+if test "$EMACS" != "no"; then
+        lisp_LISP='$(LISPSRC)'
+fi
+AC_SUBST(lisp_LISP)
+
 
 AC_OUTPUT(Makefile m4/Makefile 
           include/Makefile include/snmp/Makefile 
