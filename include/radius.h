@@ -71,7 +71,6 @@ typedef struct pw_auth_hdr {
 #define RT_ASCEND_RELEASE_IP            52
 
 
-#define DV_ACCT_STATUS_TYPE_QUERY       -1
 
 /* Basic structures */
 
@@ -100,6 +99,7 @@ enum {
 
 #define AP_PROPAGATE   0x10
 #define AP_REQ_CMP     0x20
+#define AP_USER_FLAG(n) (0x1000<<(n))
 
 #define ADDITIVITY(val) ((val) & 0x3)
 #define SET_ADDITIVITY(val,a) ((val) = ((val) & ~0x3) | (a))
@@ -274,6 +274,8 @@ VALUE_PAIR *avp_create(int attr, int length, char *strval, int lval);
 void avl_move_attr(VALUE_PAIR **to, VALUE_PAIR **from, int attr);
 void avl_move_pairs(VALUE_PAIR **to, VALUE_PAIR **from,
 		    int (*fun)(), void *closure);
+int avl_cmp(VALUE_PAIR *a, VALUE_PAIR *b, int prop);
+int avp_cmp(VALUE_PAIR *a, VALUE_PAIR *b);
 
 extern int do_not_resolve;
 char *ip_hostname (UINT4);

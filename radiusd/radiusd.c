@@ -159,6 +159,11 @@ int suspend_flag;
 serv_stat saved_status;
 #endif
 
+/* These are the user flags marking attributes that
+   can be used in comparing ... */
+int auth_comp_flag; /* ... authentication requests */
+int acct_comp_flag; /* ... accounting requests */
+
 Config config = {
 	10,              /* delayed_hup_wait */
 	1,               /* checkrad_assume_logged */
@@ -1437,61 +1442,36 @@ stat_request_list(stat)
 }
 
 /* ************************************************************************* */
-#define REQ_CMP_ID            0x01
-#define REQ_CMP_AUTHENTICATOR 0x02
-#define REQ_CMP_CONTENTS      0x03
 
 int
 rad_req_cmp(a, b)
         RADIUS_REQ *a, *b;
 {
-	NAS *nas;
-	int cmp = 0;
-
-	/* The two requests are surely different if they come from
-	   different NASes or are of different types */
+	int prop = 0;
+	
 	if (a->ipaddr != b->ipaddr || a->code != b->code)
 		return 1;
-
-	/* Default comparison method: compared request IDs and
-	   authenticators */
-	cmp = REQ_CMP_ID|REQ_CMP_AUTHENTICATOR;
 	
-	/* Modify comparison method. For security reasons, only accounting
-	   requests are configurable */
+	if (a->id == b->id
+	    && memcmp(a->vector, b->vector, sizeof(a->vector)) == 0)
+		return 0;
+
 	switch (a->code) {
-	case RT_ACCOUNTING_REQUEST:
-		nas = nas_request_to_nas(a);
-		if (nas) {
-			int n = 0;
-			if (envar_lookup_int(nas->args, "cmppairs", 0))
-				n |= REQ_CMP_CONTENTS;
-			if (envar_lookup_int(nas->args, "cmpid", 0))
-				n |= REQ_CMP_ID;
-			if (envar_lookup_int(nas->args, "cmpauth", 0))
-				n |= REQ_CMP_AUTHENTICATOR;
-
-			if (n)
-				cmp = n;
-		}
+	case RT_AUTHENTICATION_REQUEST:
+	case RT_AUTHENTICATION_ACK:
+	case RT_AUTHENTICATION_REJECT:
+	case RT_ACCESS_CHALLENGE:
+		prop = auth_comp_flag;
 		break;
-	default:
-		/* Use the default cmp */
+	case RT_ACCOUNTING_REQUEST:
+	case RT_ACCOUNTING_RESPONSE:
+	case RT_ACCOUNTING_STATUS:
+	case RT_ACCOUNTING_MESSAGE:
+		prop = acct_comp_flag;
+		break;
 	}
-
-	/* Finally compare the requests */
 	
-	if ((cmp & REQ_CMP_ID) && a->id != b->id)
-		return 1;
-
-	if ((cmp & REQ_CMP_AUTHENTICATOR)
-	    && memcmp(a->vector, b->vector, sizeof(a->vector)))
-		return 1;
-
-	if ((cmp & REQ_CMP_CONTENTS) && avl_cmp(a->request, b->request))
-		return 1;
-
-	return 0;
+	return avl_cmp(a->request, b->request, AP_REQ_CMP|prop);
 }
 
 void

@@ -251,6 +251,8 @@ extern char *message_text[MSG_COUNT];
 extern char *username_valid_chars;
 extern unsigned long stat_start_time;
 extern REQUEST_CLASS    request_class[];
+extern int auth_comp_flag; /* ... authentication requests */
+extern int acct_comp_flag; /* ... accounting requests */
 
 #ifdef USE_SNMP
 extern int snmp_port;
