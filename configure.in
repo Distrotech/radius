@@ -21,7 +21,10 @@ ALL_LINGUAS="no"
 AC_SUBST(RADIUSD_LDADD)
 AC_SUBST(BUILD_TARGET)
 AC_SUBST(INCLUDEPATH)
+
+YACC_OPTS=-t
 AC_SUBST(YACC_OPTS)
+
 AC_SUBST(RADLOG_DIR)
 AC_SUBST(RADIUS_PID)
 AC_SUBST(PS)
@@ -204,8 +207,7 @@ AC_DEFINE_UNQUOTED(RADIUS_DEBUG, $RADIUS_DEBUG)
 AC_ARG_ENABLE(yydebug,
 	[  --enable-yydebug	         enable parser debugging],
 	[case $enableval in
-		yes) 	AC_DEFINE(YACC_DEBUG)		
-			YACC_OPTS="-t";;
+		yes) 	AC_DEFINE(YACC_DEBUG);;		
 		*)	;;
 	esac])
 
