@@ -54,6 +54,10 @@ obstack_grow_quoted(obp, str, len)
 {
 	for (; len > 0; len--, str++) {
 		switch (*str) {
+		case 0:
+			obstack_1grow(obp, '\\');
+			obstack_1grow(obp, '0');
+			break;
 		case '"':
 		case '\'':
 		case '\\':
@@ -161,7 +165,9 @@ attr_to_str(obp, req, pairlist, attr, defval)
 	tmp[AUTH_STRING_LEN] = 0;
 	switch (attr->type) {
 	case TYPE_STRING:
-		if (attr->value == DA_PASSWORD && req) {
+		if ((attr->value == DA_PASSWORD 
+                     || attr->value == DA_CHAP_PASSWORD)
+                    && req) {
 			char string[AUTH_STRING_LEN+1];
 			int len;
 			req_decrypt_password(string, req, pair);
@@ -175,7 +181,7 @@ attr_to_str(obp, req, pairlist, attr, defval)
 		}
 		break;
 	case TYPE_INTEGER:
-		snprintf(tmp, sizeof(tmp), "%ld", pair->lvalue);
+		snprintf(tmp, sizeof(tmp), "%lu", pair->lvalue);
 		len = strlen(tmp);
 		obstack_grow(obp, tmp, len);
 		break;
