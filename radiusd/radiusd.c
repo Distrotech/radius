@@ -424,6 +424,7 @@ main(argc, argv)
 	
 	snmp_init(0, 0, emalloc, efree);
 
+	srand(time(NULL));
 	rad_main(argv[optind]);
 }
 
