@@ -13,6 +13,7 @@ of @attr{Auth-Type} attribute in @LHS{} of a @file{users} entry.
 @menu
 * Accept Auth::                   Accept unconditionally.
 * Reject Auth::                   Reject unconditionally.
+* Ignore Auth::                   Silently ignore the request.
 * Local Password Auth::           Authenticate using plaintext password.
 * Encrypted Password Auth::       Authenticate using MD5 encrypted password.
 * System Auth::                   Authenticate using system account.
@@ -75,6 +76,16 @@ This authentication type is used for each @file{users} entry, whose
 @example
 Auth-Type = Reject
 @end example
+
+@comment *L2****************************************************************
+@node Ignore Auth
+@section Ignore Authentication Type
+@cindex Ignore Authentication Type
+
+The @dfn{Ignore} authentication type causes the request 
+to be silently ignored. The authentication fails and no reply
+is sent back to the @NAS{}. 
+
 
 @comment *L2****************************************************************
 @node Local Password Auth
