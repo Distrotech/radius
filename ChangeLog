@@ -1,3 +1,8 @@
+2002-03-20  Sergey Poznyakoff
+
+	* raddb/Makefile.am: Do not overwrite existing dictionaries.
+	* NEWS: Updated.
+	
 2002-03-19  Sergey Poznyakoff
 
         * radiusd/sql.c (rad_sql_retrieve_pairs): Honor additivity
