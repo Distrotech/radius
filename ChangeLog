@@ -1,3 +1,28 @@
+2002-05-30  Sergey Poznyakoff 
+
+	* config.sub: removed.
+	* README: Fixed typo.
+	* include/radius.h (DICT_ATTR): Added attr_parser_fp member.
+	  (dict_register_parser, ascend_parse_filter): New protos.
+
+	* radlib/ascend.c: Implementation of ascend-specific filters.
+	* radlib/Makefile.am: Added ascend.c
+	* radlib/dict.c: Handle `abinary' attribute type.
+	* radlib/users.y: Likewise.
+	* raddb/dict/ascend: Added Ascend-Call-Filter and
+	  Ascend-Data-Filter attributes.
+
+	* radlib/util.c (format_string_visual): Bugfix. Characters > 128
+	  were printed incorrectly.
+	
+	* radiusd/acct.c: Honour Proxy-State attributes in accounting
+	  replies. 0.99 branch does this in a better way, but since 0.96
+	  still uses old radius.c, we have to use the kludge here.
+
+	* radiusd/auth.c: Detect CHAP automatically.
+
+	* NEWS: Updated.
+	
 2002-04-11  Sergey Poznyakoff
 
 	* include/radutmp.h: Removed P_ protocol defines.
