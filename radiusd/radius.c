@@ -159,8 +159,8 @@ rad_send_reply(code, radreq, oreply, msg, activefd)
 				reply->strlength = strlen(reply->strvalue);
 
 			len = reply->strlength;
-			if (len >= AUTH_STRING_LEN) {
-				len = AUTH_STRING_LEN - 1;
+			if (len > AUTH_STRING_LEN) {
+				len = AUTH_STRING_LEN;
 			}
 			if (total_length + len + 2 >= SEND_BUFFER_SIZE)
 				goto err;
@@ -415,7 +415,7 @@ radrecv(host, udp_port, buffer, length)
 
 		if ((attr = attr_number_to_dict(attribute)) == NULL) {
 			debug(1, ("Received unknown attribute %d", attribute));
-		} else if ( attrlen >= AUTH_STRING_LEN ) {
+		} else if ( attrlen > AUTH_STRING_LEN ) {
 			debug(1, ("attribute %d too long, %d >= %d", attribute,
 				attrlen, AUTH_STRING_LEN));
 		} else if ( attrlen > length ) {
