@@ -591,111 +591,18 @@ userparse(buffer, first_pair, errmsg)
 			break;
 			
 		case PS_RHS:
-			pair = avp_alloc();
-			pair->name = attr->name;
-			pair->attribute = attr->value;
-			pair->type = attr->type;
-			pair->operator = op;
-
-			switch (pair->type) {
-
-			case TYPE_STRING:
-				pair->strvalue = make_string(token);
-				pair->strlength = strlen(pair->strvalue);
-				break;
-
-			case TYPE_INTEGER:
-				/*
-				 *	For DA_NAS_PORT_ID, allow a
-				 *	port range instead of just a port.
-				 */
-				if (attr->value == DA_NAS_PORT_ID) {
-					for (s = token; *s; s++)
-						if (!isdigit(*s))
-							break;
-					if (*s) {
-						pair->type = TYPE_STRING;
-						pair->strvalue = make_string(token);
-						pair->strlength = strlen(pair->strvalue);
-						break;
-					}
-				}
-				if (isdigit(*token)) {
-					pair->lvalue = atoi(token);
-				} else if (!(dval = value_name_to_value(token, pair->attribute))) {
-					avp_free(pair);
-					snprintf(errbuf, sizeof(errbuf),
-						_("unknown value %s"),
-						token);
-					*errmsg = errbuf;
-					return -1;
-				} else {
-					pair->lvalue = dval->value;
-				}
-				break;
-
-			case TYPE_IPADDR:
-				if (pair->attribute != DA_FRAMED_IP_ADDRESS) {
-					pair->lvalue = get_ipaddr(token);
-					break;
-				}
-
-				/*
-				 * We allow a "+" at the end to	indicate that
-				 * we should add the portno. to the IP address.
-				 */
-				x = 0;
-				if (token[0]) {
-					for(s = token; s[1]; s++)
-						;
-					if (*s == '+') {
-						*s = 0;
-						x = 1;
-					}
-				}
-				pair->lvalue = get_ipaddr(token);
-
-				/*
-				 *	Add an extra (hidden) attribute.
-				 */
-				pair2 = avp_alloc();
-				
-				pair2->name = "Add-Port-To-IP-Address";
-				pair2->attribute = DA_ADD_PORT_TO_IP_ADDRESS;
-				pair2->type = TYPE_INTEGER;
-				pair2->lvalue = x;
-				pair2->next = pair;
-				pair = pair2;
-				break;
-
-			case TYPE_DATE:
-				timeval = time(NULL);
-				tm = localtime(&timeval);
-				if (user_gettime(token, tm)) {
-					snprintf(errbuf, sizeof(errbuf),
-						_("%s: error parsing date %s"),
-						attr->name, token);	
-					goto error;
-				}
-#ifdef TIMELOCAL
-				pair->lvalue = (UINT4)timelocal(tm);
-#else /* TIMELOCAL */
-				pair->lvalue = (UINT4)mktime(tm);
-#endif /* TIMELOCAL */
-				break;
-
-			default:
-				snprintf(errbuf, sizeof(errbuf),
-					_("unknown attribute type %d"),
-					pair->type);
-			error:
-				*errmsg = errbuf;
-				avp_free(pair);
-				return -1;
-			}
-			avl_add_list(first_pair, pair);
-			state = PS_END;
-			break;
+                        pair = install_pair0("<stdin>", 0, attr->name,
+                                             op, token);
+                        if (!pair) {
+                                snprintf(errbuf, sizeof(errbuf),
+                                         _("install_pair0 failed on %s"),
+                                         attr->name);
+                                return -1;
+                        }
+                        avl_merge(first_pair, &pair);
+			avl_free(pair);
+                        state = PS_END;
+                        break;
 			
 		case PS_END:
 			if (token[0] != ',' && token[0] != '\n') {
