@@ -85,6 +85,12 @@ static char *compile_flag_str[] = {
 #if defined(USE_PAM)
 	"USE_PAM",
 #endif
+#if defined(USE_SECURID)
+	"USE_SECURID",
+#endif
+#if defined(USE_SECURID_LEGACY)
+	"USE_SECURID_LEGACY",
+#endif
 #if defined(USE_DBM)
 # if USE_DBM == DBM_DBM	
 	"USE_DBM=DBM",
@@ -100,6 +106,9 @@ static char *compile_flag_str[] = {
 #endif	
 #ifdef USE_SQL_ODBC
 	"USE_SQL_ODBC",
+#endif	
+#ifdef USE_SQL_SYBASE
+	"USE_SQL_SYBASE",
 #endif	
 #if defined(USE_SNMP)
 	"USE_SNMP",

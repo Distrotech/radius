@@ -12,7 +12,7 @@
 AC_REVISION($Revision$)
 AC_INIT(radiusd/radiusd.c)
 AC_CANONICAL_SYSTEM
-AM_INIT_AUTOMAKE(gnu-radius, 0.96.3)
+AM_INIT_AUTOMAKE(gnu-radius, 0.96.4)
 AM_CONFIG_HEADER(config.h)
 
 ## * Available linguas
@@ -318,6 +318,54 @@ if test x$USE_PAM = xyes; then
 		  exit 1])
 fi
 
+## **************
+## SecurID support
+## **************
+	
+AC_ARG_ENABLE(securid,
+	[  --enable-securid		         (EXPERIMENTAL) enable securid support],
+	[case $enableval in
+		yes)		USE_SECURID=yes; AC_DEFINE(USE_SECURID);;
+		no)		;;
+		*)		AC_MSG_ERROR(--enable-securid can't be used with an argument)
+				exit 1;;
+	esac])
+
+if test x$USE_SECURID = xyes; then
+	HAVE_ACECLNT=no
+	HAVE_SDICLIENT=no
+	AC_CHECK_LIB(aceclnt, SD_Init,
+			[ AC_DEFINE(HAVE_LIBSECURID)
+			HAVE_ACECLNT=yes
+			HAVE_ACE=yes
+               	  	RADIUSD_LDADD="$RADIUSD_LDADD -laceclnt" ])
+
+	if test x$HAVE_ACECLNT = xno; then
+		save_LIBS=$LIBS
+		LIBS="-lsdiclient $LIBS"
+		AC_TRY_RUN([char configure; tst(){creadcfg();}main(){exit(0);}],
+			   [ HAVE_SDICLIENT=yes
+			   HAVE_ACE=yes
+			   AC_DEFINE(USE_SECURID_LEGACY)
+               	  	   RADIUSD_LDADD="$RADIUSD_LDADD -lsdiclient"],
+			   [ AC_MSG_ERROR(can't find aceclnt or sdiclient libraries - have you linked sdiclient.a to libsdiclient.a)],
+			   [ HAVE_SDICLIENT=yes
+			   AC_DEFINE(USE_SECURID_LEGACY)
+               	  	   RADIUSD_LDADD="$RADIUSD_LDADD -lsdiclient"])
+		LIBS=$save_LIBS
+	fi
+	if test x$HAVE_ACECLNT = xyes; then
+		AC_TRY_CPP(acexport.h,,
+				[ AC_MSG_ERROR(can't find header acexport.h)
+				exit 0] )
+	fi
+	if test x$HAVE_SDICLIENT = xyes; then
+		AC_TRY_CPP(sdi_athd.h,,
+				[ AC_MSG_ERROR(can't find header sdi_athd.h)
+				exit 0] )
+	fi
+fi
+	
 
 ## **************
 ## DBM 
@@ -397,6 +445,20 @@ AC_ARG_WITH(postgres,
 	 no)    ;;
         esac])
 
+AC_ARG_WITH(sybase,
+        [  --with-sybase       (EXPERIMENTAL) Configure to work with Sybase],
+	[case $withval in
+	 yes)	rad_CHECK_LIB(ct, ct_init, [-lcs -ltcl -lcomn],
+			    [ USE_SQL=1
+                              AC_DEFINE(USE_SQL_SYBASE)
+                              AC_DEFINE(HAVE_LIBSYBASE) 
+                              RADIUSD_LDADD="$RADIUSD_LDADD $rad_cv_lib_ct" ],
+		            [ AC_MSG_ERROR(-lct not found) ],
+                            [/usr/sybase/lib])
+		;;
+	 no)    ;;
+        esac])
+
 rad_lib_odbc() {
 rad_CHECK_LIB(odbc, SQLAllocHandle, [],
 			    [ USE_SQL=1
@@ -419,7 +481,7 @@ rad_CHECK_LIB(iodbc, SQLAllocHandle, [],
 
 
 AC_ARG_WITH(odbc,
-	[  --with-odbc][[={odbc|iodbc}]][      Configure to work with ODBC (EXPERIMENTAL)],
+	[  --with-odbc][[={odbc|iodbc}]][      Configure to work with ODBC],
 	[case $withval in
 	 yes)			rad_lib_odbc
 		;;

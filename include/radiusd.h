@@ -239,6 +239,7 @@ extern UINT4 expiration_seconds;
 extern UINT4 warning_seconds;
 extern int radius_pid;
 extern int use_dbm;
+extern int ace_client_ip;
 extern UINT4 myip;
 extern UINT4 warning_seconds;
 extern int auth_port;
@@ -320,6 +321,12 @@ void version();
 #ifdef USE_PAM
 int pam_pass(char *name, char *passwd, const char *pamauth, char **reply_msg);
 # define PAM_DEFAULT_TYPE    "radius"
+#endif
+
+/* securid.c */
+#ifdef USE_SECURID
+int securid_pass(char *name, char *passcode, char **reply_msg,
+		 RADIUS_REQ *radreq);
 #endif
 
 /* proxy.c */

@@ -33,6 +33,7 @@ struct conf_tok {
 %%
 acct, T_ACCT
 acct-dir, T_ACCT_DIR
+aceclientip, T_ACECLIENTIP
 acl, T_ACL
 alert, T_SEVERITY, _Y(L_ALERT)
 allow, T_ALLOW,

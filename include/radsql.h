@@ -19,7 +19,8 @@
 #define SQLT_MYSQL    1
 #define SQLT_POSTGRES 2
 #define SQLT_ODBC     3
-#define SQLT_MAX      4
+#define SQLT_SYBASE   4
+#define SQLT_MAX      5
 
 #ifdef USE_SQL
 
@@ -115,6 +116,11 @@ extern SQL_DISPATCH_TAB postgres_dispatch_tab[];
 extern SQL_DISPATCH_TAB odbc_dispatch_tab[];
 #else
 #define odbc_dispatch_tab NULL
+#endif
+#ifdef USE_SQL_SYBASE
+extern SQL_DISPATCH_TAB sybase_dispatch_tab[];
+#else
+#define sybase_dispatch_tab NULL
 #endif
 
 #else

@@ -340,6 +340,19 @@ rad_check_password(radreq, check_item, namepair, user_msg, userpass)
 #endif
 		break;
 
+	case DV_AUTH_TYPE_SECURID:
+#ifdef USE_SECURID
+		debug(1, ("  auth: SecurID"));
+		if (securid_pass(name, userpass, user_msg, radreq) != 0)
+			result = AUTH_FAIL;
+#else
+		radlog(L_ERR,
+		       _("%s: SecurID authentication not available"),
+		       name);
+		result = AUTH_NOUSER;
+#endif
+		break;
+
 	case DV_AUTH_TYPE_CRYPT_LOCAL:
 		debug(1, ("  auth: Crypt"));
 		if (real_password == NULL) {
@@ -462,10 +475,14 @@ rad_auth_init(radreq, activefd)
 	 * See if the user has access to this huntgroup.
 	 */
 	if (!huntgroup_access(radreq)) {
+		VALUE_PAIR *reply = NULL;
+
 		radlog(L_NOTICE, _("No huntgroup access: [%s] (from nas %s)"),
 			namepair->strvalue, nas_request_to_name(radreq));
+	        avl_move_attr(&reply, &radreq->request, DA_PROXY_STATE);
 		rad_send_reply(RT_AUTHENTICATION_REJECT, radreq,
-			       radreq->request, NULL, activefd);
+			       reply, NULL, activefd);
+		avl_free(reply);
 		return -1;
 	}
 
@@ -862,8 +879,7 @@ sfn_init(m)
 		/* Send reject packet with proxy-pairs as a reply */
 		newstate(as_reject);
 		avl_free(m->user_reply);
-		m->user_reply = m->proxy_pairs;
-		m->proxy_pairs = NULL;
+		m->user_reply = NULL;
 	}
 }
 
@@ -943,7 +959,6 @@ sfn_validate(m)
 	RADIUS_REQ *radreq = m->req;
 	int rc;
 	
-	avl_move_attr(&m->user_reply, &m->proxy_pairs, DA_PROXY_STATE);
 	rc = rad_check_password(radreq,
 				m->user_check, m->namepair,
 				&m->user_msg,
@@ -1247,6 +1262,7 @@ sfn_ack(m)
 	
 	stat_inc(auth, m->req->ipaddr, num_accepts);
 
+	avl_move_attr(&m->user_reply, &m->proxy_pairs, DA_PROXY_STATE);
 	rad_send_reply(RT_AUTHENTICATION_ACK,
 		       m->req,
 		       m->user_reply,
@@ -1271,6 +1287,7 @@ sfn_reject(m)
 	AUTH_MACH *m;
 {
 	debug(1, ("REJECT: %s", m->namepair->strvalue));
+	avl_move_attr(&m->user_reply, &m->proxy_pairs, DA_PROXY_STATE);
 	rad_send_reply(RT_AUTHENTICATION_REJECT,
 		       m->req,
 		       m->user_reply,

@@ -67,11 +67,15 @@
 
 #undef HAVE_LIBPAM
 
+#undef HAVE_LIBSECURID
+
 #undef HAVE_LIBMYSQL
 
 #undef HAVE_LIBPQ
 
 #undef HAVE_LIBODBC
+
+#undef HAVE_LIBSYBASE
 
 /* Define this to disable shadow support */
 #undef PWD_SHADOW
@@ -101,6 +105,9 @@
 /* Define this to enable ODBC subsystem of SQL support */
 #undef USE_SQL_ODBC
 
+/* Define this to enable Sybase subsystem of SQL support */
+#undef USE_SQL_SYBASE
+
 /* Define this to enable Livingston-compatible menus */
 #undef USE_LIVINGSTON_MENUS
 
@@ -110,6 +117,12 @@
 
 /* Define this to enable PAM support */
 #undef USE_PAM
+
+/* Define this to enable SecurID support */
+#undef USE_SECURID
+
+/* Define this to enable SecurID legacy function support */
+#undef USE_SECURID_LEGACY
 
 /* Define this if you wish the DBM support */
 #undef USE_DBM

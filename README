@@ -48,6 +48,50 @@
     --enable-pam
     	Enable PAM support.
 	
+    --enable-securid
+	Enable SecurID support.  This option automatically detects libaceclnt.a
+	first and then falls back to sdiclient.a.  However, on OS's that
+	require a lib prefix to recognise a library it may be necessary to
+	ln -s sdiclient.a libsdiclient.a before running configure.  In
+	addition it may be necessary to set --with-lib-path and
+	--with-include-path to include the directory containing the Ace
+	client libraries.
+	
+    	SecurID Inc / RSA have a number of versions of the client library:
+	Version prior to 3.x where called sdiclient.a and supported basic
+	synchronous authentication.  Version 3.x and 4.x were shipped with
+	both sdiclient.a and an additional libaceclnt.a library that supported
+	asynchronous (multithreaded) operation.
+	
+	From 5.x onwards the two libaries were combined into a single
+	libaceclnt.a and (on Solaris and maybe others) a shared version called
+	libaceclnt.so.  These versions also supports all version of the
+	Ace/Server from 3.3.1.  The 5.x library can be downloaded for free
+	from RSA's web site. However, access to this may require SecurCare
+	Online to have been purchased.  For 5.02 of the library the file is
+	called Agentsdk_502.zip
+
+	With the release of the asynchronous library it was possible to pass
+	the client IP address so that authentication proxies (such as RADIUS)
+	could have the Ace/Server perform client authorisation for the
+	original client and not the proxy.
+	
+	Unfortunately the asychronous libraries are tricky to work with,
+	requiring threads programming that can be hard to make portable.
+	However, with the introduction of the 5.x client library a new set
+	of sychronous client functions has been added and it is now easy
+	to pass the client ip address to the Ace/Server.
+
+	As a consquence support for passing the client address to the
+	Ace/Server is only available with version 5.x and later of the
+	libraries.
+
+	The code has been tested with 3.3.1 and 5.02 libraries against a
+	4.1 ACE/Server.  However, experience shows that all libraries after
+	2.3 (and possibly earlier) work with ACE/Server 2.3 onwards.  The
+	reverse (where the library is newer than the server) may not be the
+	case except with 5.02 and (presumably) later version.
+
     --enable-dbm[={dbm|ndbm}]
 	Enable dbm support. If no argument is specified, usual DBM is
 	assumed. The `ndbm' argument instructs to enable support of NDBM.
@@ -60,6 +104,14 @@
 	Enable PostgreSQL support. Usually this requires adding appropriate
 	--with-lib-path and --with-include-path options.
 
+    --with-sybase
+	Enable Sybase support. Usually this requires adding appropriate
+	--with-lib-path and --with-include-path options.  Note that with
+	Sybase the SYBASE environment variable must be set appropriately
+	before running the server.  In addition, the name specified in the sql
+	server parameter must have an entry in the interfaces file and the
+	port option is ignored.
+    
     --with-odbc[={odbc|iodbc}]
         Configure to work with ODBC. This is an experimental feature, it
         has not been tested thoroughly.
