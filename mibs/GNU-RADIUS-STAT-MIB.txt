@@ -46,7 +46,7 @@ radiusStatMIB MODULE-IDENTITY
        DESCRIPTION
              "The MIB module for entities implementing the statistics
               agent of GNU Radius project."
-       REVISION "$Revision$"
+       REVISION "0000320010Z"
        DESCRIPTION "Experimental Version"
        ::= { radiusStatistics 1 }
 
