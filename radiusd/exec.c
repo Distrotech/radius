@@ -203,6 +203,7 @@ radius_exec_program(cmd, req, reply, exec_wait, user_msg)
 
 	if (vp) {
 		avl_merge(reply, &vp);
+		avl_free(vp);
 	}
 
 	
