@@ -1,3 +1,12 @@
+2002-06-05  Sergey Poznyakoff  
+
+	* TODO: Updated. Lots of entries were already implemented in 1.0,
+	  others were of no interest to 0.96 series.
+	* mibs/GNU-RADIUS-SERVER-MIB.txt: Fixed REVISION syntax.
+	* mibs/GNU-RADIUS-SERVER-MIB.txt: Likewise.
+	* raddb/client.conf: Synchronized with raddb/clients
+	* radiusd/version.c: Removed irrelevant definitions.
+
 2002-05-30  Sergey Poznyakoff 
 
 	Tagged alpha_0_96_3
