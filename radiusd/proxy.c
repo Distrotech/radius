@@ -155,7 +155,6 @@ random_vector(vector)
 	int	randno;
 	int	i;
 
-	srand(time(0) + getpid());
 	for(i = 0;i < AUTH_VECTOR_LEN;) {
 		randno = rand();
 		memcpy(vector, &randno, sizeof(int));
