@@ -1,3 +1,28 @@
+2002-03-19  Sergey Poznyakoff  
+
+	Synchronized with bugfixes in the main trunc. Files affected:
+	
+	* doc/texinfo/auth.texi,
+	* doc/texinfo/configure.texi,
+	* doc/texinfo/radwho.texi,
+	* m4/guile.m4,
+	* raddb/Makefile.am,
+	* radiusd/auth.c,
+	* radiusd/config.y,
+	* radiusd/files.c,
+	* radiusd/proxy.c,
+	* radiusd/stat.c,
+	* radlib/client.c.
+	
+	* radiusd/radiusd.c: Call srand() early.
+	* configure.in: define lisp_LISP only if emacs was found
+	  on the system.
+	* elisp/Makefile.am: Install elisp files only if emacs
+	  is present on the system (bug reported by Andrey Lakhno
+	  <land@dnepr.net>).
+	
+	* NEWS: Updated
+	
 2002-01-05 Sergey Poznyakoff
 	
 	* db/db.m4: Use ENUM_T instead of enum.
