@@ -201,6 +201,7 @@ void snmp_req_drop(int type, SNMP_REQ *req, char *status_str);
 #define AUTH_FAIL    1 /* Password fail */
 #define AUTH_NOUSER  2 /* No such user  */
 #define AUTH_REJECT  3 /* Rejected */
+#define AUTH_IGNORE  4 /* Ignored */
 
 /* Logging modes */
 #define RLOG_AUTH               0x0001
