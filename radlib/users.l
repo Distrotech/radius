@@ -453,6 +453,8 @@ done_lex()
 	yy_delete_buffer(yy_current_buffer); 
 #endif
 	yyin = NULL;
+	source_filename = "";
+	source_line_num = 0;
 }
 
 /* A rudimentary attempt to synchronize input after an error.
