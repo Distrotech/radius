@@ -120,7 +120,7 @@ realm-quota, T_MESGDEF, _Y(MSG_REALM_QUOTA)
 multiple-login, T_MESGDEF, _Y(MSG_MULTIPLE_LOGIN)
 second-login, T_MESGDEF, _Y(MSG_SECOND_LOGIN)
 timespan-violation, T_MESGDEF, _Y(MSG_TIMESPAN_VIOLATION)
-compare-atribute-flag, T_COMPARE_ATTRIBUTE_FLAG
+compare-attribute-flag, T_COMPARE_ATTRIBUTE_FLAG
 %%
 
 int
