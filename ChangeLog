@@ -1,3 +1,33 @@
+2002-07-09  Sergey Poznyakoff 
+
+	* include/radius.h: Replaced install_pair() declaration
+	  with install_pair0().
+	* radiusd/radutil.c (attr_to_str): Use install_pair0.
+	* radiusd/sql.c (rad_sql_retrieve_pairs): Likewise.
+	* radtest/gram.y: Likewise.
+	* radlib/users.l (done_lex): Re-initialize source_filename and
+	  source_line_num to the safe values.
+	* radlib/users.y (install_pair): Made static. Interface to
+	  install_pair0.
+	  (install_pair0): New function. Old version was apt to coredump
+	  on dereferencing source_filename which was set only when called
+	  from users.y:yyparse. Noted by Doug Shubert <doug@accessgate.net>.
+	
+	* raddb/dictionary: Added new Auth-Type = Ignore. It means
+	  ignore the request silently (no reply is sent to the NAS).
+	* include/radiusd.h (AUTH_IGNORE): New define.
+	* radiusd/auth.c: Support for Auth-Type = Ignore.
+	
+2002-07-05  Sergey Poznyakoff 
+
+	* radiusd/auth.c (sfn_validate): Synchronized with the
+	  main trunc.
+
+2002-07-05  Sergey Poznyakoff 
+
+	* radiusd/acct.c (rad_accounting): Bugfix. The reply value
+	  was not used. Thanks to Michael Samuel.
+
 2002-07-02  Sergey Poznyakoff 
 
 	* radiusd/radius.c (radrecv): Add NAS-IP-Address to the packet
@@ -23,6 +53,10 @@
 	* radlib/avl.c: (avl_find_n, avl_delete_n): New functions.  
 	* include/radius.h (avl_find_n, avl_delete_n): New functions.  
 	* mibs/GNU-RADIUS-STAT-MIB.txt: Fixed revision syntax
+
+2002-06-05  Sergey Poznyakoff
+
+	-= Version 0.96.3 released =-
 	
 2002-06-05  Sergey Poznyakoff  
 
