@@ -622,7 +622,7 @@ rad_accounting(radreq, activefd)
 		write_detail(radreq, auth, "detail");
 		avl_move_attr(&reply, &radreq->request, DA_PROXY_STATE); 
 		rad_send_reply(RT_ASCEND_EVENT_RESPONSE,
-			       radreq, NULL, NULL, activefd);
+			       radreq, reply, NULL, activefd);
 		avl_move_attr(&radreq->request, &reply, DA_PROXY_STATE);
 		stat_inc(acct, radreq->ipaddr, num_resp);
 		return 0;
@@ -635,7 +635,7 @@ rad_accounting(radreq, activefd)
 		VALUE_PAIR *reply = NULL;
 		avl_move_attr(&reply, &radreq->request, DA_PROXY_STATE);
 		rad_send_reply(RT_ACCOUNTING_RESPONSE,
-			       radreq, NULL, NULL, activefd);
+			       radreq, reply, NULL, activefd);
 		avl_move_attr(&radreq->request, &reply, DA_PROXY_STATE);
 		stat_inc(acct, radreq->ipaddr, num_resp);
 		return 0;
