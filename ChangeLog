@@ -1,5 +1,9 @@
 2002-05-30  Sergey Poznyakoff 
 
+	Tagged alpha_0_96_3
+
+2002-05-30  Sergey Poznyakoff 
+
 	* config.sub: removed.
 	* README: Fixed typo.
 	* include/radius.h (DICT_ATTR): Added attr_parser_fp member.
