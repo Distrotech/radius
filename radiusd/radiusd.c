@@ -66,17 +66,17 @@ typedef struct request {
 
 void rad_req_free(RADIUS_REQ *req);
 void rad_req_drop(int type, RADIUS_REQ *ptr, char *status_str);
-int radreq_cmp(RADIUS_REQ *a, RADIUS_REQ *b);
+int rad_req_cmp(RADIUS_REQ *a, RADIUS_REQ *b);
 
 struct request_class request_class[] = {
 	{ "AUTH", 0, MAX_REQUEST_TIME, CLEANUP_DELAY, 1,
-	  rad_authenticate, NULL, radreq_cmp, rad_req_free,
+	  rad_authenticate, NULL, rad_req_cmp, rad_req_free,
 	  rad_req_drop, rad_sql_setup, rad_sql_cleanup },
 	{ "ACCT", 0, MAX_REQUEST_TIME, CLEANUP_DELAY, 1,
-	  rad_accounting, rad_acct_xmit, radreq_cmp, rad_req_free,
+	  rad_accounting, rad_acct_xmit, rad_req_cmp, rad_req_free,
 	  rad_req_drop, rad_sql_setup, rad_sql_cleanup },
 	{ "PROXY",0, MAX_REQUEST_TIME, CLEANUP_DELAY, 0,
-	  rad_proxy, NULL, radreq_cmp, rad_req_free,
+	  rad_proxy, NULL, rad_req_cmp, rad_req_free,
 	  rad_req_drop, NULL, NULL },
 #ifdef USE_SNMP
 	{ "SNMP", 0, MAX_REQUEST_TIME, 0, 1,
@@ -149,6 +149,7 @@ int        log_mode;
 static int foreground; /* Stay in the foreground */
 static int spawn_flag; 
 int use_dbm = 0;
+int ace_client_ip = 0;
 int open_acct = 1;
 int auth_detail = 0;
 int acct_detail = 1;      
@@ -1436,13 +1437,61 @@ stat_request_list(stat)
 }
 
 /* ************************************************************************* */
+#define REQ_CMP_ID            0x01
+#define REQ_CMP_AUTHENTICATOR 0x02
+#define REQ_CMP_CONTENTS      0x03
+
 int
-radreq_cmp(a, b)
-	RADIUS_REQ *a, *b;
+rad_req_cmp(a, b)
+        RADIUS_REQ *a, *b;
 {
-	return !(a->ipaddr == b->ipaddr &&
-		 a->id == b->id &&
-			memcmp(a->vector, b->vector, sizeof(a->vector)) == 0);
+	NAS *nas;
+	int cmp = 0;
+
+	/* The two requests are surely different if they come from
+	   different NASes or are of different types */
+	if (a->ipaddr != b->ipaddr || a->code != b->code)
+		return 1;
+
+	/* Default comparison method: compared request IDs and
+	   authenticators */
+	cmp = REQ_CMP_ID|REQ_CMP_AUTHENTICATOR;
+	
+	/* Modify comparison method. For security reasons, only accounting
+	   requests are configurable */
+	switch (a->code) {
+	case RT_ACCOUNTING_REQUEST:
+		nas = nas_request_to_nas(a);
+		if (nas) {
+			int n = 0;
+			if (envar_lookup_int(nas->args, "cmppairs", 0))
+				n |= REQ_CMP_CONTENTS;
+			if (envar_lookup_int(nas->args, "cmpid", 0))
+				n |= REQ_CMP_ID;
+			if (envar_lookup_int(nas->args, "cmpauth", 0))
+				n |= REQ_CMP_AUTHENTICATOR;
+
+			if (n)
+				cmp = n;
+		}
+		break;
+	default:
+		/* Use the default cmp */
+	}
+
+	/* Finally compare the requests */
+	
+	if ((cmp & REQ_CMP_ID) && a->id != b->id)
+		return 1;
+
+	if ((cmp & REQ_CMP_AUTHENTICATOR)
+	    && memcmp(a->vector, b->vector, sizeof(a->vector)))
+		return 1;
+
+	if ((cmp & REQ_CMP_CONTENTS) && avl_cmp(a->request, b->request))
+		return 1;
+
+	return 0;
 }
 
 void
