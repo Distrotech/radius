@@ -3,13 +3,13 @@ Changes in Radius 0.96.2
 This release fixes some bugs found in 0.96. These are:
 
  1. Malfunction of the daemon if the total number of reported ports
-    grew beyond STAT_MAX_PORT_COUNT (default 1024).
+    grows beyond STAT_MAX_PORT_COUNT (default 1024).
  2. Inconsistencies in Postgres part of db/ scripts.
  3. Typo in raddb/Makefile.am which prevented menus subdirectory
     from being installed.
  4. Typos in raddb/config.y (acct_def production) which caused
     spawn, ttl, max-requests and request-cleanup-delay statements
-    to affect authentication settings, instead of accounting.
+    to affect authentication settings, instead of accounting ones.
  5. Client sub-package has been extended to send accounting
     packets as well.
  6. Fixed bug that caused install to attempt installing *.el? files
@@ -24,6 +24,8 @@ work with non-gnu versions of sed.
 
 The install procedure no longer overwrites the existing dictionaries.
 
+
+=============================================================================
 Changes in Radius 0.96
 
 ** The format of raddb/config has changed a little.
@@ -81,7 +83,7 @@ defaults to %u, i.e. user name.
 ** raddb/naslist:
 
 The word DEFAULT may be used in the first column to match any
-NAS, not explicitely defined in the file. E.g.:
+NAS, not explicitly defined in the file. E.g.:
 
 # NAS Name		Short Name	Type		  Flags
 #----------------	----------	----		---------------
@@ -95,7 +97,7 @@ are they reflected in SNMP variables.
 The realm is matched when the user did not specify any explicit realm
 with his username.
 
-** raddb/realms: Both authentication and accouting ports can be
+** raddb/realms: Both authentication and accounting ports can be
 specified.
 
 The syntax is: servername[:auth-port[:acct-port]] (brackets mark
@@ -173,7 +175,7 @@ using the following special reply-pairs:
 1. Scheme-Procedure. 
 This attribute can be used in reply-pairs of raddb/users entry.
 Its value is the name of Guile function to be called on
-authentication. The function defininition should look like:
+authentication. The function definition should look like:
 
 (define (auth-function-name request-list check-list reply-list)
   ...
