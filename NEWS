@@ -12,7 +12,7 @@ Changes in Radius 0.96.4
 4. Added new Auth-Type value Ignore. It causes the incoming request
    to be dropped.
 
-5. Request comparison has been made comparable.
+5. Request comparison has been made configurable.
 
 6. Fixed bug in formatting A/V pairs for detailed logging which
    caused radiusd to dump core upon receiving certain vendor-specific
