@@ -49,7 +49,20 @@ session start, session stop or changing some parameters during the
 session. It can also notify the server about other events, such as @NAS{}
 shutdown or startup. This is called @dfn{accounting} and the radius server
 responsible for processing this information is called an @dfn{accounting
-server}. 
+server}. The responses to accounting requests do not carry any attributes.
+
+The radius server may fail to receive some incoming requests or may
+fail to process them due to high server load. In order to prevent
+such requests from being lost, the @NAS{} retransmits the request
+if no response from the server is received within a
+predefined interval of time (a @dfn{timeout} interval). Usually the
+@NAS{} is configured in such a way that it continues retransmitting
+failed requests until either it receives a reply from the server
+or a predefined number of @dfn{retries} expires, whichever occurs first.
+Furthermore, the @NAS{} may be configured to communicate with a set
+of @dfn{backup} radius servers. In this case it applies the described
+process to each server from the set, until some of them responds or
+the set is exhausted.
 
 @menu
 * Attributes::                  Attributes.
@@ -102,14 +115,14 @@ Each attribute has a set of properties associated with it. The
 properties are:
 
 @table @dfn
-@item usage flags
+@item Usage flags
 These flags determine usage of the attribute in configuration
 files @file{huntgroups}, @file{hints} and @file{users}.
-@item propagation
+@item Propagation
 When a radius server functions in proxy mode, it uses the @dfn{propagation}
 bit to determine which attributes from the reply packet should be passed
 back to the requesting @NAS{} (@pxref{Proxy Service}).
-@item additivity
+@item Additivity
 Some configuration rules may cause addition of new @AVP{}s to the
 incoming request. Before addition of a new pair, @command{radiusd}
 scans the request to see if it already contains a pair with the same
@@ -125,6 +138,9 @@ that of the new pair.
 @item Append
 The new pair is appended to the end of the pair list.
 @end table
+@item User-defined flags
+These can be used to mark those attributes that can be used in comparing
+two incoming request (@pxref{Checking Duplicates}). 
 @end table
 
 The attributes are declared in @file{raddb/dictionary} file. For a
@@ -420,11 +436,61 @@ This step applies only to authentication requests.
 @end table
 
 @menu
+* Checking Duplicates::
 * Proxying::      
 * Hints::
 * Huntgroups::
 * User Profiles::
 @end menu
+
+@comment **L3***************************************************************
+@node Checking Duplicates
+@subsection Checking for Duplicate Requests
+@cindex duplicate requests, checking
+
+As described above (@pxref{Operation}), a @NAS{} may decide
+to retransmit the request under a certain circumstances. Whereas this
+behaviour makes sure no requests are lost, it has its upshots. For
+example, consider the following scenario:
+
+@enumerate
+@item @NAS{} sends a request to the server.
+@item The server processes it and sends back the reply.
+@item The reply is lost due to network outage or the load average of the
+@NAS{} was too high and it dropped the response.
+@item The @NAS{} retransmits the request.
+@end enumerate
+
+Thus the server will receive and process the same request twice. It
+possibly won't do any harm if the request in question was an
+authentication one, but for accounting requests this will lead to
+duplicate accounting. In order to avoid such undesirable effects,
+@command{radiusd} tries to determine if it received a duplicate
+request prior to processing it. In order to do so, @command{radiusd}
+keeps a queue of received requests. When it receives an incoming request
+it first scans the request queue to see if the request is a duplicate
+of an already received one. If so, it drops the request. Otherwise
+it inserts the request into the queue and starts processing it. After
+the request is completed it will still reside in the queue for a
+preconfigured interval of time (@xref{auth}, parameter
+@code{request-cleanup-delay}).
+
+By default, @command{radiusd} considers two requests to be equal
+if the following conditions are met:
+
+@enumerate
+@item Both requests come from the same @NAS{}.
+@item They are of the same type.
+@item The request identifier is the same for both requests.
+@item The request authenticatior is the same for both requests.
+@end enumerate
+
+Additionally, @command{radiusd} may be configured to take into account
+the contents of both requests. This may be necessary since some @NAS{}es
+modify the request authenticator or even request identifier before
+retransmitting the request and so the above described method fails to
+recognize the request as a duplicate. This @dfn{extended comparison} is
+described in detail in @ref{Extended Comparison}.
 
 @comment **L3***************************************************************
 @node Proxying

@@ -2,7 +2,7 @@
 @c Copyright (C) 1999,2000,2001 Sergey Poznyakoff
 @c See file radius.texi for copying conditions.
 @comment *******************************************************************
-@node Authentication, Accounting, Configuration Files, Top
+@node Authentication, Accounting, Request Comparison, Top
 @chapter Authentication
 
 An @dfn{Authentication Type} specifies which credentials the user

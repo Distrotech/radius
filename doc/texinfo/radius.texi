@@ -63,12 +63,19 @@ original English.
 @shorttitlepage GNU Radius Manual
 @end iftex
 @titlepage
-@sp 6
-@center @titlefont{GNU Radius Manual}
-@sp 4
-@center for Radius version @value{VERSION}
-@sp5
-@sp 1
+@title GNU Radius Manual
+@subtitle version @value{VERSION}, @value{UPDATED}
+@author Sergey Poznyakoff
+
+@page
+@vskip 0pt plus 1filll
+Copyright @copyright{} 2001, 2002 Free Software Foundation, Inc.
+
+@sp 2
+Published by the Free Software Foundation, @*
+59 Temple Place - Suite 330, @*
+Boston, MA 02111-1307, USA
+
 Permission is granted to make and distribute verbatim copies of
 this manual provided the copyright notice and this permission notice
 are preserved on all copies.
@@ -86,8 +93,8 @@ except that the sections entitled ``The GNU Manifesto'',
 ``Distribution'' and ``GNU General Public License'' may be included in a
 translation approved by the Free Software Foundation instead of in the
 original English.
-@author Sergey Poznyakoff
 @end titlepage
+@page
 
 @node Top, Distrib, , (dir)
 
@@ -114,6 +121,7 @@ The radius daemon
 * Operation::           How radius operates.
 * Invocation::          How to start the daemon.
 * Configuration Files:: Radius configuration files.
+* Request Comparison::  
 * Authentication::      How the users are authenticated.
 * Accounting::          Accounting methods.
 * Logging::             What gets logged and where.
@@ -574,6 +582,7 @@ Public License instead of this License.
 @include operation.texi
 @include invoke.texi
 @include configure.texi
+@include comp.texi
 @include auth.texi
 @include acct.texi
 @include logging.texi

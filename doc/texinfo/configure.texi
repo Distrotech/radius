@@ -2,7 +2,7 @@
 @c Copyright (C) 1999,2000,2001 Sergey Poznyakoff
 @c See file radius.texi for copying conditions.
 @comment *******************************************************************
-@node Configuration Files, Authentication, Invocation, Top
+@node Configuration Files, Request Comparison, Invocation, Top
 @chapter Radius Configuration Files
 @cindex Radiusd configuration files
 @cindex Configuration files (radiusd)
@@ -362,6 +362,7 @@ auth @{
         [ strip-names @var{bool} ; ]
         [ checkrad-assume-logged @var{bool} ; ]
         [ password-expire-warning @var{number} ; ]
+        [ compare-attribute-flag @var{character} ; ]
 @} ;
 @end example
 
@@ -369,7 +370,7 @@ auth @{
 The @code{auth} statement configures the parameters of the authentication
 service.
 
-@subheading listen statement
+@subheading @code{listen} statement
 
 This statement determines on which addresses radiusd will listen for incoming
 authentication requests. Its argument is a comma-separated list of items
@@ -432,6 +433,17 @@ Otherwise @command{radiusd} assumes the user @emph{is not} logged in.
 
 @end table
 
+@subheading Character statement
+
+@table @code
+@item compare-attribute-flag
+The argument to this statement is a character from @samp{1} through
+@samp{9}. This statement modifies the request comparison method for
+authentication requests. @xref{Extended Comparison}, for a detailed
+description of its usage.
+
+@end table
+
 @comment **L3***************************************************************
 @node acct
 @subsection @code{acct} statement
@@ -456,6 +468,7 @@ acct @{
         [ max-requests @var{number} ; ]
         [ time-to-live @var{number} ; ]
         [ request-cleanup-delay @var{number} ; ]
+        [ compare-attribute-flag @var{character} ; ]
 @} ;
 @end example
 
@@ -506,6 +519,17 @@ Determines if @command{radiusd} should spawn a child to process the request.
 @item detail
 When set to @code{false}, disables detailed accounting
 (@pxref{Detailed Request Accounting}). 
+@end table
+
+@subheading Character statement
+
+@table @code
+@item compare-attribute-flag
+The argument to this statement is a character from @samp{1} through
+@samp{9}. This statement modifies the request comparison method for
+accounting requests. @xref{Extended Comparison}, for a detailed
+description of its usage.
+
 @end table
 
 @comment **L3***************************************************************
@@ -966,6 +990,8 @@ Additivity = None
 @item
 The presence of letter @samp{P} in property flags raises the propagation
 bit.
+@item
+The characters from @samp{1} to @samp{9} denote nine user-defined flags.
 @end enumerate
 
 @subheading Example
@@ -1102,10 +1128,23 @@ method specified by @sc{rfc 2865}. However some @NAS{}es, most notably
 @sc{max a}scend series, implement a broken method of encoding long
 passwords. This flag instructs @command{radiusd} to use broken method
 of password encryption for the given @NAS{}.
+@item compare-auth-flag=@var{flag}
+Instructs radius to use attributes marked with a given user-defined flag
+when comparing authentication requests. It overrides
+@code{compare-atribute-flag} (@pxref{auth}) for this particular @NAS{}.
+@xref{Extended Comparison}, for a detailed description of its usage.
+@item compare-acct-flag=@var{flag}
+Instructs radius to use attributes marked with a given user-defined flag
+when comparing accounting requests. It overrides
+@code{compare-atribute-flag} (@pxref{acct}) for this particular @NAS{}.
+@xref{Extended Comparison}, for a detailed description of its usage.
 @end table
 
-For the list of nas-querying arguments,
-@xref{nastypes file,,Full list of allowed arguments}.
+@xref{Checking Duplicates}, for general description of request
+comparison methods.
+
+For the list of nas-querying arguments, see
+@ref{nastypes file,,Full list of allowed arguments}.
 
 @menu
 * Example: naslist example.     Example of @file{naslist} file.

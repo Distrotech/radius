@@ -15,7 +15,8 @@
 	* radiusd/config.kw (compare-attribute-flag): Was misspelled.
 	* radiusd/radiusd.c: Allow compare-.*-flag from naslist to
 	  override compare-attribute-flag.
-
+	* raduse/Makefile.am: Removed -lcurses
+	
 2002-08-14  Sergey Poznyakoff  
 
 	Sync with the main trunc.
