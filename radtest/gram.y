@@ -253,7 +253,8 @@ pair_list     : pair
 
 pair          : NAME op string
                 {
-                        $$ = install_pair($1, $2, $3);
+                        $$ = install_pair0(source_filename, source_line_num,
+                                           $1, $2, $3);
 			free_string($3);
                 }
               ;
