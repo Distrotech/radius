@@ -1,6 +1,7 @@
 2002-03-20  Sergey Poznyakoff
 
 	* raddb/Makefile.am: Do not overwrite existing dictionaries.
+	* raduse/raduse.c: Fixed possible null pointer dereference.
 	* NEWS: Updated.
 	
 2002-03-19  Sergey Poznyakoff

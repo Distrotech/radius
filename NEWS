@@ -22,6 +22,8 @@ surrounding whitespace (as in Session-Timeout=10).
 The detection of Guile version in configure script was improved to
 work with non-gnu versions of sed.
 
+The install procedure no longer overwrites the existing dictionaries.
+
 Changes in Radius 0.96
 
 ** The format of raddb/config has changed a little.
