@@ -235,8 +235,18 @@ install_pair(name, op, valstr)
 				return NULL;
 			}
 		}
+
 		pair->strvalue = make_string(valstr);
 		pair->strlength = strlen(pair->strvalue);
+
+		if (attr->parser && attr->parser(pair, &s)) {
+			radlog(L_ERR, "%s:%d: attribute %s: %s",
+			       source_filename, source_line_num,
+			       pair->name, s);
+			free(s);
+			avp_free(pair);
+			return NULL;
+		}
 		break;
 
 	case TYPE_INTEGER:
@@ -371,3 +381,4 @@ enable_usr_dbg(val)
 	    source_filename, source_line_num);
 #endif
 }
+
