@@ -817,7 +817,8 @@ used in matching rules.
 VALUE      Auth-Type         Local                0       
 VALUE      Auth-Type         System               1       
 VALUE      Auth-Type         Crypt-Local          3       
-VALUE      Auth-Type         Reject               4       
+VALUE      Auth-Type         Reject               4
+VALUE      Auth-Type         Ignore               5
 VALUE      Auth-Type         SQL                  252     
 VALUE      Auth-Type         Pam                  253     
 VALUE      Auth-Type         Accept               254     
@@ -847,6 +848,9 @@ on the supplied @attr{Password} value and compares both strings.
 
 @item Reject
 Authentication fails.
+
+@item Ignore
+Authentication fails, but no reply is returned to the NAS.
 
 @item Accept
 Authentication succeeds.
