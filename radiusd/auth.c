@@ -198,7 +198,7 @@ unix_pass(name, passwd)
 	 * Forbid logins on passwordless accounts 
 	 */
 	if (encrypted_pass[0] == 0)
-		return 0;
+		return -1;
 
 	/*
 	 * Check encrypted password.
