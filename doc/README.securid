@@ -1,0 +1,22 @@
+When a request is received the queue is checked to determine if this
+is a duplicate request. By default the checks include the authenticator
+field of each request.  Now, it appears that some devices (the Netscreen
+firewall appliance for example) resend the request with a different
+authenticator (but the same ID).
+
+The problem is that SecurID, by design, inserts a 1 second delay before
+replying to a request.  Unfortunately, the standard RADIUS timeout used
+by a lot of devices (including the Netscreen) is also 1 sec.  The upshot
+is that most authentication requests will retry at least once.
+
+Now, because of the authenticator difference, the second request is not
+detected as a duplicate and passed to the securid backend.
+
+Unfortunately, because this is a duplicate request and the password
+(actually passcode) is the same, the SecurID server detects a duplicate
+login attempt / replay attack.  A couple of retries later (depeding on
+the SecurID setup) and the user's account is toasted!
+
+If you happen to experience this problem, enable extended request
+comparison for authentication requests. See documentation node
+`Extended Comparison' for more information on how to do that.
