@@ -121,7 +121,7 @@ The radius daemon
 * Operation::           How radius operates.
 * Invocation::          How to start the daemon.
 * Configuration Files:: Radius configuration files.
-* Request Comparison::  
+* Request Comparison::  How are duplicate requests dealt with.
 * Authentication::      How the users are authenticated.
 * Accounting::          Accounting methods.
 * Logging::             What gets logged and where.

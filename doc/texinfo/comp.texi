@@ -6,7 +6,7 @@
 @chapter Request Comparison Methods
 
 The basic notions about comparison of the incoming requests and why
-it is necessary were described in @ref{Checking Duplicates}. This
+it is necessary were given in @ref{Checking Duplicates}. This
 chapter concentrates on extended methods of request comparison and
 on the configuration issues.
 
@@ -18,25 +18,24 @@ on the configuration issues.
 @node Extended Comparison
 @section Extended Comparison
 
-The default comparison method may fail to recognise duplicate requests.
-It occurs because some @NAS{}es modify the request authenticator or
-even request identifier before retransmitting the request. If you
+The default comparison method may fail to recognize duplicate requests.
+if the originating @NAS{} has modified the request authenticator or
+request identifier before retransmitting the request. If you
 happen to use such @NAS{}es, you will have to enable @dfn{extended
-request comparison} to compensate for their deficiences.
+request comparison} to compensate for their deficiencies.
 
 The extended request comparison consists in comparing the
 @emph{contents} of both requests. However, blindly comparing
 each @AVP{} from both requests won't work, since many attributes do
 change their values between successive retransmits. Therefore,
 @command{radiusd} uses only @dfn{comparable attribute}, i.e. a
-user-defined subset of such attributes that can safely
-be used in comparison. Thus, extended request comparison works
-as follows
+user-defined subset of such attributes that can safely be used in
+comparison. Thus, extended request comparison works as follows:
 
 @enumerate
 @item The comparable attributes are extracted from each request. They
 form two sorted @dfn{attribute lists}.
-@item If lengths of both requests differ, they are considered different.
+@item If lengths of both lists differ, the requests are considered different.
 @item Otherwise, the value of each @AVP{} from the first list is
 compared against that of the corresponding @AVP{} from the second list.
 If at least one @AVP{} differs, then the requests are considered
@@ -50,7 +49,7 @@ To use the extended comparison, follow the procedure below:
 @item Select user-defined attribute properties.
 
 The syntax of dictionary file allows for nine user-defined properties,
-denoted by characters @samp{1} to @samp{9}. You should select one of
+denoted by characters @samp{1} through @samp{9}. You should select one of
 them to mark comparable attributes for authentication and another one to
 mark those for accounting. @xref{ATTRIBUTE}, for detailed description
 of attribute property flags.
@@ -58,7 +57,7 @@ of attribute property flags.
 @item To enable the extended comparison for requests coming from any
 @NAS{}, declare extended comparison flags in @file{raddb/config}.
 
-To enable the extended comparison for authentication request,
+To enable the extended comparison for authentication requests,
 add to your @code{auth} block the statement
 
 @example
@@ -67,6 +66,9 @@ add to your @code{auth} block the statement
 
 The @var{flag} is the same symbol you used in the dictionary to mark
 comparable attributes for authentication.
+
+To enable the extended comparison for accounting requests, insert 
+@code{compare-attribute-flag} statement into the @code{acct} block.
 
 @item To enable the extended comparison for requests coming from
 selected @NAS{}es, declare extended comparison flags in
@@ -150,20 +152,20 @@ The following attributes can be declared as comparable:
 Notice that this list is by no means an exhaustive one. Depending on
 a particular @NAS{} other attributes may be safe to be used
 in comparisons, or, vice-versa, some attributes from this list may not 
-be used. You should carefully analize paquets coming from your @NAS{}
+be used. You should carefully analyze packets coming from your @NAS{}
 before deciding which attributes to mark as comparable.
 
 @node Request Queue
 @section Fine-Tuning the Request Queue
 @cindex request queue, configuring
 
-As described in @ref{Checking Duplicates}, each request is entered
-into the request queue when @command{radiusd} starts processing it
+As described in @ref{Checking Duplicates}, each request is added
+to the request queue when @command{radiusd} starts processing it
 and is removed from there a certain amount of time after its
 processing was finished. The configuration parameter
 @code{request-cleanup-delay} defines how long each already processed
 request is kept in the queue. Its value must be synchronized with
-your @NAS{} settings.
+the @NAS{} settings.
 
 Each @NAS{} allows to configure two parameters:
  

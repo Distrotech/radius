@@ -462,16 +462,14 @@ example, consider the following scenario:
 @end enumerate
 
 Thus the server will receive and process the same request twice. It
-possibly won't do any harm if the request in question was an
+possibly won't do any harm if the request in question is an
 authentication one, but for accounting requests this will lead to
-duplicate accounting. In order to avoid such undesirable effects,
-@command{radiusd} tries to determine if it received a duplicate
-request prior to processing it. In order to do so, @command{radiusd}
-keeps a queue of received requests. When it receives an incoming request
-it first scans the request queue to see if the request is a duplicate
-of an already received one. If so, it drops the request. Otherwise
-it inserts the request into the queue and starts processing it. After
-the request is completed it will still reside in the queue for a
+duplicate accounting. To avoid such undesirable effects, @command{radiusd}
+keeps a queue of received requests. When an incoming request arrives,
+@command{radiusd} first scans the request queue to see if the request
+is a duplicate of an already received one. If so, it drops the request.
+Otherwise it inserts the request into the queue and starts processing
+it. After the request is completed it will still reside in the queue for a
 preconfigured interval of time (@xref{auth}, parameter
 @code{request-cleanup-delay}).
 
@@ -482,13 +480,13 @@ if the following conditions are met:
 @item Both requests come from the same @NAS{}.
 @item They are of the same type.
 @item The request identifier is the same for both requests.
-@item The request authenticatior is the same for both requests.
+@item The request authenticator is the same for both requests.
 @end enumerate
 
 Additionally, @command{radiusd} may be configured to take into account
 the contents of both requests. This may be necessary since some @NAS{}es
 modify the request authenticator or even request identifier before
-retransmitting the request and so the above described method fails to
+retransmitting the request, so the method described above fails to
 recognize the request as a duplicate. This @dfn{extended comparison} is
 described in detail in @ref{Extended Comparison}.
 
@@ -538,7 +536,7 @@ insert any local site-specific information that might be
 needed. Finally, it passes the reply back to the @NAS{}.
 
 The accounting requests are processed in the similar manner, except that
-no attribute filtering takes place, as the accounting responces do
+no attribute filtering takes place, as the accounting responses do
 not carry any @AVP{}s.
 
 This example illustrates the simplest @dfn{proxy chain}, consisting of

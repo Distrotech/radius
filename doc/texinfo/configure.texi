@@ -86,7 +86,7 @@ These are the basic statements:
 * acct::        Configure accounting service.
 * proxy::       Configure proxy service.
 * usedbm::      Enable the DBM feature.
-* aceclientip:: Enable the DBM feature.
+* aceclientip:: Control the @IP{} of Ace client.
 * snmp::        Configure SNMP service.
 * guile::       Configure Guile interface.
 * message::     Configure server reply messages.
@@ -613,7 +613,7 @@ consequence the Ace/Server will see the @RADIUS{} server as the client.
 
 @item yes
 The @IP{} of the original @NAS{} will be passed to the Ace/Server.
-As a consequence the Ace/Server will see each @NAS{} as a seperate client.
+As a consequence the Ace/Server will see each @NAS{} as a separate client.
 
 @end table
 
@@ -965,7 +965,7 @@ to @file{raddb/users}, the second one corresponds to @file{raddb/hints},
 and the third one corresponds to @file{raddb/huntgroups}. Within each
 pair, the letter @samp{L} in first position means that the attribute
 is allowed in @LHS{} of a rule. The letter @samp{R} in second position
-means that the attribute is allowed in @RHS{} of a rule. The absense of
+means that the attribute is allowed in @RHS{} of a rule. The absence of
 any of these letters is indicated by dash (@samp{-}). Thus, the
 following usage specification:
 
@@ -1131,12 +1131,12 @@ of password encryption for the given @NAS{}.
 @item compare-auth-flag=@var{flag}
 Instructs radius to use attributes marked with a given user-defined flag
 when comparing authentication requests. It overrides
-@code{compare-atribute-flag} (@pxref{auth}) for this particular @NAS{}.
+@code{compare-attribute-flag} (@pxref{auth}) for this particular @NAS{}.
 @xref{Extended Comparison}, for a detailed description of its usage.
 @item compare-acct-flag=@var{flag}
 Instructs radius to use attributes marked with a given user-defined flag
 when comparing accounting requests. It overrides
-@code{compare-atribute-flag} (@pxref{acct}) for this particular @NAS{}.
+@code{compare-attribute-flag} (@pxref{acct}) for this particular @NAS{}.
 @xref{Extended Comparison}, for a detailed description of its usage.
 @end table
 
@@ -1631,7 +1631,7 @@ a combination of @option{--with-mysql}, @option{--with-sybase} and
 @item server @var{string}
 Specifies the hostname or @IP{} of the @sc{sql} server.
 @item port @var{number}
-Sets the @sc{sql} communicaton port number. It can be omitted if your
+Sets the @sc{sql} communication port number. It can be omitted if your
 server uses the default port.
 @item login @var{string}
 Sets the @sc{sql} user login name.
@@ -1899,7 +1899,7 @@ types (@pxref{Accounting Requests}) has a @sc{sql} query associated with
 it. Thus, when radius receives an accounting request, it determines
 the query to use by the value of @attr{Acct-Status-Type} attribute.
 
-Following statemens define the accounting queries:
+Following statements define the accounting queries:
 
 @table @code
 @item acct_start_query @var{string}
@@ -1923,7 +1923,7 @@ Specifies the @sc{sql} query to be used when a @NAS{} sends
 None of these queries should return any values.
 
 @menu
-* Queries::                     Writing SQL acounting query templates.
+* Queries::                     Writing SQL accounting query templates.
 @end menu
 
 @comment ***L4**************************************************************
@@ -2305,7 +2305,7 @@ request pairlist, and to @var{defval} otherwise. For example:
 will return the value of Acct-Session-Time attribute or 0 if it
 doesn't exist in the request pairlist.
 
-The substitition @code{%C@{@var{attr-name}:=@var{defval}@}} is expanded
+The substitution @code{%C@{@var{attr-name}:=@var{defval}@}} is expanded
 to the value of @var{attr-name} attribute. If this attribute is not
 present in the request pairlist, it will be created and assigned the
 value @var{defval}. E.g.:
@@ -2319,9 +2319,9 @@ to the value of @var{attr-name} attribute, if it is present. Otherwise
 the diagnostic message ``@var{attr-name}: @var{message}'' is issued to
 the log error channel, and string ``@var{message}'' is returned.
 
-The substitition @code{%C@{@var{attr-name}:+@var{retval}@}} is expanded
+The substitution @code{%C@{@var{attr-name}:+@var{retval}@}} is expanded
 to empty string if the attribute @var{attr-name} is present in the
-referenced pairlist. Othervise it is expanded to @var{retval}.
+referenced pairlist. Otherwise it is expanded to @var{retval}.
 
 You can also use the following shortcuts:
 
@@ -2346,3 +2346,4 @@ Protocol (SLIP/PPP)
 Speed (Connect-Info attribute)
 @end table
 
+@c  LocalWords:  op

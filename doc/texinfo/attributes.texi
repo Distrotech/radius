@@ -1348,7 +1348,7 @@ accounting.
 
 @defattr{Hint,1040,string,L-,-R,-R,Append,No}
 
-Use @attr{Hint} attribute to specify additional matching criterium
+Use @attr{Hint} attribute to specify additional matching criterion
 depending on the hint (@pxref{hints file}).
 
 Let the @file{hints} contain:
@@ -1614,7 +1614,7 @@ VALUE		Acct-Type		SQL	3
 @end example
 
 The @attr{Acct-Type} allows to control which accounting methods
-must be used for a given user or a group of users. In the absense
+must be used for a given user or a group of users. In the absence
 of this attribute, all currently enabled accounting types are used.
 @xref{Accounting}, for more information about accounting types.
 

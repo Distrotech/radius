@@ -1,8 +1,8 @@
 Changes in Radius 0.96.4
 
 1. The syntax of the "rewrite" language is extended. It 
-   supports adressing multiple attributes in a request and
-   deleting arbitrary atributes.
+   supports addressing multiple attributes in a request and
+   deleting arbitrary attributes.
 
 2. Fixed bug in "rewrite" optimizer, which caused boolean
    short-cuts (|| and &&) to malfunction.

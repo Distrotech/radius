@@ -51,7 +51,7 @@
     --enable-securid
 	Enable SecurID support.  This option automatically detects libaceclnt.a
 	first and then falls back to sdiclient.a.  However, on OS's that
-	require a lib prefix to recognise a library it may be necessary to
+	require a lib prefix to recognize a library it may be necessary to
 	ln -s sdiclient.a libsdiclient.a before running configure.  In
 	addition it may be necessary to set --with-lib-path and
 	--with-include-path to include the directory containing the Ace

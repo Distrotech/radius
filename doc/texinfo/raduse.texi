@@ -6,7 +6,7 @@
 @section Raduse
 @pindex raduse
 
-The @command{raduse} utility shows the usage of dialup lines in the
+The @command{raduse} utility shows the usage of dial-up lines in the
 realtime.
 
 @menu
@@ -27,7 +27,7 @@ of two lines. First line shows the statistic collection uptime and
 current date/time. Second line shows total number of lines, number of
 active lines, number of idle (inactive) lines and load percentage.
 
-The dialup statistics is displayed in the area below. For each dialup
+The dial-up statistics is displayed in the area below. For each dial-up
 line three lines of data are shown.
 
 First line shows the network access server name, port number on that
@@ -89,7 +89,7 @@ The following options modify the behavior of @command{raduse}:
 @item -b
 @itemx --brief
 Start up in brief mode. In this mode only first line of information for
-each dialup line is displayed.
+each dial-up line is displayed.
 @item -d @var{count}
 @itemx --display @var{count}
 Show only count displays, then exit. A display is considered to be one
@@ -100,7 +100,7 @@ Dump the statistics database to the standard output and then
 exit. This is for debugging purposes only.
 @item -I
 @itemx --no-idle-lines
-Do not display idle lines. By default @command{raduse} displays all dialup
+Do not display idle lines. By default @command{raduse} displays all dial-up
 lines.
 @item -i
 @itemx --interactive

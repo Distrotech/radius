@@ -70,7 +70,7 @@ The amount of time a client program waits for the reply from a
 server is configured using @code{timeout} statement:
 
 @example
-timepout @var{number}
+timeout @var{number}
 @end example
 @noindent
 

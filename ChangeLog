@@ -1,3 +1,21 @@
+2002-08-17  Sergey Poznyakoff
+
+	* NEWS: Updated.
+	* README: Updated.
+	* TODO: Updated.
+	* doc/texinfo/acct.texi: Updated.
+	* doc/texinfo/attributes.texi: Updated.
+	* doc/texinfo/auth.texi: Updated.
+	* doc/texinfo/client.texi: Updated.
+	* doc/texinfo/comp.texi: Updated.
+	* doc/texinfo/configure.texi: Updated.
+	* doc/texinfo/extensions.texi: Updated.
+	* doc/texinfo/operation.texi: Updated.
+	* doc/texinfo/radius.texi: Updated.
+	* doc/texinfo/raduse.texi: Updated.
+	* radiusd/auth.c (unix_pass): Bugfix. Was allowing passwordless
+  	  accounts to log in.
+
 2002-08-16  Sergey Poznyakoff
 
 	* doc/README.securid: New file.

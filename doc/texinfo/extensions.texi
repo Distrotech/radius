@@ -791,7 +791,7 @@ delete @var{attribute-name};
 delete @var{attribute-name}(@var{n});
 @end example
 
-The first variant deletes @emph{all} the atributes of the given type.
+The first variant deletes @emph{all} the attributes of the given type.
 The second variant deletes only @var{n}th occurrence of the matching
 attribute.
 
