@@ -1494,8 +1494,7 @@ rad_req_cmp(a, b)
 	    && memcmp(a->vector, b->vector, sizeof(a->vector)) == 0)
 		return 0;
 
-	if (nas = nas_request_to_nas(a))
-		prop = envar_lookup_int(nas->args, "compare-atribute-flag", 0);
+	nas = nas_request_to_nas(a);
 
 	if (!prop) {
 		switch (a->code) {
@@ -1503,13 +1502,18 @@ rad_req_cmp(a, b)
 		case RT_AUTHENTICATION_ACK:
 		case RT_AUTHENTICATION_REJECT:
 		case RT_ACCESS_CHALLENGE:
-			prop = auth_comp_flag;
+			prop = envar_lookup_int(nas ? nas->args : NULL,
+						"compare-auth-flag",
+						auth_comp_flag); 
 			break;
+			
 		case RT_ACCOUNTING_REQUEST:
 		case RT_ACCOUNTING_RESPONSE:
 		case RT_ACCOUNTING_STATUS:
 		case RT_ACCOUNTING_MESSAGE:
-			prop = acct_comp_flag;
+			prop = envar_lookup_int(nas ? nas->args : NULL,
+						"compare-acct-flag",
+						acct_comp_flag); 
 			break;
 		}
 	}
