@@ -11,6 +11,8 @@
 	* radlib/users.y: Likewise.
 	* raddb/dict/ascend: Added Ascend-Call-Filter and
 	  Ascend-Data-Filter attributes.
+	* raddb/dict/ascend.vs: Changed type of Ascend-.*-Filter attributes
+	  to abinary.
 
 	* radlib/util.c (format_string_visual): Bugfix. Characters > 128
 	  were printed incorrectly.
