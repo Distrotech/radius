@@ -474,6 +474,12 @@ radrecv(host, udp_port, buffer, length)
 		ptr += attrlen;
 		length -= attrlen;
 	}
+	if (!avl_find(first_pair, DA_NAS_IP_ADDRESS)) {
+	        pair =  avp_create(DA_NAS_IP_ADDRESS,
+                                   0, NULL,
+                                   host);
+		avl_add_pair(&first_pair, pair);
+	}
 	radreq->request = first_pair;
 	return(radreq);
 }

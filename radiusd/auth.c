@@ -941,7 +941,7 @@ sfn_validate(m)
 	/*
 	 * Validate the user
 	 */
-	if ((rc = check_expiration(m)) >= 0) {
+	if ((rc = check_expiration(m)) == AUTH_OK) {
 		rc = rad_check_password(radreq,
 					m->user_check, m->namepair,
 					&m->user_msg,
