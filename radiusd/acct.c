@@ -617,9 +617,13 @@ rad_accounting(radreq, activefd)
 #if defined(RT_ASCEND_EVENT_REQUEST) && defined(RT_ASCEND_EVENT_RESPONSE)
 	/* Special handling for Ascend-Event-Request */
 	if (radreq->code == RT_ASCEND_EVENT_REQUEST) {
+		VALUE_PAIR *reply = NULL;
+ 
 		write_detail(radreq, auth, "detail");
+		avl_move_attr(&reply, &radreq->request, DA_PROXY_STATE); 
 		rad_send_reply(RT_ASCEND_EVENT_RESPONSE,
 			       radreq, NULL, NULL, activefd);
+		avl_move_attr(&radreq->request, &reply, DA_PROXY_STATE);
 		stat_inc(acct, radreq->ipaddr, num_resp);
 		return 0;
 	}
@@ -628,9 +632,11 @@ rad_accounting(radreq, activefd)
 	if (rad_acct_system(radreq, doradwtmp) == 0 &&
 	    rad_acct_db(radreq, auth) == 0 &&
 	    rad_acct_ext(radreq) == 0) {
-		/* Now send back an ACK to the NAS. */
+		VALUE_PAIR *reply = NULL;
+		avl_move_attr(&reply, &radreq->request, DA_PROXY_STATE);
 		rad_send_reply(RT_ACCOUNTING_RESPONSE,
 			       radreq, NULL, NULL, activefd);
+		avl_move_attr(&radreq->request, &reply, DA_PROXY_STATE);
 		stat_inc(acct, radreq->ipaddr, num_resp);
 		return 0;
 	}
