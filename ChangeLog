@@ -1,3 +1,53 @@
+
+2002-07-31  Sergey Poznyakoff 
+
+	* radiusd/radiusd.c (rad_req_cmp): Rewritten: added "cmpid"
+	  flag. The comparison method is configurable only for
+	  accounting requests.
+	* radiusd/radck.c (setbit,bitisset): Renamed to avoid nameclashes
+	  (sync with the main trunc)
+	* radiusd/rewrite.y (mtx_bool): Brought in synch with the
+	  main trunc.
+	  
+	* THANKS: Updated
+	* AUTHORS: Updated
+	* NEWS: Updated
+	
+2002-07-12  Sergey Poznyakoff 
+
+	* README: Integrated SecurID and sybase patches provided
+	  by Steve Bleazard
+	* acconfig.h: Likewise.
+	* configure.in: Likewise.
+	* include/radiusd.h: Likewise.
+	* include/radsql.h: Likewise.
+	* radiusd/auth.c: Likewise.
+	* radiusd/config.kw: Likewise.
+	* radiusd/config.y: Likewise.
+	* radiusd/radck.c: Likewise.
+	* radiusd/version.c: Likewise.
+	* sql/sybase.c: (new) Support for sybase DB.
+	* sql/Makefile.am: Added sql/sybase.c.
+	* radiusd/securid.c: (new) Support for SecurID.
+	* radiusd/Makefile.am: Added radiusd/securid.c
+	* m4/lib.m4: Moved -L$path in front of all -l arguments.
+	
+	* doc/texinfo/attributes.texi: Documented Auth-Type = Ignore
+	* doc/texinfo/auth.texi: Documented Auth-Type = Ignore and
+	  aceclientip.
+
+	  Sync with the main trunc:
+	* include/radius.h (AP_REQ_CMP): New define  
+	* raddb/dictionary: Marked comparable attributes.
+	* radiusd/radiusd.c: Rewritten rad_req_cmp.
+	* radlib/avl.c (avp_comp,avl_comp): new functions
+	* radlib/dict.c (_dict_attribute): Handle AP_REQ_CMP property.
+
+	* radlib/util.c (flush_seg): Cast to u_char.
+	  (format_pair): Use static buffer.
+	
+	* TODO: Updated
+
 2002-07-09  Sergey Poznyakoff 
 
 	* include/radius.h: Replaced install_pair() declaration
