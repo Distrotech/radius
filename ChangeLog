@@ -1,3 +1,23 @@
+2002-12-16  Sergey Poznyakoff  
+
+	* raddb/dictionary: (Hint): Fixed syntax flags.
+	* radiusd/exec.c: (radius_exec_program): Call avl_free() after
+	  merging the two lists.
+	* radiusd/files.c (userparse): Use install_pair0.
+	* radiusd/radius.c (radrecv): Hack for non-compliant USR VSA
+	* radiusd/radutil.c (obstack_grow_quoted): Quote zero characters
+	  (attr_to_str): Decode DA_CHAP_PASSWORD. Use %lu when printing
+	  numeric attributes.
+	* radlib/raddb.c (read_raddb_file): Fix counting of the input
+	  lines.	
+	* radlib/users.l: Allow octal and hex char representations in
+	  strings.
+	* test/radiusd.m4: Added testcase for getting Ascend-Data-Filter
+	  attribute from exec-program-wait.
+	* test/raddb/ascend.bin: New file.  
+	* test/raddb/Makefile.am: Added ascend.bin
+	* test/raddb/users.in (execwait1): New user.
+
 2002-08-30  Sergey Poznyakoff 
 
 	Fixed relaying of Access-Challenge requests:
