@@ -99,6 +99,7 @@ enum {
 #define AP_ADD_NONE      2
 
 #define AP_PROPAGATE   0x10
+#define AP_REQ_CMP     0x20
 
 #define ADDITIVITY(val) ((val) & 0x3)
 #define SET_ADDITIVITY(val,a) ((val) = ((val) & ~0x3) | (a))
