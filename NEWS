@@ -1,3 +1,30 @@
+Changes in Radius 0.96.4
+
+1. The syntax of the "rewrite" language is extended. It 
+   supports adressing multiple attributes in a request and
+   deleting arbitrary atributes.
+
+2. Fixed bug in "rewrite" optimizer, which caused boolean
+   short-cuts (|| and &&) to malfunction.
+
+3. Added support for sybase and SecurID (thanks to Steve Bleazard)
+
+4. Added new Auth-Type value Ignore. It causes the incoming request
+   to be dropped.
+
+5. Request comparison has been made comparable.
+
+6. Fixed bug in formatting A/V pairs for detailed logging which
+   caused radiusd to dump core upon receiving certain vendor-specific
+   attributes.
+
+7. If the incoming request does not contain NAS-IP-Address attribute,
+   it is generated and added to it.
+
+8. Fixed bug in handling Expiration attribute
+
+
+=============================================================================
 Changes in Radius 0.96.3
 
  1. Radiusd now automatically determines whether CHAP authentication

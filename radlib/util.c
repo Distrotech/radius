@@ -287,7 +287,7 @@ flush_seg(bufp, seg, ptr, runlen)
 		outbytes += 4*(ptr - seg);
 		if (buf)
 			while (seg < ptr) {
-				sprintf(buf, "\\%03o", *seg);
+				sprintf(buf, "\\%03o", *(u_char*)seg);
 				seg++;
 				buf += 4;
 			}
@@ -376,10 +376,9 @@ format_pair(pair)
 	VALUE_PAIR *pair;
 {
 	static char *buf1;
-	char *buf2ptr = NULL;
-	char buf2[4*AUTH_STRING_LEN+1]; /* Enough to hold longest possible
-					   string value all converted to
-					   octal */
+	char buf2[1+10+4*AUTH_STRING_LEN+1]; /* Enough to hold longest possible
+					        string value all converted to
+					        octal + enentual V%d prefix */
 	DICT_VALUE *dval;
 	
 	if (buf1)
@@ -398,15 +397,7 @@ format_pair(pair)
 			snprintf(buf2, sizeof(buf2),
 				 "[invalid length: %d]", pair->strlength);
 		else {
-			int len = format_vendor_pair(NULL, pair);
-			buf2ptr = malloc(len+1);
-			if (!buf2ptr) {
-				radlog(L_ERR,
-				       "%s:%d: can't alloc %d bytes",
-				       __FILE__, __LINE__);
-				buf2[0] = 0;
-			} else
-				format_vendor_pair(buf2ptr, pair);
+			format_vendor_pair(buf2, pair);
 		}
 		break;
 					
@@ -438,16 +429,13 @@ format_pair(pair)
 		asprintf(&buf1, "%s %s %s",
 			 pair->name,
 			 op_to_str(pair->operator),
-			 buf2ptr ? buf2ptr : buf2);
+			 buf2);
 	else
 		asprintf(&buf1, "%d %s %s",
 			 pair->attribute,
 			 op_to_str(pair->operator),
-			 buf2ptr ? buf2ptr : buf2);
+			 buf2);
 
-	if (buf2ptr)
-		free(buf2ptr);
-	
 	return buf1;
 }
 

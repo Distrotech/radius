@@ -8,10 +8,12 @@
 	  (sync with the main trunc)
 	* radiusd/rewrite.y (mtx_bool): Brought in synch with the
 	  main trunc.
+	* radiusd/auth.c: Likewise.
 	  
 	* THANKS: Updated
 	* AUTHORS: Updated
 	* NEWS: Updated
+	* TODO: Updated
 	
 2002-07-12  Sergey Poznyakoff 
 

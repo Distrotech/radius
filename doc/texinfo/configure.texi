@@ -86,6 +86,7 @@ These are the basic statements:
 * acct::        Configure accounting service.
 * proxy::       Configure proxy service.
 * usedbm::      Enable the DBM feature.
+* aceclientip:: Enable the DBM feature.
 * snmp::        Configure SNMP service.
 * guile::       Configure Guile interface.
 * message::     Configure server reply messages.
@@ -562,6 +563,33 @@ Do not use DBM support at all.
 
 @item yes
 Use only the DBM database and ignore @file{raddb/users}.
+
+@end table
+
+@comment **L3***************************************************************
+@node aceclientip
+@subsection @code{aceclientip} statement
+@cindex Ace: enabling
+@cindex Enabling Ace Client IP
+@kwindex aceclientip 
+
+@subheading Syntax:
+@example
+aceclientip ( yes | no ) ;
+@end example
+
+@subheading Usage
+The @code{aceclientip} statement determines whether the the NAS' IP address
+is passed to the Ace/Server or the IP address of the RADIUS server itself.
+
+@table @code
+@item no
+The IP address of the RADIUS server will be passed to the Ace/Server. As a
+consequence the Ace/Server will see the RADIUS server as the client.
+
+@item yes
+The IP address of the original NAS server will be passed to the Ace/Server.
+As a consequence the Ace/Server will see each NAS as a seperate client.
 
 @end table
 
@@ -1555,11 +1583,12 @@ These parameters configure various aspects of connection between
 @table @code
 @item interface @var{iface-type}
 Specifies the @sc{sql} interface to use. Currently supported values
-for @var{iface-type} are @code{mysql} and @code{postgres}. Depending
-on this, the default communication port number is set: it is 3306 for
+for @var{iface-type} are @code{mysql}, @code{sybase} and @code{postgres}.
+Depending on this, the default communication port number is set: it is 3306 for
 @code{interface mysql} and 5432 for @code{interface postgres}. Use of
 this statement is only meaningful when the package was configured with
-both @option{--with-mysql} and @option{--with-postgres} option.
+a combination of @option{--with-mysql}, @option{--with-sybase} and
+@option{--with-postgres} option.
 @item server @var{string}
 Specifies the hostname or @IP{} of the @sc{sql} server.
 @item port @var{number}

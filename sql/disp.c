@@ -27,6 +27,7 @@ static SQL_DISPATCH_TAB *sql_dispatch_tab[] = {
 	mysql_dispatch_tab,
 	postgres_dispatch_tab,
 	odbc_dispatch_tab,
+	sybase_dispatch_tab,
 };
 
 #define NDISP sizeof(sql_dispatch_tab)/sizeof(sql_dispatch_tab[0])

@@ -13,3 +13,6 @@ WEB-RADACT is written by
 
 sql/odbc.c is written by
 	Vlad Lungu		<vlad@rls.roknet.ro>
+
+sql/sybase.c, radiusd/securid.c are written by
+	Steve Bleazard          <steve@bleazard.com>
