@@ -1,3 +1,8 @@
+2003-02-06  Sergey Poznyakoff 
+
+	* radiusd/config.y: Bugfix for category "main".
+	* sql/odbc.c (rad_odbc_column): Bugfix.
+
 2002-12-16  Sergey Poznyakoff  
 
 	* raddb/dictionary: (Hint): Fixed syntax flags.
