@@ -49,7 +49,6 @@ static char rcsid[] =
 struct radstat radstat;
 #endif
 PORT_STAT *stat_base;
-unsigned maxstat = STAT_MAX_PORT_COUNT;
 
 #ifdef USE_SNMP
 void
@@ -113,7 +112,8 @@ stat_create()
 #endif
 
 	if (debug_on(2)) {
-		for (port = stat_base + 1; port < stat_base + 1 + maxstat; port++) {
+		for (port = stat_base + 1;
+		     port < stat_base + STAT_MAX_PORT_COUNT; port++) {
 			if (port->ip == 0)
 				break;
 			
@@ -128,7 +128,8 @@ stat_alloc_port()
 {
 	PORT_STAT *port;
 	
-	for (port = stat_base + 1; port < stat_base + 1 + maxstat; port++) {
+	for (port = stat_base + 1;
+	     port < stat_base + STAT_MAX_PORT_COUNT; port++) {
 		if (port->ip == 0)
 			return port;
 	}
@@ -142,7 +143,8 @@ stat_find_port(nas, port_no)
 {
 	PORT_STAT *port;
 	
-	for (port = stat_base + 1; port < stat_base + 1 + maxstat; port++) {
+	for (port = stat_base + 1;
+	     port < stat_base + STAT_MAX_PORT_COUNT; port++) {
 		if (port->ip == 0)
 			break;
 		if (port->ip == nas->ipaddr && port->port_no == port_no)
@@ -152,7 +154,7 @@ stat_find_port(nas, port_no)
 	/* Port not found */
 	if ((port = stat_alloc_port()) == NULL) {
 		radlog(L_ERR,
-		    _("can't allocate port_stat: increase maxstat and recompile"));
+		    _("can't allocate port_stat: increase STAT_MAX_PORT_COUNT and recompile"));
 		return NULL;
 	}
 	port->ip = nas->ipaddr;
@@ -170,7 +172,8 @@ stat_get_port_index(nas, port_no)
 {
 	PORT_STAT *port;
 	
-	for (port = stat_base + 1; port < stat_base + 1 + maxstat; port++) {
+	for (port = stat_base + 1;
+	     port < stat_base + STAT_MAX_PORT_COUNT; port++) {
 		if (port->ip == 0)
 			break;
 		if (port->ip == nas->ipaddr && port->port_no == port_no)
@@ -187,7 +190,8 @@ stat_get_next_port_no(nas, port_no)
 	PORT_STAT *port;
 	int next = STAT_MAX_PORT_COUNT;
 	
-	for (port = stat_base + 1; port < stat_base + 1 + maxstat; port++) {
+	for (port = stat_base + 1;
+	     port < stat_base + STAT_MAX_PORT_COUNT; port++) {
 		if (port->ip == 0)
 			break;
 		if (port->ip == nas->ipaddr &&
@@ -301,7 +305,8 @@ stat_count_ports()
 	
 	radstat.port_active_count = radstat.port_idle_count = 0;
 
-	for (port = stat_base + 1; port < stat_base + 1 + maxstat; port++) {
+	for (port = stat_base + 1;
+	     port < stat_base + STAT_MAX_PORT_COUNT; port++) {
 		if (port->ip == 0)
 			break;
 
@@ -332,7 +337,7 @@ findportbyindex(ind)
         if (ind < 1 || ind > STAT_MAX_PORT_COUNT)
                 return NULL;
 	for (i = 1, p = stat_base+1;
-	     i < ind && p < stat_base + STAT_MAX_PORT_COUNT + 1 && p->ip;
+	     i < ind && p < stat_base + STAT_MAX_PORT_COUNT && p->ip;
 	     i++, p++) /* empty */ ;
 
 	if (p->ip == 0)
