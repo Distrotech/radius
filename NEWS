@@ -1,3 +1,15 @@
+Changes in Radius 0.96.3
+
+ 1. Radiusd now automatically determines whether CHAP authentication
+    type should be used.
+ 2. Proxy-State attributes are preserved in accounting replies.
+ 3. Ascend-specific filters (attributes Ascend-Call-Filter and
+    Ascend-Data-Filter are now supported. Note, that you will
+    have to update your raddb/dict/ascend dictionary to use
+    this feature.
+
+
+=============================================================================
 Changes in Radius 0.96.2
 
 This release fixes some bugs found in 0.96. These are:

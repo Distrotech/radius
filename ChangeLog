@@ -22,6 +22,7 @@
 	* radiusd/auth.c: Detect CHAP automatically.
 
 	* NEWS: Updated.
+	* configure.in: Raised version number to 0.96.3
 	
 2002-04-11  Sergey Poznyakoff
 
