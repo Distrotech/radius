@@ -964,6 +964,7 @@ radrespond(radreq, activefd)
 	case RT_AUTHENTICATION_ACK:
 	case RT_AUTHENTICATION_REJECT:
 	case RT_ACCOUNTING_RESPONSE:
+	case RT_ACCESS_CHALLENGE:
 		if (proxy_receive(radreq, activefd) < 0) {
 			radreq_free(radreq);
 			return 0;

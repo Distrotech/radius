@@ -517,7 +517,7 @@ enum auth_state {
 	as_ipaddr, 
 	as_exec_wait, 
 	as_cleanup_cbkid, 
-	as_menu,
+	as_menu_challenge,
 	as_ack, 
 	as_exec_nowait, 
 	as_stop, 
@@ -565,6 +565,7 @@ static void sfn_ipaddr(AUTH_MACH*);
 static void sfn_exec_wait(AUTH_MACH*);
 static void sfn_cleanup_cbkid(AUTH_MACH*);
 static void sfn_menu(AUTH_MACH*);
+static void sfn_menu_challenge(AUTH_MACH*);
 static void sfn_ack(AUTH_MACH*);
 static void sfn_exec_nowait(AUTH_MACH*);
 static void sfn_reject(AUTH_MACH*);
@@ -617,11 +618,11 @@ struct auth_state_s states[] = {
 	as_exec_wait,    as_cleanup_cbkid,
 	                 DA_EXEC_PROGRAM_WAIT, L_reply, sfn_exec_wait,
 	
-	as_cleanup_cbkid,as_menu,
+	as_cleanup_cbkid,as_menu_challenge,
 	                 DA_CALLBACK_ID,  L_reply, sfn_cleanup_cbkid,
 	
-	as_menu,         as_ack,
-	                 DA_MENU,         L_reply, sfn_menu,
+	as_menu_challenge,         as_ack,
+	                 DA_MENU,         L_reply, sfn_menu_challenge,
 	
 	as_ack,          as_exec_nowait,
 	                 0,               L_null, sfn_ack,
@@ -752,23 +753,9 @@ rad_authenticate(radreq, activefd)
 	enum auth_state oldstate;
 	struct auth_state_s *sp;
 	struct auth_mach m;
-#ifdef USE_LIVINGSTON_MENUS
-	VALUE_PAIR *pair_ptr;
-#endif
 
 	log_open(L_AUTH);
 	
-#ifdef USE_LIVINGSTON_MENUS
-	/*
-	 * If the request is processing a menu, service it here.
-	 */
-	if ((pair_ptr = avl_find(radreq->request, DA_STATE)) != NULL &&
-	    strncmp(pair_ptr->strvalue, "MENU=", 5) == 0) {
-	    process_menu(radreq, activefd);
-	    return 0;
-	}
-#endif
-
 	m.req = radreq;
 	m.activefd = activefd;
 	m.user_check = NULL;
@@ -836,7 +823,7 @@ rad_authenticate(radreq, activefd)
 # define newstate(s) m->state = s
 #endif
 				
-	
+
 void
 sfn_init(m)
 	AUTH_MACH *m;
@@ -845,26 +832,50 @@ sfn_init(m)
 	RADIUS_REQ *radreq = m->req;
 	VALUE_PAIR *pair_ptr;
 	
+	switch (radreq->server_code) {
+	case RT_AUTHENTICATION_REJECT:
+		m->user_check = avp_create(DA_AUTH_TYPE, 0,
+					   NULL, DV_AUTH_TYPE_REJECT);
+		break;
+
+	case RT_AUTHENTICATION_ACK:
+		m->user_check = avp_create(DA_AUTH_TYPE, 0,
+					   NULL, DV_AUTH_TYPE_ACCEPT);
+		break;
+
+	case 0:
+		break;
+
+	default:
+		rad_send_reply(radreq->server_code,
+			       radreq,
+			       radreq->server_reply,
+			       NULL,
+			       m->activefd);
+		newstate(as_stop);
+		return;
+	}
+	
+#ifdef USE_LIVINGSTON_MENUS
+	/*
+	 * If the request is processing a menu, service it here.
+	 */
+	if (radreq->server_code == 0
+	    && (pair_ptr = avl_find(m->req->request, DA_STATE)) != NULL
+	    && strncmp(pair_ptr->strvalue, "MENU=", 5) == 0) {
+	    process_menu(m->req, m->activefd);
+	    newstate(as_stop);
+	    return;
+	}
+#endif
+
 	/*
 	 *	Move the proxy_state A/V pairs somewhere else.
 	 */
 	avl_move_attr(&m->proxy_pairs, &radreq->request, DA_PROXY_STATE);
 
-	/*
-	 * If this request got proxied to another server, we need
-	 * to add an initial Auth-Type: Auth-Accept for success,
-	 * Auth-Reject for fail. We also need to add the reply
-	 * pairs from the server to the initial reply.
-	 */
-	if (radreq->server_code == RT_AUTHENTICATION_REJECT ||
-	    radreq->server_code == RT_AUTHENTICATION_ACK) {
-		m->user_check = avp_create(DA_AUTH_TYPE, 0, NULL, 0);
-		proxied = 1;
-	}
-	if (radreq->server_code == RT_AUTHENTICATION_REJECT)
-		m->user_check->lvalue = DV_AUTH_TYPE_REJECT;
-	if (radreq->server_code == RT_AUTHENTICATION_ACK)
-		m->user_check->lvalue = DV_AUTH_TYPE_ACCEPT;
+	/* If this request was proxied to another server, we need
+	   to add the reply pairs from the server to the initial reply. */
 
 	if (radreq->server_reply) {
 		m->user_reply = radreq->server_reply;
@@ -881,7 +892,7 @@ sfn_init(m)
 	 */
 	if (user_find(m->namepair->strvalue, radreq,
 		      &m->user_check, &m->user_reply) != 0
-	    && !proxied) {
+	    && !radreq->server_code) {
 
 		if (is_log_mode(m, RLOG_AUTH)) 
 			auth_log(m, _("Invalid user"), NULL, NULL, NULL);
@@ -1245,7 +1256,7 @@ sfn_cleanup_cbkid(m)
 }
 
 void
-sfn_menu(m)
+sfn_menu_challenge(m)
 	AUTH_MACH *m;
 {
 #ifdef USE_LIVINGSTON_MENUS
