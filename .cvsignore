@@ -8,6 +8,7 @@ ltmain.sh
 config.log
 config.h
 libtool
+config.sub
 config.cache
 config.status
 stamp-h
