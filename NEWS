@@ -9,10 +9,12 @@ Changes in Radius 0.96.4
 
 3. Added support for sybase and SecurID (thanks to Steve Bleazard)
 
-4. Added new Auth-Type value Ignore. It causes the incoming request
+4. Introduced new Auth-Type value Ignore. It causes the incoming request
    to be dropped.
 
-5. Request comparison has been made configurable.
+5. Configurable comparison of the requests allows to detect duplicate
+   requests even if the NAS changes request ID or authenticator between
+   retransmissions.
 
 6. Fixed bug in formatting A/V pairs for detailed logging which
    caused radiusd to dump core upon receiving certain vendor-specific

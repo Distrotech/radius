@@ -11,8 +11,10 @@
 	* doc/texinfo/Makefile.am: Added comp.texi
 	
 	* README: Updated.
-
+	* NEWS: Updated.
+	
 	* radiusd/config.kw (compare-attribute-flag): Was misspelled.
+	* raddb/config.syntax: Likewise.
 	* radiusd/radiusd.c: Allow compare-.*-flag from naslist to
 	  override compare-attribute-flag.
 	* raduse/Makefile.am: Removed -lcurses

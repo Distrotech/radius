@@ -603,17 +603,17 @@ aceclientip ( yes | no ) ;
 @end example
 
 @subheading Usage
-The @code{aceclientip} statement determines whether the the NAS' IP address
-is passed to the Ace/Server or the IP address of the RADIUS server itself.
+The @code{aceclientip} statement determines whether the @NAS{}' @IP{}
+is passed to the Ace/Server or the @IP{} of the @RADIUS{} server itself.
 
 @table @code
 @item no
-The IP address of the RADIUS server will be passed to the Ace/Server. As a
-consequence the Ace/Server will see the RADIUS server as the client.
+The @IP{} of the @RADIUS{} server will be passed to the Ace/Server. As a
+consequence the Ace/Server will see the @RADIUS{} server as the client.
 
 @item yes
-The IP address of the original NAS server will be passed to the Ace/Server.
-As a consequence the Ace/Server will see each NAS as a seperate client.
+The @IP{} of the original @NAS{} will be passed to the Ace/Server.
+As a consequence the Ace/Server will see each @NAS{} as a seperate client.
 
 @end table
 
