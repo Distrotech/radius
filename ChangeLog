@@ -1,3 +1,17 @@
+2002-06-20  Sergey Poznyakoff
+
+	* configure.in: YACC_OPTS are always -t.
+	* radiusd/config.y (channel_stmt production): bugfix (sync'ed
+	  with the main trunc).
+
+	* radiusd/rewrite.y: New statement: `delete'. New notation:
+	  %[attr](n). 
+	* doc/texinfo/extensions.texi: Documented `delete' statement
+	  and %[attr](n) notation.
+	* radlib/avl.c: (avl_find_n, avl_delete_n): New functions.  
+	* include/radius.h (avl_find_n, avl_delete_n): New functions.  
+	* mibs/GNU-RADIUS-STAT-MIB.txt: Fixed revision syntax
+	
 2002-06-05  Sergey Poznyakoff  
 
 	* TODO: Updated. Lots of entries were already implemented in 1.0,
