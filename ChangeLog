@@ -1,3 +1,15 @@
+2002-08-05  Sergey Poznyakoff 
+
+	* include/radius.h: Synchronized with the recent changes to
+	  rad_req_cmp in the main trunc.
+	* include/radiusd.h: Likewise.
+	* raddb/config.syntax: Likewise.
+	* radiusd/radiusd.c: Likewise.
+	* radlib/avl.c: Likewise.
+	* radlib/dict.c: Likewise.
+	
+	* radiusd/config.kw (compare-atribute-flag): New keyword
+	* radiusd/config.y: Handle compare-attribute-flag statements.
 
 2002-07-31  Sergey Poznyakoff 
 
