@@ -19,6 +19,7 @@ radius_TEXINFOS=acct.texi\
  client.texi\
  config.texi\
  configure.texi\
+ comp.texi\
  debug.texi\
  extensions.texi\
  intro.texi\
