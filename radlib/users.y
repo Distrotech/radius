@@ -52,7 +52,7 @@ int old_lineno;
 static void *closure;
 static int (*add_entry)(void*, char *, int, char *, VALUE_PAIR *, VALUE_PAIR *);
 
-VALUE_PAIR *install_pair(char *name, int op, char *valstr);
+static VALUE_PAIR *install_pair(char *name, int op, char *valstr);
 %}
 %token EQ LT GT NE LE GE
 %token NUL
@@ -187,6 +187,18 @@ yyerror(s)
 
 VALUE_PAIR *
 install_pair(name, op, valstr)
+        char *name;
+        int op;
+        char *valstr;
+{
+	return install_pair0(source_filename, source_line_num, 
+                             name, op, valstr);
+}
+
+VALUE_PAIR *
+install_pair0(filename, line, name, op, valstr)
+	char *filename;
+	int line;
 	char *name;
 	int op;
 	char *valstr;
@@ -201,7 +213,7 @@ install_pair(name, op, valstr)
 	
 	if ((attr = attr_name_to_dict(name)) == (DICT_ATTR *)NULL) {
 		radlog(L_ERR, _("%s:%d: unknown attribute `%s'"),
-		       source_filename, source_line_num, name);
+		       filename, line, name);
 		return NULL;
 	}
 
@@ -230,7 +242,7 @@ install_pair(name, op, valstr)
 			if (valstr[0] != '/') {
 				radlog(L_ERR,
 				   _("%s:%d: %s: not an absolute pathname"),
-				       source_filename, source_line_num, name);
+				       filename, line, name);
 				avp_free(pair);
 				return NULL;
 			}
@@ -241,7 +253,7 @@ install_pair(name, op, valstr)
 
 		if (attr->parser && attr->parser(pair, &s)) {
 			radlog(L_ERR, "%s:%d: attribute %s: %s",
-			       source_filename, source_line_num,
+			       filename, line,
 			       pair->name, s);
 			free(s);
 			avp_free(pair);
@@ -268,10 +280,9 @@ install_pair(name, op, valstr)
 		if (isdigit(*valstr)) {
 			pair->lvalue = atoi(valstr);
 		} else if ((dval = value_name_to_value(valstr, pair->attribute)) == NULL) {
+			radlog(L_ERR, _("%s:%d: value %s is not declared for attribute %s"),
+			       filename, line, valstr, name);
 			avp_free(pair);
-			radlog(L_ERR, _("%s:%d: unknown value %s"),
-			    source_filename, source_line_num,
-			    valstr);
 			return NULL;
 		} else {
 			pair->lvalue = dval->value;
@@ -318,7 +329,7 @@ install_pair(name, op, valstr)
 		if (user_gettime(valstr, tm)) {
 			radlog(L_ERR,
 				_("%s:%d: %s: can't parse date"),
-				source_filename, source_line_num, name);
+				filename, line, name);
 			avp_free(pair);
 			return NULL;
 		}
@@ -331,7 +342,7 @@ install_pair(name, op, valstr)
 
 	default:
 		radlog(L_ERR, _("%s:%d: %s: unknown attribute type %d"),
-		    source_filename, source_line_num, name,
+		    filename, line, name,
 		    pair->type);
 		avp_free(pair);
 		return NULL;
