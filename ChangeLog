@@ -1,3 +1,15 @@
+2002-07-02  Sergey Poznyakoff 
+
+	* radiusd/radius.c (radrecv): Add NAS-IP-Address to the packet
+	  if the NAS didn't supply one.
+	* radiusd/auth.c (sfn_validate): Bugfix: the return from
+	  check_expiration() was handled incorrectly.
+	* raddb/dictionary (Expiration): Fixed properties.
+	* THANKS: Added Cornel Cristea
+
+	* test/radiusd.m4: Added tests for Expiration attribute.
+	* test/raddb/users.in: Likewise.
+	
 2002-06-20  Sergey Poznyakoff
 
 	* configure.in: YACC_OPTS are always -t.
