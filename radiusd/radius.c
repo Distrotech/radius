@@ -406,10 +406,20 @@ radrecv(host, udp_port, buffer, length)
 			vendorpec = ntohl(lval);
 			if ((vendorcode = vendor_pec_to_id(vendorpec)) != 0) {
 				ptr += 4;
-				attribute = *ptr | (vendorcode << 16);
-				ptr += 2;
-				attrlen -= 6;
-				length -= 6;
+				if (vendorpec == 429) {
+					/* Hack for non-compliant USR VSA */
+					memcpy(&attribute, ptr, 4);
+					ptr += 4;
+					attribute = ntohl(attribute)
+						    | (vendorcode << 16);
+					attrlen -= 8;
+					length -= 8;
+				} else {
+					attribute = *ptr | (vendorcode << 16);
+					ptr += 2;
+					attrlen -= 6;
+					length -= 6;
+				}
 			}
 		}
 
