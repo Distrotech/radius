@@ -1,3 +1,21 @@
+2002-08-16  Sergey Poznyakoff
+
+	* doc/README.securid: New file.
+	* doc/Makefile.am: Added README.securid
+	* doc/texinfo/comp.texi: New file. Describes request comparison
+	  techniques.
+	* doc/texinfo/auth.texi: Updated.
+	* doc/texinfo/configure.texi: Likewise.
+	* doc/texinfo/operation.texi: Likewise.
+	* doc/texinfo/radius.texi: Likewise.
+	* doc/texinfo/Makefile.am: Added comp.texi
+	
+	* README: Updated.
+
+	* radiusd/config.kw (compare-attribute-flag): Was misspelled.
+	* radiusd/radiusd.c: Allow compare-.*-flag from naslist to
+	  override compare-attribute-flag.
+
 2002-08-14  Sergey Poznyakoff  
 
 	Sync with the main trunc.
