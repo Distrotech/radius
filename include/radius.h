@@ -116,6 +116,8 @@ enum {
 			 |AF_RHS(0)|AF_RHS(1)|AF_RHS(2))
 #define AP_DEFAULT_ADD   AP_ADD_APPEND
 
+struct value_pair;
+typedef int (*attr_parser_fp)(struct value_pair *p, char **s);
 
 /* Dictionary attribute */
 typedef struct dict_attr {
@@ -125,6 +127,7 @@ typedef struct dict_attr {
         int                     type;       /* Data type */
         int                     vendor;     /* Vendor index */
         int                     prop;       /* Properties */
+	attr_parser_fp          parser;     /* Not-NULL if AP_BINARY is set */
 } DICT_ATTR;
 
 /* Dictionary value */
@@ -236,6 +239,7 @@ extern char *bug_report_address;
 #define VENDOR(x) (x >> 16)
 
 int dict_init();
+void dict_register_parser(int attr, attr_parser_fp fun);
 DICT_ATTR *attr_number_to_dict(int);
 DICT_ATTR *attr_name_to_dict(char *);
 DICT_VALUE *value_name_to_value(char *, int);
@@ -330,3 +334,5 @@ void decrypt_password(char *password, VALUE_PAIR *pair,
 void decrypt_password_broken(char *password, VALUE_PAIR *pair,
 			     char *vector, char *secret);
 
+/* ascend.c */
+int ascend_parse_filter(VALUE_PAIR *pair, char **errp);
