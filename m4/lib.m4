@@ -14,7 +14,7 @@ AC_DEFUN(rad_CHECK_LIB,
    do
       LIBS="$save_LIBS -L$path"
       AC_CHECK_LIB($1, $2,
-                   [rad_cv_lib_$1="$3 -L$path -l$1"
+                   [rad_cv_lib_$1="-L$path -l$1 $3"
                     break],
                    [rad_cv_lib_$1=no],$3)
    done
