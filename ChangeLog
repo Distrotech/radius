@@ -1,3 +1,21 @@
+2002-08-30  Sergey Poznyakoff 
+
+	Fixed relaying of Access-Challenge requests:
+	
+	* raddb/dictionary: Marked State with propagation bit.
+	* radiusd/auth.c: Handle RT_ACCESS_CHALLENGE.
+	* radiusd/radius.c (rad_send_reply): Bugfix: Was cutting off the
+	  last character from string attributes AUTH_STRING_LEN bytes long.
+	  (radrecv): Fixed attribute length check. It was not allowing
+	  attributes AUTH_STRING_LEN bytes long.
+	* radiusd/radiusd.c (radrespond): Handle RT_ACCESS_CHALLENGE.
+
+2002-08-19  Sergey Poznyakoff
+
+	-= Version 0.96.4 released =-
+
+	Tagged release_0_96_4
+
 2002-08-19  Sergey Poznyakoff
 
 	* test/raddb/config.in: Absense of final newline confused some
