@@ -585,7 +585,7 @@ category_name   : category
 
 category        : T_MAIN
                   {
-			  $$ = L_ACCT;
+			  $$ = L_MAIN;
 		  }
                 | T_AUTH
                   {
