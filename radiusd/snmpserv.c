@@ -1,2791 +1,2125 @@
-/* This file is part of GNU Radius.
-   Copyright (C) 2000,2001,2002,2003,2004,2006,
-   2007 Free Software Foundation, Inc.
-
-   Written by Sergey Poznyakoff
-
-   GNU Radius is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 3 of the License, or
-   (at your option) any later version.
-  
-   GNU Radius is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-  
-   You should have received a copy of the GNU General Public License
-   along with GNU Radius; if not, write to the Free Software Foundation,
-   Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA. */
-
+/* This file is part of GNU RADIUS.
+ * Copyright (C) 2000, Sergey Poznyakoff
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+ *
+ */
+#define RADIUS_MODULE 14
 #if defined(HAVE_CONFIG_H)
 # include <config.h>
 #endif
 
 #ifdef USE_SNMP
 
+#ifndef lint
+static char rcsid[] = "@(#) $Id$";
+#endif
+
 #include <sys/types.h>
 #include <sys/socket.h>
-
-#include <snmp/asn1.h>
-#include <snmp/snmp.h>
-#include <snmp/mib.h>
+#include <snmp.h>
+#include <snmp_impl.h>
+#include <asn1.h>
+#include <snmp_api.h>
+#include <snmp_vars.h>
 
 #include <sysdep.h>
 #include <radiusd.h>
-#include <radius/radutmp.h>
+#include <radutmp.h>
 #include <radsnmp.h>
-#define SERVER
-#include <radmibs.h>
+#include <radmib.h>
+#include <varargs.h>
 
-#define MAXOIDLEN 512
- 
+#define MAXOIDLEN 64
+#define XVAL 0
+
+Mib_tree_node *mib_tree;
+
+Mib_tree_node * snmp_add_node();
+Mib_tree_node * snmp_add_simple_node();
+
+Mib_tree_node * snmp_sibling(oid, int, Mib_tree_node *);
 struct snmp_pdu * snmp_agent_response(struct snmp_pdu *pdu, int access);
-int variable_cmp(struct snmp_var *v1, struct snmp_var *v2);
-static grad_nas_t *nas_lookup_index(int ind);
-static void snmpserv_before_config_hook(void *unused1, void *unused2);
-static void snmpserv_after_config_hook(void *arg, void *unused);
-static void snmp_tree_init();
+oid * dup_oid(oid *, int);
+oid * snmp_create_oid();
+char * sprint_oid(char *buf, int buflen, oid *name, int len);
 
-static grad_list_t /* of ACL */ *snmp_acl;
-static grad_list_t /* of Community */ *commlist;
+int snmp_decode(SNMP_REQ *req, char *buf, int len);
+int variable_cmp(variable_list *v1, variable_list *v2);
+
+	
+ACL *snmp_acl, *snmp_acl_tail;
+Community *commlist, *commlist_tail;
 Server_stat *server_stat;
-struct radstat radstat;
+extern PORT_STAT *stat_base;
 
-/* ************************************************************************ */
-/* Configuration file */
-
-static grad_list_t /* of NETNAME */ *netlist;
-
-static int
-_netname_cmp(const void *item, const void *data)
-{
-	const NETNAME *p = item;
-	const char *name = data;
-	return strcmp(p->name, name);
-}
-
-static NETNAME *
-netname_find(char *name)
-{
-        return grad_list_locate(netlist, name, _netname_cmp);
-}
-
-static int
-_netdef_destroy(void *item, void *data ARG_UNUSED)
-{
-	grad_free(item);
-	return 0;
-}
-
-static int
-_netname_destroy(void *item, void *data ARG_UNUSED)
-{
-	NETNAME *p = item;
-	grad_free(p->name);
-	grad_list_destroy(&p->netlist, _netdef_destroy, NULL);
-	grad_free(p);
-	return 0;
-}
-
-static void
-netgrad_list_destroy()
-{
-	grad_list_destroy(&netlist, _netname_destroy, NULL);
-}
 
 /* ************************************************************************ */
 /* ACL fiddling */
 
 void
-snmp_add_community(char *str, int access)
+snmp_add_community(str, access)
+	char *str;
+	int access;
 {
-        Community *p = grad_emalloc(sizeof(*p));
-        p->name = grad_estrdup(str);
-        p->access = access;
-	if (!commlist)
-		commlist = grad_list_create();
-        grad_list_append(commlist, p);
+	Community *p = alloc_entry(sizeof(*p));
+	p->name = estrdup(str);
+	p->access = access;
+	if (commlist_tail)
+		commlist_tail->next = p;
+	else
+		commlist = p;
+	commlist_tail = p;
 }
-
-
-static int
-_community_cmp(const void *item, const void *data)
-{
-        const Community *p = item;
-	return strcmp(p->name, (const char*) data);
-}
-
 
 Community *
-snmp_find_community(char *str)
+snmp_find_community(str)
+	char *str;
 {
-	return grad_list_locate(commlist, str, _community_cmp);
-}
+	Community *p;
 
-static int
-_community_destroy(void *item, void *data)
-{
-	Community *p = item;
-	grad_free(p->name);
-	grad_free(p);
-	return 0;
+	for (p = commlist; p; p = p->next)
+		if (strcmp(p->name, str) == 0)
+			return p;
+	return NULL;
 }
 
 void
 snmp_free_communities()
 {
-	grad_list_destroy(&commlist, _community_destroy, NULL);
+	Community *p = commlist, *next;
+	while (p) {
+		next = p->next;
+		efree(p->name);
+		free_entry(p);
+		p = next;
+	}
+	commlist = commlist_tail = NULL;
 }
 
-struct acl_closure {
-	grad_uint32_t ip;
+int
+check_acl(ip, community)
+	UINT4 ip;
 	char *community;
-	int access;
-};
-
-int
-_netdef_cmp(const void *item, const void *data)
 {
-	const grad_netdef_t *nd = item;
-	const struct acl_closure *clos = data;
+	ACL *acl;
 
-	if (grad_ip_in_net_p(nd, clos->ip))
-		return 0;
-	return 1;
-}
-
-int
-_acl_iterator(void *item, void *data)
-{
-	ACL *acl = item;
-	struct acl_closure *clos = data;
-
-	if (acl->community
-	    && strcmp(acl->community->name, clos->community))
-		return 0;
-	if (grad_list_locate(acl->netlist, data, _netdef_cmp)) {
-		clos->access = acl->community ? acl->community->access : 0;
-		return 1;
+	for (acl = snmp_acl; acl; acl = acl->next) {
+		if (acl->ipaddr == (ip & acl->netmask)) {
+			if (!acl->community)
+				return 0;
+			else if (strcmp(acl->community->name, community) == 0)
+				return acl->community->access;
+		}
 	}
 	return 0;
 }
 
-int
-check_acl(grad_uint32_t ip, char *community)
-{
-	struct acl_closure clos;
-
-	clos.ip = ntohl(ip);
-	clos.community = community;
-	clos.access = 0;
-	grad_list_iterate(snmp_acl, _acl_iterator, &clos);
-        return clos.access;
-}
-
 void
-snmp_add_acl(Community *community, grad_list_t /* of grad_netdef_t */ *netlist)
+snmp_add_acl(acl, community)
+	ACL *acl;
+	Community *community;
 {
-        ACL *acl;
-
-	acl = grad_emalloc(sizeof(*acl));
-	acl->community = community;
-	acl->netlist = netlist;
-	if (!snmp_acl)
-		snmp_acl = grad_list_create();
-	grad_list_append(snmp_acl, acl);
+	ACL *new_acl;
+	
+	for (; acl; acl = acl->next) {
+		new_acl = alloc_entry(sizeof(*new_acl));
+		memcpy(new_acl, acl, sizeof(ACL));
+		new_acl->community = community;
+		if (snmp_acl_tail)
+			snmp_acl_tail->next = new_acl;
+		else
+			snmp_acl = new_acl;
+		snmp_acl_tail = new_acl;
+	}
 }
 
-static int
-_acl_destroy(void *item, void *data)
-{
-	grad_free(item);
-	return 0;
-}
-		
 void
 snmp_free_acl()
 {
-	grad_list_destroy(&snmp_acl, _acl_destroy, NULL);
-}
-
-
-/* ************************************************************************* */
-static int _opened_snmp_sockets;
-
-int
-snmp_stmt_begin(int finish, void *data, void *up_data)
-{
-	if (!finish) {
-		netgrad_list_destroy();
-		snmp_free_communities();
-		snmp_free_acl();
-		_opened_snmp_sockets = 0;
-	} else if (radius_mode == MODE_DAEMON
-		   && !_opened_snmp_sockets
-		   && snmp_port) 
-		udp_open(R_SNMP, INADDR_ANY, snmp_port, 1);
-	return 0;
-}
-
-static int
-snmp_cfg_ident(int argc, cfg_value_t *argv, void *block_data,
-	       void *handler_data)
-{
-	if (argc > 2) {
-		cfg_argc_error(0);
-		return 0;
-	}
-
- 	if (argv[1].type != CFG_STRING) {
-		cfg_type_error(CFG_STRING);
-		return 0;
-	}
-	if (server_id)
-		grad_free(server_id);
-	server_id = grad_estrdup(argv[1].v.string);
-	return 0;
-}
-
-static grad_keyword_t snmp_access[] = {
-	{ "read-only", SNMP_RO },
-	{ "read-write", SNMP_RW },
-	{ "ro", SNMP_RO },
-	{ "rw", SNMP_RW },
-	{ 0 }
-};
-
-static int
-snmp_cfg_community(int argc, cfg_value_t *argv,
-		   void *block_data, void *handler_data)
-{
-	int access;
-
-	if (argc != 3) {
-		cfg_argc_error(argc < 3);
-		return 0;
-	}
-
- 	if (argv[1].type != CFG_STRING
-	    || argv[2].type != CFG_STRING) {
-		cfg_type_error(CFG_STRING);
-		return 0;
-	}
-
-	access = grad_xlat_keyword(snmp_access, argv[2].v.string, -1);
-	if (access == -1) 
-		return 1;
-		
-	if (snmp_find_community(argv[1].v.string)) {
-		grad_log(L_ERR,
-		         _("%s:%d: community %s already declared"),
-		         cfg_filename, cfg_line_num, argv[1].v.string);
-		return 0;
-	}
-	
-	snmp_add_community(argv[1].v.string, access);
-	return 0;
-}
-
-int
-snmp_cfg_listen(int argc, cfg_value_t *argv,
-		void *block_data, void *handler_data)
-{
-	int i, errcnt = 0;
-	
-	if (argc == 2 && argv[1].type == CFG_BOOLEAN) {
-		if (argv[1].v.bool == 0)
-			snmp_port = 0;
-		return 0;
-	}
-	
-	for (i = 1; i < argc; i++) 
-		if (argv[i].type != CFG_HOST) {
-			cfg_type_error(CFG_HOST);
-			errcnt++;
-		}
-	
-	if (errcnt == 0 && radius_mode == MODE_DAEMON) 
-		for (i = 1; i < argc; i++) 
-			udp_open(R_SNMP,
-				 argv[i].v.host.ipaddr,
-				 argv[i].v.host.port > 0 ?
-				 argv[i].v.host.port : snmp_port,
-				 1);
-	_opened_snmp_sockets++;
-	return 0;
-}
-
-static int
-snmp_cfg_network(int argc, cfg_value_t *argv,
-		 void *block_data, void *handler_data)
-{
-	int i;
-	NETNAME *np;
-	
-	if (argc < 3) {
-		cfg_argc_error(1);
-		return 0;
-	}
-
- 	if (argv[1].type != CFG_STRING) {
-		cfg_type_error(CFG_STRING);
-		return 0;
-	}
-
-        np = grad_emalloc(sizeof(*np));
-	if (!netlist) 
-		netlist = grad_list_create(netlist);
-		
-	grad_list_append(netlist, np);
-        np->name = grad_estrdup(argv[1].v.string);
-	np->netlist = grad_list_create();
-	for (i = 2; i < argc; i++) {
-		if (argv[i].type != CFG_NETWORK) {
-			grad_log(L_ERR,
-			         _("%s:%d: list item %d has wrong datatype"),
-			         cfg_filename, cfg_line_num,
-			         i);
-		} else {
-			grad_netdef_t *net = grad_emalloc(sizeof(*net));
-			net->ipaddr = argv[i].v.network.ipaddr;
-			net->netmask = argv[i].v.network.netmask;
-			grad_list_append(np->netlist, net);
-		}
-	}
-	return 0;
-}
-
-static int
-snmp_cfg_allow(int argc, cfg_value_t *argv,
-	       void *block_data, void *handler_data)
-{
-	Community *comm;
-	NETNAME *nn;
-	
-	if (argc != 3) {
-		cfg_argc_error(argc < 3);
-		return 0;
-	}
-	
- 	if (argv[1].type != CFG_STRING || argv[2].type != CFG_STRING) {
-		cfg_type_error(CFG_STRING);
-		return 0;
-	}
-
-	if ((nn = netname_find(argv[1].v.string)) == NULL) {
-		grad_log(L_ERR, _("%s:%d: no such network: %s"),
-		         cfg_filename, cfg_line_num, argv[1].v.string);
-		return 0;
-	}
-
-	comm = snmp_find_community(argv[2].v.string);
-	if (!comm) {
-		grad_log(L_ERR, 
-		         _("%s:%d: undefined community %s"),
-		         cfg_filename, cfg_line_num, argv[2].v.string);
-		return 0;
-	} 
-
-	snmp_add_acl(comm, nn->netlist);
-	return 0;
-}
-
-static int
-snmp_cfg_deny(int argc, cfg_value_t *argv,
-	      void *block_data, void *handler_data)
-{
-	NETNAME *nn;
-	
-	if (argc != 2) {
-		cfg_argc_error(argc < 2);
-		return 0;
-	}
-	
- 	if (argv[1].type != CFG_STRING) {
-		cfg_type_error(CFG_STRING);
-		return 0;
-	}
-
-	if ((nn = netname_find(argv[1].v.string)) == NULL) {
-		grad_log(L_ERR, _("%s:%d: no such network: %s"),
-		         cfg_filename, cfg_line_num, argv[1].v.string);
-		return 0;
-	}
-
-	snmp_add_acl(NULL, nn->netlist);
-	return 0;
-}
-
-static struct cfg_stmt acl_stmt[] = {
-	{ "allow", CS_STMT, NULL, snmp_cfg_allow, NULL, NULL, NULL },
-	{ "deny", CS_STMT, NULL, snmp_cfg_deny, NULL, NULL, NULL },
-	{ NULL },
-};
-
-struct cfg_stmt snmp_stmt[] = {
-	{ "port", CS_STMT, NULL, cfg_get_port, &snmp_port, NULL, NULL },
-	{ "listen", CS_STMT, NULL, snmp_cfg_listen, NULL, NULL, NULL },
-	{ "max-requests", CS_STMT, NULL,
-	  cfg_get_integer, &request_class[R_SNMP].max_requests,
-	  NULL, NULL },
-	{ "time-to-live", CS_STMT, NULL,
-	  cfg_get_integer, &request_class[R_SNMP].ttl,
-	  NULL, NULL },
-	{ "request-cleanup-delay", CS_STMT, NULL,
-	  cfg_get_integer, &request_class[R_SNMP].cleanup_delay,
-	  NULL, NULL },
-	{ "ident", CS_STMT, NULL, snmp_cfg_ident, NULL,
-	  NULL, NULL },
-	{ "community", CS_STMT, NULL, snmp_cfg_community, NULL, 
-	  NULL, NULL },
-	{ "storage", CS_BLOCK, NULL, NULL, NULL,
-	  storage_stmt, NULL },
-	{ "network", CS_STMT, NULL, snmp_cfg_network, NULL,
-	  NULL, NULL },
-	{ "acl", CS_BLOCK, NULL, NULL, NULL, acl_stmt, NULL },
-	/* Obsolete statements */
-	{ "spawn", CS_STMT, NULL, cfg_obsolete, NULL, NULL, NULL },
-	{ NULL, }
-};
-
-static void
-snmpserv_before_config_hook(void *a ARG_UNUSED, void *b ARG_UNUSED)
-{
-	if (server_stat) {
-		server_stat->auth.status = serv_init;
-		server_stat->acct.status = serv_init;
-	}
-}
-
-static void
-snmpserv_after_config_hook(void *arg, void *data ARG_UNUSED)
-{
-	stat_done();
-	stat_init();
-	if (server_stat) {
-		grad_nas_t *nas;
-		grad_iterator_t *itr;
-	
-		server_stat->auth.status =
-			suspend_flag ? serv_suspended : serv_running;
-		snmp_auth_server_reset();
-
-		server_stat->acct.status = server_stat->auth.status;
-		snmp_acct_server_reset();
-                
-		*(serv_stat*)arg = server_stat->auth.status;
-		snmp_init_nas_stat();
-		itr = grad_nas_iterator();
-		for (nas = grad_iterator_first(itr); nas; nas = grad_iterator_next(itr))
-			snmp_attach_nas_stat(nas);
-		grad_iterator_destroy(&itr);
-		snmp_sort_nas_stat();
-	}
+	free_acl(snmp_acl);
+	snmp_acl = snmp_acl_tail = NULL;
 }
 
 void
-snmpserv_init(void *arg)
+free_acl(acl)
+	ACL *acl;
 {
-	stat_init();
-	radiusd_set_preconfig_hook(snmpserv_before_config_hook, NULL, 0);
-	radiusd_set_postconfig_hook(snmpserv_after_config_hook, arg, 0);
-	snmp_tree_init();
-	snmpserv_after_config_hook(arg, NULL);
+	ACL *next;
+
+	while (acl) {
+		next = acl->next;
+		free_entry(acl);
+		acl = next;
+	}
+}
+
+/* ************************************************************************ */
+/* MIB tree functions */
+
+Mib_tree_node *
+snmp_lookup(node, name, len)
+	Mib_tree_node *node;
+	oid *name;
+	int len;
+{
+	int i;
+
+	for (i = 0; i < len && node; i++) {
+		if (node->len == i) {
+			if ((node = node->son) == NULL)
+				break;
+		}
+		if (node->len-1 == i && node->get) {
+			node = node->get(node, name, len);
+			break;
+		}
+		while (node->name[i] != name[i]) {
+			if ((node = node->brother) == NULL)
+				break;
+		}
+	}
+	return node;
+}
+	
+Mib_tree_node *
+snmp_add_node(name, len, parser, set, get, getnext, numchld, va_alist)
+	oid *name;
+	int len;
+	oid_pf parser;	
+	oid_sf set;
+	oid_gf get;
+	oid_gf getnext;
+	int numchld;
+	va_dcl
+{
+	va_list ap;
+	Mib_tree_node *node;
+	char buf[150];
+	
+	debug(5,("SNMP ADD: %s",
+			   sprint_oid(buf, sizeof(buf), name, len)));
+	
+	node = alloc_entry(sizeof(*node));
+	node->name = name;
+	node->len = len;
+	node->parser = parser;
+	node->set = set;
+	node->get = get;
+	node->getnext = getnext;
+	node->son = node->brother = NULL;
+	if (numchld) {
+		int i;
+		Mib_tree_node *sibling, *last = NULL, *son = NULL;
+
+		va_start(ap);
+
+		for (i = 0; i < numchld; i++) {
+			sibling = va_arg(ap, Mib_tree_node *);
+			sibling->parent = node;
+			if (last)
+				last->brother = sibling;
+			last = sibling;
+			if (!son)
+				son = sibling;
+		}
+		node->son = son;
+		va_end(ap);
+	}
+	return node;
+}
+
+Mib_tree_node *
+snmp_add_simple_node(name, len, parser, numchld, va_alist)
+	oid *name;
+	int len;
+	oid_pf parser;	
+	int numchld;
+	va_dcl
+{
+	va_list ap;
+	Mib_tree_node *node;
+	char buf[150];
+	
+	debug(5,("SNMP ADD: %s",
+			   sprint_oid(buf, sizeof(buf), name, len)));
+
+	node = alloc_entry(sizeof(*node));
+	node->name = name;
+	node->len = len;
+	node->parser = parser;
+	node->set = NULL;
+	node->get = NULL;
+	node->getnext = NULL;
+	node->son = node->brother = NULL;
+	if (numchld) {
+		int i;
+		Mib_tree_node *sibling, *last = NULL, *son = NULL;
+
+		va_start(ap);
+
+		for (i = 0; i < numchld; i++) {
+			sibling = va_arg(ap, Mib_tree_node *);
+			sibling->parent = node;
+			if (last)
+				last->brother = sibling;
+			last = sibling;
+			if (!son)
+				son = sibling;
+		}
+		node->son = son;
+		va_end(ap);
+	}
+	return node;
+}
+	
+oid *
+dup_oid(id, length)
+	oid *id;
+	int length;
+{
+	oid *p = emalloc(sizeof(*p) * length);
+	memcpy(p, id, sizeof(*p) * length);
+	return p;
+}
+
+oid *
+snmp_create_oid(length, va_alist)
+	int length;
+	va_dcl
+{
+	int i;
+	va_list ap;
+	oid *id;
+	
+	va_start(ap);
+	id = emalloc(sizeof(*id) * length);
+	for (i = 0; i < length; i++) 
+		id[i] = va_arg(ap, int);
+
+	va_end(ap);
+	return id;
+}
+
+oid_pf 
+snmp_tree_pf(tree, name, length)
+	Mib_tree_node *tree;
+	oid *name;
+	int length;
+{
+	Mib_tree_node *node;
+
+	node = snmp_lookup(tree, name, length);
+	return (node && node->parser) ? node->parser : NULL;
+}
+
+oid_sf 
+snmp_tree_sf(tree, name, length)
+	Mib_tree_node *tree;
+	oid *name;
+	int length;
+{
+	Mib_tree_node *node;
+
+	node = snmp_lookup(tree, name, length);
+	return (node && node->set) ? node->set : NULL;
+}
+
+oid_pf 
+snmp_tree_next(tree, name, name_length, nextoid, nextoid_len)
+	Mib_tree_node *tree;
+	oid *name;
+	int name_length;
+	oid **nextoid;
+	int *nextoid_len;
+{
+	Mib_tree_node *node, *ptr;
+	char buf[MAXOIDLEN];
+	
+	debug(2,
+		("SNMP GETNEXT: %s",
+		 sprint_oid(buf, sizeof(buf), name, name_length)));
+
+	if ((node = snmp_lookup(tree, name, name_length)) == NULL)
+		return NULL;
+
+again:
+	if (!node->parser) {
+		debug(2,("going down"));
+		while (node && !node->parser) 
+			node = node->son;
+	
+		if (!node)
+			return NULL;
+		ptr = node;
+	} else if (ptr = node->brother) {
+		if (!ptr->parser) {
+			debug(2,("restaring"));
+			node = ptr;
+			goto again;
+		}
+	} else if (!node->getnext) {
+	rollback:
+		/* Roll back */
+		debug(2,("rolling back"));
+		ptr = node;
+		while ((ptr = ptr->parent) && !ptr->brother)
+			;
+		
+		if (ptr) {
+			ptr = ptr->brother;
+			while (ptr && !ptr->parser) 
+				ptr = ptr->son;
+			
+			if (!ptr)
+				return NULL;
+		} else
+			return NULL;
+	} else
+		ptr = node;
+
+	if (ptr->getnext) {
+		debug(2,("following getnext"));
+		node = ptr;
+		ptr = ptr->getnext(ptr, name, name_length);
+		if (!ptr) 
+			goto rollback;
+	}
+	
+	debug(2, ("next oid %s",
+		 sprint_oid(buf, sizeof(buf), ptr->name, ptr->len)));
+
+	*nextoid = ptr->name;
+	*nextoid_len = ptr->len;
+		 
+	return (ptr && ptr->parser) ? ptr->parser : NULL;
+
 }
 
 /* ************************************************************************ */
 /* Application-specific */
 
-struct mib_node_t *mib_tree;
-int snmp_auth_handler(enum mib_node_cmd cmd, void *closure, subid_t subid,
-                      struct snmp_var **varp, int *errp);
-int snmp_auth_v_handler(enum mib_node_cmd cmd, void *closure, subid_t subid,
-                        struct snmp_var **varp, int *errp);
-int snmp_acct_handler(enum mib_node_cmd cmd, void *closure, subid_t subid,
-                      struct snmp_var **varp, int *errp);
-int snmp_acct_v_handler(enum mib_node_cmd cmd, void *closure, subid_t subid,
-                        struct snmp_var **varp, int *errp);
-int snmp_serv_handler(enum mib_node_cmd cmd, void *closure, subid_t subid,
-                      struct snmp_var **varp, int *errp);
-int snmp_stat_handler(enum mib_node_cmd cmd, void *closure, subid_t subid,
-                      struct snmp_var **varp, int *errp);
+#define N snmp_add_simple_node
+#define F snmp_add_node
+#define ID snmp_create_oid
+#define MIB(name) ID(LEN_##name, MIB_##name), LEN_##name
 
-int snmp_stat_nas1(enum mib_node_cmd cmd, void *closure, subid_t subid,
-                   struct snmp_var **varp, int *errp);
-int snmp_stat_nas2(enum mib_node_cmd cmd, void *closure, subid_t subid,
-                   struct snmp_var **varp, int *errp);
-int snmp_stat_nas3(enum mib_node_cmd cmd, void *closure, subid_t subid,
-                   struct snmp_var **varp, int *errp);
-int snmp_stat_nas4(enum mib_node_cmd cmd, void *closure, subid_t subid,
-                   struct snmp_var **varp, int *errp);
-int snmp_nas_table(enum mib_node_cmd cmd, void *closure, subid_t subid,
-                   struct snmp_var **varp, int *errp);
-int snmp_port_index1(enum mib_node_cmd cmd, void *closure, subid_t subid,
-                     struct snmp_var **varp, int *errp);
-int snmp_port_index2(enum mib_node_cmd cmd, void *closure, subid_t subid,
-                     struct snmp_var **varp, int *errp);
-int snmp_port_table(enum mib_node_cmd cmd, void *closure, subid_t subid,
-                    struct snmp_var **varp, int *errp);
-
-struct auth_mib_data {
-        int nas_index;
-};
-
-struct nas_data {
-        subid_t quad[4];
-};
-
-struct nas_table_data {
-        int row;
-};
-
-struct port_data {
-        int nas_index;
-        int port_no;
-};
-
-struct port_table_data {
-        int port_index;
-};
-
-union snmpserv_data {
-        struct auth_mib_data auth_mib;
-        struct nas_data nas;
-        struct nas_table_data nas_data;
-        struct port_data port;
-        struct port_table_data port_table;
-};
-
-static union snmpserv_data *__snmpserv_data;
-
-static void *
-snmpserv_get_data()
+void
+snmp_build_acct_tree()
 {
-        if (!__snmpserv_data) {
-                __snmpserv_data = grad_emalloc(sizeof(*__snmpserv_data));
-                __snmpserv_data->auth_mib.nas_index = 1;
-        }
-        return __snmpserv_data;
+	mib_tree =
+		N(ID(1, 1), 1, NULL, 1,
+		N(ID(2, 1, 3), 2, NULL, 1,
+		N(ID(3, 1, 3, 6), 3, NULL, 1,
+		N(ID(4, 1, 3, 6, 1), 4, NULL, 1,
+		N(ID(5, 1, 3, 6, 1, 2), 5, NULL, 1,
+		N(ID(6, 1, 3, 6, 1, 2, 1), 6, NULL, 1,
+		N(ID(7, 1, 3, 6, 1, 2, 1, 67), 7, NULL, 3,
+		  /* Authentication */
+		N(MIB(radiusAuthentication), NULL, 1,
+		N(MIB(radiusAuthServMIB), NULL, 1,
+	        N(MIB(radiusAuthServMIBObjects), NULL, 1,
+		   N(MIB(radiusAuthServ), NULL, 15,
+		     N(MIB(radiusAuthServIdent), snmp_auth_var, 0),
+		     N(MIB(radiusAuthServUpTime), snmp_auth_var, 0),
+		     N(MIB(radiusAuthServResetTime), snmp_auth_var, 0),
+		     F(MIB(radiusAuthServConfigReset), snmp_auth_var, snmp_auth_set, NULL, NULL, 0),
+		     N(MIB(radiusAuthServTotalAccessRequests), snmp_auth_var, 0),
+		     N(MIB(radiusAuthServTotalInvalidRequests), snmp_auth_var, 0),      
+		     N(MIB(radiusAuthServTotalDupAccessRequests), snmp_auth_var, 0),          
+		     N(MIB(radiusAuthServTotalAccessAccepts), snmp_auth_var, 0),            
+		     N(MIB(radiusAuthServTotalAccessRejects), snmp_auth_var, 0),            
+		     N(MIB(radiusAuthServTotalAccessChallenges), snmp_auth_var, 0),            
+		     N(MIB(radiusAuthServTotalMalformedAccessRequests), snmp_auth_var, 0),    
+		     N(MIB(radiusAuthServTotalBadAuthenticators), snmp_auth_var, 0),
+		     N(MIB(radiusAuthServTotalPacketsDropped), snmp_auth_var, 0), 
+		     N(MIB(radiusAuthServTotalUnknownTypes), snmp_auth_var, 0), 
+		     N(MIB(radiusAuthClientTable), NULL, 1,
+		       N(MIB(radiusAuthClientEntry), NULL, 11,
+			 N(MIB(radiusAuthClientIndex), NULL, 1,
+			   F(MIB(radiusAuthClientIndex_X), snmp_auth_client_var, NULL, snmp_auth_get, snmp_auth_getnext, 0)),
+			 N(MIB(radiusAuthClientAddress), NULL, 1,
+			   F(MIB(radiusAuthClientAddress_X), snmp_auth_client_var, NULL, snmp_auth_get, snmp_auth_getnext, 0)),   
+			 N(MIB(radiusAuthClientID), NULL, 1,
+			   F(MIB(radiusAuthClientID_X), snmp_auth_client_var, NULL, snmp_auth_get, snmp_auth_getnext, 0)), 
+			 N(MIB(radiusAuthServAccessRequests), NULL, 1,
+			   F(MIB(radiusAuthServAccessRequests_X), snmp_auth_client_var,  NULL, snmp_auth_get, snmp_auth_getnext, 0)),      
+			 N(MIB(radiusAuthServDupAccessRequests), NULL, 1,
+			   F(MIB(radiusAuthServDupAccessRequests_X), snmp_auth_client_var,  NULL, snmp_auth_get, snmp_auth_getnext, 0)),      
+			 N(MIB(radiusAuthServAccessAccepts), NULL, 1,
+			   F(MIB(radiusAuthServAccessAccepts_X), snmp_auth_client_var, NULL, snmp_auth_get, snmp_auth_getnext, 0)),
+			 N(MIB(radiusAuthServAccessRejects), NULL, 1,
+			   F(MIB(radiusAuthServAccessRejects_X), snmp_auth_client_var,  NULL, snmp_auth_get, snmp_auth_getnext, 0)),
+			 N(MIB(radiusAuthServAccessChallenges), NULL, 1,
+			   F(MIB(radiusAuthServAccessChallenges_X), snmp_auth_client_var,  NULL, snmp_auth_get, snmp_auth_getnext, 0)),  
+			 N(MIB(radiusAuthServMalformedAccessRequests), NULL, 1,
+			   F(MIB(radiusAuthServMalformedAccessRequests_X), snmp_auth_client_var,  NULL, snmp_auth_get, snmp_auth_getnext, 0)),  
+			 N(MIB(radiusAuthServBadAuthenticators), NULL, 1,
+			   F(MIB(radiusAuthServBadAuthenticators_X), snmp_auth_client_var,  NULL, snmp_auth_get, snmp_auth_getnext, 0)), 
+			 N(MIB(radiusAuthServPacketsDropped), NULL, 1,
+			   F(MIB(radiusAuthServPacketsDropped), snmp_auth_client_var,  NULL, snmp_auth_get, snmp_auth_getnext, 0)),
+			 N(MIB(radiusAuthServUnknownTypes), NULL, 1,
+			   F(MIB(radiusAuthServUnknownTypes_X), snmp_auth_client_var,  NULL, snmp_auth_get, snmp_auth_getnext, 0)))))))), /*radiusAuthServ*/
+
+		  
+		  /* Accounting */
+		N(MIB(radiusAccounting), NULL, 1,
+		N(MIB(radiusAccServMIB), NULL, 1,
+	        N(MIB(radiusAccServMIBObjects), NULL, 1,
+		  N(MIB(radiusAccServ), NULL, 14,
+		     N(MIB(radiusAccServIdent), snmp_acct_var, 0),
+		     N(MIB(radiusAccServUpTime), snmp_acct_var, 0),
+		     N(MIB(radiusAccServResetTime), snmp_acct_var, 0),
+		     F(MIB(radiusAccServConfigReset), snmp_acct_var, snmp_acct_set, NULL, NULL, 0),
+		     N(MIB(radiusAccServTotalRequests), snmp_acct_var, 0),
+		     N(MIB(radiusAccServTotalInvalidRequests), snmp_acct_var, 0),      
+		     N(MIB(radiusAccServTotalDupRequests), snmp_acct_var, 0),          
+		     N(MIB(radiusAccServTotalResponses), snmp_acct_var, 0),            
+		     N(MIB(radiusAccServTotalMalformedRequests), snmp_acct_var, 0),    
+		     N(MIB(radiusAccServTotalBadAuthenticators), snmp_acct_var, 0),
+		     N(MIB(radiusAccServTotalPacketsDropped), snmp_acct_var, 0), 
+		     N(MIB(radiusAccServTotalNoRecords), snmp_acct_var, 0), 
+		     N(MIB(radiusAccServTotalUnknownTypes), snmp_acct_var, 0),
+		     N(MIB(radiusAccClientTable), NULL, 1,
+		       N(MIB(radiusAccClientEntry), NULL, 11,
+			 N(MIB(radiusAccClientIndex), NULL, 1,
+			   F(MIB(radiusAccClientIndex_X), snmp_acct_client_var, NULL, snmp_acct_get, snmp_acct_getnext, 0)),
+			 N(MIB(radiusAccClientAddress), NULL, 1,
+			   F(MIB(radiusAccClientAddress_X), snmp_acct_client_var, NULL, snmp_acct_get, snmp_acct_getnext, 0)),   
+			 N(MIB(radiusAccClientID), NULL, 1,
+			   F(MIB(radiusAccClientID_X), snmp_acct_client_var, NULL, snmp_acct_get, snmp_acct_getnext, 0)), 
+			 N(MIB(radiusAccServPacketsDropped), NULL, 1,
+			   F(MIB(radiusAccServPacketsDropped_X), snmp_acct_client_var, NULL, snmp_acct_get, snmp_acct_getnext, 0)),      
+			 N(MIB(radiusAccServRequests), NULL, 1,
+			   F(MIB(radiusAccServRequests_X), snmp_acct_client_var, NULL, snmp_acct_get, snmp_acct_getnext, 0)),
+			 N(MIB(radiusAccServDupRequests), NULL, 1,
+			   F(MIB(radiusAccServRequests_X), snmp_acct_client_var, NULL, snmp_acct_get, snmp_acct_getnext, 0)),  
+			 N(MIB(radiusAccServResponses), NULL, 1,
+			   F(MIB(radiusAccServResponses_X), snmp_acct_client_var, NULL, snmp_acct_get, snmp_acct_getnext, 0)),
+			 N(MIB(radiusAccServBadAuthenticators), NULL, 1,
+			   F(MIB(radiusAccServBadAuthenticators_X), snmp_acct_client_var, NULL, snmp_acct_get, snmp_acct_getnext, 0)), 
+			 N(MIB(radiusAccServMalformedRequests), NULL, 1,
+			   F(MIB(radiusAccServMalformedRequests_X), snmp_acct_client_var, NULL, snmp_acct_get, snmp_acct_getnext, 0)), 
+			 N(MIB(radiusAccServNoRecords), NULL, 1,
+			   F(MIB(radiusAccServNoRecords_X), snmp_acct_client_var, NULL, snmp_acct_get, snmp_acct_getnext, 0)),
+			 N(MIB(radiusAccServUnknownTypes), NULL, 1,
+			   F(MIB(radiusAccServUnknownTypes_X), snmp_acct_client_var, NULL, snmp_acct_get, snmp_acct_getnext, 0))))))) /*radiusAccServ*/ ),
+
+		  /* Statistics */
+		  N(MIB(radiusStatistics), NULL, 1,
+		    N(MIB(radiusStatMIB), NULL, 8,
+		      N(MIB(radiusStatIdent), snmp_stat_var, 0),
+		      N(MIB(radiusStatUpTime), snmp_stat_var, 0),
+		      N(MIB(radiusStatConfigReset), snmp_stat_var, 0),
+		      N(MIB(radiusStatTotalLines), snmp_stat_var, 0),
+		      N(MIB(radiusStatTotalLinesInUse), snmp_stat_var, 0),
+		      N(MIB(radiusStatTotalLinesIdle), snmp_stat_var, 0),
+		      N(MIB(radiusStatNASTable), NULL, 1,
+			N(MIB(radiusStatNASEntry), NULL, 6,
+			  N(MIB(NASIndex), NULL, 1,
+			    F(MIB(NASIndex_X), snmp_stat_client_var, NULL, snmp_stat_get, snmp_stat_getnext, 0)),
+			  N(MIB(NASAddress), NULL, 1,
+			    F(MIB(NASAddress_X), snmp_stat_client_var, NULL, snmp_stat_get, snmp_stat_getnext, 0)),
+			  N(MIB(NASID), NULL, 1,
+			    F(MIB(NASID_X), snmp_stat_client_var, NULL, snmp_stat_get, snmp_stat_getnext, 0)),
+			  N(MIB(NASLines), NULL, 1,
+			    F(MIB(NASLines_X), snmp_stat_client_var, NULL, snmp_stat_get, snmp_stat_getnext, 0)),
+			  N(MIB(NASLinesInUse), NULL, 1,
+			    F(MIB(NASLinesInUse_X), snmp_stat_client_var, NULL, snmp_stat_get, snmp_stat_getnext, 0)),
+			  N(MIB(NASLinesIdle), NULL, 1,
+			    F(MIB(NASLinesIdle_X), snmp_stat_client_var, NULL, snmp_stat_get, snmp_stat_getnext, 0)))),
+
+		      N(MIB(radiusStatNASPortTable), NULL, 1,
+			N(MIB(radiusStatNASPortEntry), NULL, 16,
+			  N(MIB(radiusStatNASIndex), NULL, 1,
+			    F(MIB(radiusStatNASIndex_X), snmp_stat_port_var, NULL, snmp_stat_port_get, snmp_stat_port_getnext, 0)),
+			  N(MIB(radiusStatPortID), NULL, 1,
+			    F(MIB(radiusStatPortID_X), snmp_stat_port_var, NULL, snmp_stat_port_get, snmp_stat_port_getnext, 0)),
+			  N(MIB(radiusStatPortFramedAddress), NULL, 1,
+			    F(MIB(radiusStatPortFramedAddress_X), snmp_stat_port_var, NULL, snmp_stat_port_get, snmp_stat_port_getnext, 0)),
+			  N(MIB(radiusStatPortTotalLogins), NULL, 1,
+			    F(MIB(radiusStatPortTotalLogins_X), snmp_stat_port_var, NULL, snmp_stat_port_get, snmp_stat_port_getnext, 0)),
+			  N(MIB(radiusStatPortStatus), NULL, 1,
+			    F(MIB(radiusStatPortStatus_X), snmp_stat_port_var, NULL, snmp_stat_port_get, snmp_stat_port_getnext, 0)),
+			  N(MIB(radiusStatPortStatusDate), NULL, 1,
+			    F(MIB(radiusStatPortStatusDate_X), snmp_stat_port_var, NULL, snmp_stat_port_get, snmp_stat_port_getnext, 0)),
+			  N(MIB(radiusStatPortUpTime), NULL, 1,
+			    F(MIB(radiusStatPortUpTime_X), snmp_stat_port_var, NULL, snmp_stat_port_get, snmp_stat_port_getnext, 0)),
+			  N(MIB(radiusStatPortLastLoginName), NULL, 1,
+			    F(MIB(radiusStatPortLastLoginName_X), snmp_stat_port_var, NULL, snmp_stat_port_get, snmp_stat_port_getnext, 0)),
+			  N(MIB(radiusStatPortLastLoginDate), NULL, 1,
+			    F(MIB(radiusStatPortLastLoginDate_X), snmp_stat_port_var, NULL, snmp_stat_port_get, snmp_stat_port_getnext, 0)),
+			  N(MIB(radiusStatPortLastLogoutDate), NULL, 1,
+			    F(MIB(radiusStatPortLastLogoutDate_X), snmp_stat_port_var, NULL, snmp_stat_port_get, snmp_stat_port_getnext, 0)),
+			  N(MIB(radiusStatPortIdleTotalTime), NULL, 1,
+			    F(MIB(radiusStatPortIdleTotalTime_X), snmp_stat_port_var, NULL, snmp_stat_port_get, snmp_stat_port_getnext, 0)),
+			  N(MIB(radiusStatPortIdleMaxTime), NULL, 1,
+			    F(MIB(radiusStatPortIdleMaxTime_X), snmp_stat_port_var, NULL, snmp_stat_port_get, snmp_stat_port_getnext, 0)),
+			  N(MIB(radiusStatPortIdleMaxDate), NULL, 1,
+			    F(MIB(radiusStatPortIdleMaxDate_X), snmp_stat_port_var, NULL, snmp_stat_port_get, snmp_stat_port_getnext, 0)),
+			  N(MIB(radiusStatPortInUseTotalTime), NULL, 1,
+			    F(MIB(radiusStatPortInUseTotalTime_X), snmp_stat_port_var, NULL, snmp_stat_port_get, snmp_stat_port_getnext, 0)),
+			  N(MIB(radiusStatPortInUseMaxTime), NULL, 1,
+			    F(MIB(radiusStatPortInUseMaxTime_X), snmp_stat_port_var, NULL, snmp_stat_port_get, snmp_stat_port_getnext, 0)),
+			  N(MIB(radiusStatPortInUseMaxDate), NULL, 1,
+			    F(MIB(radiusStatPortInUseMaxDate_X), snmp_stat_port_var, NULL, snmp_stat_port_get, snmp_stat_port_getnext, 0)))))))))))));
+
 }
 
-static struct mib_data {
-        oid_t oid;
-        mib_fp handler;
-        void *closure;
-} mib_data[] = {
-        /* Authentication */
-        /* Fixed oids */
-        { oid_AuthServIdent,                   snmp_auth_handler, NULL },
-        { oid_AuthServUpTime,                  snmp_auth_handler, NULL },
-        { oid_AuthServResetTime,               snmp_auth_handler, NULL },
-        { oid_AuthServConfigReset,             snmp_auth_handler, NULL },
-        { oid_AuthServTotalAccessRequests,     snmp_auth_handler, NULL },
-        { oid_AuthServTotalInvalidRequests,    snmp_auth_handler, NULL },
-        { oid_AuthServTotalDupAccessRequests,  snmp_auth_handler, NULL },
-        { oid_AuthServTotalAccessAccepts,      snmp_auth_handler, NULL },
-        { oid_AuthServTotalAccessRejects,      snmp_auth_handler, NULL },
-        { oid_AuthServTotalAccessChallenges,   snmp_auth_handler, NULL }, 
-        { oid_AuthServTotalMalformedAccessRequests,
-                                             snmp_auth_handler, NULL },
-        { oid_AuthServTotalBadAuthenticators,  snmp_auth_handler, NULL },
-        { oid_AuthServTotalPacketsDropped,     snmp_auth_handler, NULL },
-        { oid_AuthServTotalUnknownTypes,       snmp_auth_handler, NULL },
-
-        /* Variable oids */
-        { oid_AuthClientIndex,                 snmp_auth_v_handler,NULL },
-        { oid_AuthClientAddress,               snmp_auth_v_handler,NULL },
-        { oid_AuthClientID,                    snmp_auth_v_handler,NULL },
-        { oid_AuthServAccessRequests,          snmp_auth_v_handler,NULL },
-        { oid_AuthServDupAccessRequests,       snmp_auth_v_handler,NULL },
-        { oid_AuthServAccessAccepts,           snmp_auth_v_handler,NULL },
-        { oid_AuthServAccessRejects,           snmp_auth_v_handler,NULL },
-        { oid_AuthServAccessChallenges,        snmp_auth_v_handler,NULL },
-        { oid_AuthServMalformedAccessRequests, snmp_auth_v_handler,NULL },
-        { oid_AuthServBadAuthenticators,       snmp_auth_v_handler,NULL },
-        { oid_AuthServPacketsDropped,          snmp_auth_v_handler,NULL },
-        { oid_AuthServUnknownTypes,            snmp_auth_v_handler,NULL },
-        
-        /* Accounting */
-        /* Fixed oids */
-        { oid_AccServIdent,                    snmp_acct_handler, NULL },
-        { oid_AccServUpTime,                   snmp_acct_handler, NULL },
-        { oid_AccServResetTime,                snmp_acct_handler, NULL },
-        { oid_AccServConfigReset,              snmp_acct_handler, NULL },
-        { oid_AccServTotalRequests,            snmp_acct_handler, NULL },
-        { oid_AccServTotalInvalidRequests,     snmp_acct_handler, NULL },    
-        { oid_AccServTotalDupRequests,         snmp_acct_handler, NULL },      
-        { oid_AccServTotalResponses,           snmp_acct_handler, NULL },      
-        { oid_AccServTotalMalformedRequests,   snmp_acct_handler, NULL },      
-        { oid_AccServTotalBadAuthenticators,   snmp_acct_handler, NULL },      
-        { oid_AccServTotalPacketsDropped,      snmp_acct_handler, NULL },      
-        { oid_AccServTotalNoRecords,           snmp_acct_handler, NULL },      
-        { oid_AccServTotalUnknownTypes,        snmp_acct_handler, NULL },      
-
-        /* Variable oids */
-        { oid_AccClientIndex,                  snmp_acct_v_handler,NULL },
-        { oid_AccClientAddress,                snmp_acct_v_handler,NULL },
-        { oid_AccClientID,                     snmp_acct_v_handler,NULL },
-        { oid_AccServPacketsDropped,           snmp_acct_v_handler,NULL },
-        { oid_AccServRequests,                 snmp_acct_v_handler,NULL },
-        { oid_AccServDupRequests,              snmp_acct_v_handler,NULL },
-        { oid_AccServResponses,                snmp_acct_v_handler,NULL },
-        { oid_AccServBadAuthenticators,        snmp_acct_v_handler,NULL },
-        { oid_AccServMalformedRequests,        snmp_acct_v_handler,NULL },
-        { oid_AccServNoRecords,                snmp_acct_v_handler,NULL },
-        { oid_AccServUnknownTypes,             snmp_acct_v_handler,NULL },
-
-#ifdef SNMP_COMPAT_0_96
-        
-        /* Server */
-        { oid_grad_radiusServerUpTime,         snmp_serv_handler, NULL },
-        { oid_grad_radiusServerResetTime,      snmp_serv_handler, NULL },
-        { oid_grad_radiusServerState,          snmp_serv_handler, NULL },
-
-        
-        /* Statistics */
-        { oid_grad_StatIdent,             snmp_stat_handler, NULL },
-        { oid_grad_StatUpTime,            snmp_stat_handler, NULL },
-        { oid_grad_StatConfigReset,       snmp_stat_handler, NULL },
-        { oid_grad_StatTotalLines,        snmp_stat_handler, NULL },
-        { oid_grad_StatTotalLinesInUse,   snmp_stat_handler, NULL },
-        { oid_grad_StatTotalLinesIdle,    snmp_stat_handler, NULL },
-
-        /* Variable oids */
-        { oid_grad_NASIndex1,             snmp_stat_nas1, NULL },
-        { oid_grad_NASIndex2,             snmp_stat_nas2, NULL },
-        { oid_grad_NASIndex3,             snmp_stat_nas3, NULL },
-        { oid_grad_NASIndex4,             snmp_stat_nas4, NULL },
-
-        { oid_grad_NASAddress,            snmp_nas_table, NULL },
-        { oid_grad_NASID,                 snmp_nas_table, NULL },
-        { oid_grad_NASLines,              snmp_nas_table, NULL },
-        { oid_grad_NASLinesInUse,         snmp_nas_table, NULL },
-        { oid_grad_NASLinesIdle,          snmp_nas_table, NULL },
-
-        { oid_grad_StatPortIndex1,        snmp_port_index1, NULL },
-        { oid_grad_StatPortIndex2,        snmp_port_index2, NULL },
-
-        /* port table */
-        { oid_grad_StatPortNASIndex,      snmp_port_table, NULL },
-        { oid_grad_StatPortID,            snmp_port_table, NULL },
-        { oid_grad_StatPortFramedAddress, snmp_port_table, NULL },
-        { oid_grad_StatPortTotalLogins,   snmp_port_table, NULL },
-        { oid_grad_StatPortStatus,        snmp_port_table, NULL },
-        { oid_grad_StatPortStatusChangeTimestamp,   snmp_port_table, NULL },
-        { oid_grad_StatPortUpTime,        snmp_port_table, NULL },
-        { oid_grad_StatPortLastLoginName, snmp_port_table, NULL },
-        { oid_grad_StatPortLastLoginTimestamp,  snmp_port_table, NULL },
-        { oid_grad_StatPortLastLogoutTimestamp, snmp_port_table, NULL },
-        { oid_grad_StatPortIdleTotalTime, snmp_port_table, NULL },
-        { oid_grad_StatPortIdleMaxTime,   snmp_port_table, NULL },
-        { oid_grad_StatPortIdleMaxTimestamp, snmp_port_table, NULL },
-        { oid_grad_StatPortInUseTotalTime, snmp_port_table, NULL },
-        { oid_grad_StatPortInUseMaxTime,   snmp_port_table, NULL },
-        { oid_grad_StatPortInUseMaxTimestamp, snmp_port_table, NULL },
-#endif
-        /* enterprise.gnu.radius subtree */
-        /* Server */
-        { oid_radiusServerUpTime,         snmp_serv_handler, NULL },
-        { oid_radiusServerResetTime,      snmp_serv_handler, NULL },
-        { oid_radiusServerState,          snmp_serv_handler, NULL },
-
-
-        /* Statistics */
-        { oid_StatIdent,                       snmp_stat_handler, NULL },
-        { oid_StatUpTime,                      snmp_stat_handler, NULL },
-        { oid_StatConfigReset,                 snmp_stat_handler, NULL },
-        { oid_StatTotalLines,                  snmp_stat_handler, NULL },
-        { oid_StatTotalLinesInUse,             snmp_stat_handler, NULL },
-        { oid_StatTotalLinesIdle,              snmp_stat_handler, NULL },
-
-        /* Variable oids */
-        { oid_NASIndex1,                       snmp_stat_nas1, NULL },
-        { oid_NASIndex2,                       snmp_stat_nas2, NULL },
-        { oid_NASIndex3,                       snmp_stat_nas3, NULL },
-        { oid_NASIndex4,                       snmp_stat_nas4, NULL },
-
-        { oid_NASAddress,                      snmp_nas_table, NULL },
-        { oid_NASID,                           snmp_nas_table, NULL },
-        { oid_NASLines,                        snmp_nas_table, NULL },
-        { oid_NASLinesInUse,                   snmp_nas_table, NULL },
-        { oid_NASLinesIdle,                    snmp_nas_table, NULL },
-
-        { oid_StatPortIndex1,                  snmp_port_index1, NULL },
-        { oid_StatPortIndex2,                  snmp_port_index2, NULL },
-
-        /* port table */
-        { oid_StatPortNASIndex,                snmp_port_table, NULL },
-        { oid_StatPortID,                      snmp_port_table, NULL },
-        { oid_StatPortFramedAddress,           snmp_port_table, NULL },
-        { oid_StatPortTotalLogins,             snmp_port_table, NULL },
-        { oid_StatPortStatus,                  snmp_port_table, NULL },
-        { oid_StatPortStatusChangeTimestamp,   snmp_port_table, NULL },
-        { oid_StatPortUpTime,                  snmp_port_table, NULL },
-        { oid_StatPortLastLoginName,           snmp_port_table, NULL },
-        { oid_StatPortLastLoginTimestamp,      snmp_port_table, NULL },
-        { oid_StatPortLastLogoutTimestamp,     snmp_port_table, NULL },
-        { oid_StatPortIdleTotalTime,           snmp_port_table, NULL },
-        { oid_StatPortIdleMaxTime,             snmp_port_table, NULL },
-        { oid_StatPortIdleMaxTimestamp,        snmp_port_table, NULL },
-        { oid_StatPortInUseTotalTime,          snmp_port_table, NULL },
-        { oid_StatPortInUseMaxTime,            snmp_port_table, NULL },
-        { oid_StatPortInUseMaxTimestamp,       snmp_port_table, NULL },
-
-};                                          
 
 void
 snmp_tree_init()
 {
-        struct mib_data *p;
-        struct mib_node_t *node;
-        
-        snmp_init(0, 0, (snmp_alloc_t)grad_emalloc, (snmp_free_t)grad_free);
-
-        for (p = mib_data; p < mib_data + GRAD_NITEMS(mib_data); p++) {
-                mib_insert(&mib_tree, p->oid, &node);
-                if (p->handler) {
-                        node->handler = p->handler;
-                        node->closure = p->closure;
-                }
-        }
+	snmp_build_acct_tree();
 }
 
-/* Mark reset of the auth server. Do not do any real work, though.
- */
+struct nas_stat *
+find_nas_stat(ip_addr)
+	UINT4 ip_addr;
+{
+	int i;
+	struct nas_stat *nasstat = (struct nas_stat *)(server_stat + 1);
+	
+	for (i = 0; i < server_stat->nas_count; i++, nasstat++)
+		if (nasstat->ipaddr == ip_addr)
+			return nasstat;
+	return NULL;
+}
+
+struct nas_stat *
+snmp_nasstat(num)
+	int num;
+{
+	return (struct nas_stat *)(server_stat + 1) + num;
+}
+
+void
+snmp_init_nas_stat()
+{
+	server_stat->nas_index = 1;
+}
+
+void
+snmp_attach_nas_stat(nas, master)
+	NAS *nas;
+	int master;
+{
+	struct nas_stat *nasstat;
+
+	nasstat = find_nas_stat(nas->ipaddr);
+	if (!nasstat) {
+		if (server_stat->nas_count >= STAT_MAX_NAS_COUNT) {
+			radlog(L_ERR, _("too many NASes: increase STAT_MAX_NAS_COUNT"));
+			return;
+		}
+		nasstat = snmp_nasstat(server_stat->nas_count++);
+		nasstat->ipaddr = nas->ipaddr;
+	}
+	if (master)
+		nasstat->index = server_stat->nas_index++;
+	nas->nas_stat = nasstat;
+}
+
 void
 snmp_auth_server_reset()
 {
-        struct timeval tv;
-        struct timezone tz;
+	struct timeval tv;
+	struct timezone tz;
 
-        gettimeofday(&tv, &tz);
-        server_stat->auth.reset_time = tv;
+	gettimeofday(&tv, &tz);
+	server_stat->auth.reset_time = tv;
 }
 
-/* Mark reset of the acct server. Again, no real work, please.
- */
 void
 snmp_acct_server_reset()
 {
-        struct timeval tv;
-        struct timezone tz;
+	struct timeval tv;
+	struct timezone tz;
 
-        gettimeofday(&tv, &tz);
-        server_stat->acct.reset_time = tv;
+	gettimeofday(&tv, &tz);
+	server_stat->acct.reset_time = tv;
+}
+
+char *
+sprint_oid(buf, buflen, name, len)
+	char *buf;
+	int buflen;
+	oid *name;
+	int len;
+{
+	int i, d;
+	char *p, *start;
+	char temp[64];
+
+	start = buf;
+	for (i = 0; i < len; i++) {
+		if (buflen < 3) {
+			*buf++ = '>';
+			break;
+		}
+
+		sprintf(temp, "%d", *name);
+		d = strlen(temp) + 1;
+		if (buflen - d < 3) {
+			*buf++ = '>';
+			break;
+		}
+		buflen -= d;
+		for (p = temp; *p; )
+		     *buf++ = *p++;
+		*buf++ = '.';
+		name++;
+	}
+	*buf = 0;
+	return start;
 }
 
 
-/* ************************************************************************* */
-/* FIXME: these belong to snmp_mib.c */
 
-int mib_get(struct mib_node_t *node, struct snmp_var **varp,
-            int *errp);
-int mib_get_next(struct mib_node_t *node, struct snmp_var **varp,
-                 int *errp);
-int mib_set_try(struct mib_node_t *node, struct snmp_var **varp,
-                int *errp);
-int mib_set(struct mib_node_t *node, struct snmp_var **varp);
-oid_t mib_node_oid(struct mib_node_t *node);
+static int		i_send_buffer[1024];
+static char		*send_buffer = (char *)i_send_buffer;
 
-int mib_down(struct mib_node_t *node, oid_t oid);
-void mib_reset(struct mib_node_t *node);
-
-/* For a given node generate its oid. Note: When not needed anymore, the
-   oid should be freed by snmp_free */
-oid_t 
-mib_node_oid(struct mib_node_t *node)
+SNMP_REQ *
+rad_snmp_respond(buf, len, sa)
+	char *buf;
+	int len;
+	struct sockaddr_in *sa;
 {
-        oid_t oid;
-        int i;
-        
-        oid = oid_create(node->index+1);
-        if (!oid)
-                return oid;
-        for (i = node->index; node && i >= 0; i--, node = node->up) {
-                SUBID(oid,i) = (node->subid != SUBID_X) ?
-                                 node->subid :
-                                 (subid_t)(*node->handler)(MIB_NODE_GET_SUBID,
-                                                           node->closure,
-                                                           0,
-                                                           NULL, NULL);
-        }
-        return oid;
+	SNMP_REQ *req;
+	char ipbuf[DOTTED_QUAD_LEN];
+
+	req = alloc_entry(sizeof *req);
+	req->sa = *sa;
+
+	debug(1,
+		("got %d bytes from %s",
+		 len,
+		 ipaddr2str(ipbuf, ntohl(req->sa.sin_addr.s_addr))));
+	
+	if (snmp_decode(req, buf, len)) {
+		free_entry(req);
+		req = NULL;
+	}
+	return req;
+}
+
+int
+snmp_decode(req, buf, len)
+	SNMP_REQ *req;
+	char *buf;
+	int len;
+{
+	struct snmp_pdu *pdu;
+	struct snmp_session session;
+	char *community;
+	int access;
+	char ipbuf[DOTTED_QUAD_LEN];
+	
+	pdu = snmp_pdu_create(0);
+	session.Version = SNMP_VERSION_1;
+	community = snmp_parse(&session, pdu, buf, len);
+
+	if (snmp_coexist_V2toV1(pdu) && community /*&& allow*/) {
+		access = check_acl(req->sa.sin_addr.s_addr, community);
+		if (!access) {
+			radlog(L_NOTICE,
+			       _("DENIED attempt to access community %s from %s (%s)"),
+			       community,
+			       ip_hostname(ntohl(req->sa.sin_addr.s_addr)),
+			       ipaddr2str(ipbuf, ntohl(req->sa.sin_addr.s_addr)));
+			return 1;
+		}
+		req->pdu = pdu;
+		req->community = community;
+		req->access = access;
+		return 0;
+	} else {
+		char ipbuf[DOTTED_QUAD_LEN];
+		radlog(L_ERR, _("failed SNMP query from %s (%s)"),
+		    ip_hostname(ntohl(req->sa.sin_addr.s_addr)),
+		    ipaddr2str(ipbuf, ntohl(req->sa.sin_addr.s_addr)));
+		efree(community);	
+		return 1;
+	}
+}
+
+int
+snmp_req_cmp(a, b)
+	SNMP_REQ *a, *b;
+{
+	return !(a->sa.sin_addr.s_addr == b->sa.sin_addr.s_addr &&
+		 variable_cmp(a->pdu->variables, b->pdu->variables) == 0);
 }
 
 void
-mib_reset(struct mib_node_t *node)
+snmp_req_free(req)
+	SNMP_REQ *req;
 {
-        if (node->subid == SUBID_X) {
-                (*node->handler)(MIB_NODE_RESET, node->closure,
-                                 0,
-                                 NULL, NULL);
-        }
+	snmp_free_pdu(req->pdu);
+	efree(req->community);
+	free_entry(req);
 }
-                
+
+void
+snmp_req_drop(type, req, status_str)
+	int type;
+	SNMP_REQ *req;
+	char *status_str;
+{
+	char ipbuf[DOTTED_QUAD_LEN];
+	
+	radlog(L_NOTICE,
+	       _("Dropping SNMP request from client %s: %s"),
+	       ipaddr2str(ipbuf, ntohl(req->sa.sin_addr.s_addr)),
+	       status_str);
+}
+
 int
-mib_down(struct mib_node_t *node, oid_t oid)
+snmp_answer(req, sock)
+	SNMP_REQ *req;
+	int sock;
 {
-        if (node->subid == SUBID_X) {
-                if (OIDLEN(oid) <= node->index) {
-                    (*node->handler)(MIB_NODE_RESET, node->closure,
-                                     0,
-                                     NULL, NULL);
-                    return 0;
-                } else if ((*node->handler)(MIB_NODE_NEXT, node->closure,
-                                            SUBID(oid,node->index),
-                                            NULL, NULL) == 0) 
-                        return 0;
-        }
-        return 1;
+	struct snmp_session session;
+	struct snmp_pdu *pdu;
+	int len;
+
+	pdu = snmp_agent_response(req->pdu, req->access);
+	if (pdu) {
+		session.Version = SNMP_VERSION_1;
+		session.community = req->community;
+		session.community_len = strlen(req->community);
+		len = sizeof(i_send_buffer);
+		if (snmp_build(&session, pdu, send_buffer, &len) == 0) {
+			sendto(sock,
+			       send_buffer, len,
+			       0, (struct sockaddr *) &req->sa,
+			       sizeof(req->sa));
+		}
+		snmp_free_pdu(pdu);
+	}
+	return 0;
 }
 
-/* Get next node.
-   Input:  node -- root node to start search from
-           varp[0][0] -- Variable to start from
-   Output: varp[0][0] -- Next variable (with its value)
-           errp[0]    -- Error status
-   Return: 0 -- OK */        
-int
-mib_get_next(struct mib_node_t *node, struct snmp_var **varp, int *errp)
-{
-        int rc;
-        oid_t oid = (*varp)->name;
-        char buf[MAXOIDLEN];
-        struct snmp_var *temp_var;
-        struct mib_node_t *found_node;
-        
-        GRAD_DEBUG1(2, "OID %s",
-                    sprint_oid(buf, sizeof(buf), (*varp)->name));
-        
-        /* first, find the node itself */
-        rc = mib_lookup(node, oid, OIDLEN(oid), &found_node);
 
-        *errp = SNMP_ERR_NOERROR;
-
-        do {
-                int depth = 0;
-                node = found_node;
-                mib_reset(node);
-                        
-                while (node) {
-                        if (depth++ && node->next == NULL) 
-                                break;
-
-                        if (node->next) {
-                                node = node->next;
-                                mib_reset(node);
-                        } else if (node->subid == SUBID_X) {
-                                if (mib_down(node, oid))
-                                        node = NULL;
-                        } else
-                                node = node->down;
-                }
-                
-                if (!node) {
-                        /* The subtree is exhausted. Roll back until we find
-                           first non-traversed down link */
-                        GRAD_DEBUG2(2, "rolling back from %d:%d",
-                                    found_node->index,
-                                    found_node->subid);
-                        while (node = found_node->up) {
-                                mib_reset(node);
-                                if (node->down && node->down != found_node)
-                                        break;
-                                if (node->subid == SUBID_X &&
-                                    mib_down(node, oid) == 0) 
-                                        break;
-                                found_node = node;
-                        }
-
-                        if (node)
-                                GRAD_DEBUG2(2, "rollback stopped at %d:%d",
-                                            node->index,
-                                            node->subid);
-
-                        if (node && node->subid != SUBID_X)
-                                node = node->down;
-
-                }
-
-                found_node = node;
-
-        } while (found_node && found_node->handler == NULL);
-
-        if (!found_node || !found_node->handler) {
-                *errp = SNMP_ERR_NOSUCHNAME;
-                return -1;
-        }
-                
-        oid = mib_node_oid(found_node);
-        temp_var = snmp_var_create(oid);
-        snmp_free(oid);
-
-        GRAD_DEBUG1(2, "NXT %s", sprint_oid(buf, sizeof(buf), temp_var->name));
-                         
-        *varp = temp_var;
-        (*found_node->handler)(MIB_NODE_GET,
-                               found_node->closure,
-                               SUBID(temp_var->name,OIDLEN(temp_var->name)-1),
-                               varp, errp);
-        snmp_var_free(temp_var);
-        return 0;
-}
-
-/* Get the value of a given variable
-   Input:  node -- root node to start search from
-           varp[0][0] -- Variable to look for
-   Output: varp[0][0] -- Variable with value (not the same as on input!) 
-           errp[0]    -- Error status
-   Return: 0 -- OK */        
-int
-mib_get(struct mib_node_t *node, struct snmp_var **varp, int *errp)
-{
-        oid_t oid = (*varp)->name;
-        
-        if (mib_lookup(node, oid, OIDLEN(oid), &node) != MIB_MATCH_EXACT ||
-            !node->handler) {
-                *errp = SNMP_ERR_NOSUCHNAME;
-                return -1;
-        }
-
-        return (*node->handler)(MIB_NODE_GET, node->closure,
-                                SUBID(oid,OIDLEN(oid)-1),
-                                varp, errp);
-}
-
-/* Check if a variable can be set
-   Input: node -- tree node to start from
-          varp[0][0] -- variable to look for
-   Output:errp -- error status
-   Return: 0 -- OK */
-int
-mib_set_try(struct mib_node_t *node, struct snmp_var **varp, int *errp)
-{
-        oid_t oid = (*varp)->name;
-        
-        if (mib_lookup(node, oid, OIDLEN(oid), &node) != MIB_MATCH_EXACT ||
-            !node->handler) {
-                *errp = SNMP_ERR_NOSUCHNAME;
-                return -1;
-        }
-        
-        if ((*node->handler)(MIB_NODE_SET_TRY, node->closure,
-                             SUBID(oid,OIDLEN(oid)-1),
-                             varp, errp) != 0) 
-                return -1;
-        return 0;
-}
-
-/* Set a variable to the new value. The fuction must be called only
-   when previous call to mib_set_try returned OK, so only rudimentary
-   error checking is done.
-   Input: node -- tree node to start from
-          varp[0][0] -- variable to be set
-   Return: 0 -- OK */
-int
-mib_set(struct mib_node_t *node, struct snmp_var **varp)
-{
-        oid_t oid = (*varp)->name;
-        
-        if (mib_lookup(node, oid, OIDLEN(oid), &node) != MIB_MATCH_EXACT ||
-            !node->handler) {
-                return -1;
-        }
-        
-        return (*node->handler)(MIB_NODE_SET, node->closure,
-                                SUBID(oid,OIDLEN(oid)-1),
-                                varp, NULL);
-}
-
-/* ************************************************************************* */
-
-/* Generate response PDU for a given request.
-   Input: pdu -- Request pdu
-          access -- Access rights
-   Return:Response PDU, NULL on error */          
 struct snmp_pdu *
-snmp_agent_response(struct snmp_pdu *pdu, int access)
+snmp_agent_response(pdu, access)
+	struct snmp_pdu *pdu;
+	int access;
 {
-        struct snmp_pdu *answer = NULL;
-        struct snmp_var *vp, *vnew = NULL, **vpp;
-        struct snmp_var **vresp;
-        int index = 0;
+	struct snmp_pdu *answer = NULL;
+	oid_pf pf = NULL;
+	oid_sf sf = NULL;
+	oid *nextoid = NULL;
+	int nextoid_len = 0;
+	variable_list *vp, *vnew = NULL, **vpp;
+	variable_list **vresp;
+	int index = 0;
 
-        if ((answer = snmp_pdu_create(SNMP_PDU_RESPONSE))) {
-                answer->req_id = pdu->req_id;
-                answer->err_ind = 0;
-                switch (pdu->type) {
+	if ((answer = snmp_pdu_create(SNMP_PDU_RESPONSE))) {
+		answer->reqid = pdu->reqid;
+		answer->errindex = 0;
+		switch (pdu->command) {
 
-                case SNMP_PDU_SET:
-                        /* First, check for the consistency of
-                         * the request (rfc1157, 4.1.5):
-                         */
-                        GRAD_DEBUG(1, "SetRequest-PDU");
-                        if (access == SNMP_RO) {
-                                answer->err_stat = SNMP_ERR_GENERR;
-                                answer->err_ind = 1;
-                                GRAD_DEBUG(1,"bad access mode");
-                                return answer;
-                        }
-                        for (vp = pdu->var; vp; vp = vp->next) {
-                                index++;
+		case SNMP_PDU_SET:
+			/* First, check for the consistency of
+			 * the request (see rfc1157, 4.1.5):
+			 */
+			debug(1, ("SetRequest-PDU"));
+			answer->variables = pdu->variables;
+			if (access == SNMP_RO) {
+				answer->errstat = SNMP_ERR_GENERR;
+				answer->errindex = 1;
+				debug(1, ("bad access mode"));
+				return answer;
+			}
+			for (vp = pdu->variables; vp; vp = vp->next_variable) {
+				index++;
+				sf = snmp_tree_sf(mib_tree, 
+						  vp->name, vp->name_length);
+				if (!sf) {
+					answer->errstat = SNMP_ERR_NOSUCHNAME;
+					debug(1, ("No such oid"));
+					break;
+				} else if (!sf(vp, &answer->errstat)) 
+					break;
+			}
 
-                                if (mib_set_try(mib_tree, &vp,
-                                                &answer->err_stat))
-                                        break;
-                        }
+			if (answer->errstat != SNMP_ERR_NOERROR) {
+				answer->errindex = index;
+				debug(1, ("returning error"));
+				return answer;
+			}
 
-                        if (answer->err_stat != SNMP_ERR_NOERROR) {
-                                answer->var = snmp_var_dup_list(pdu->var);
-                                answer->err_ind = index;
-                                GRAD_DEBUG(1, "returning error");
-                                return answer;
-                        }
+			/* Do real work */
+			vresp = &answer->variables;
+			/* Loop through all variables */
+			for (vpp = &pdu->variables;
+			     *vpp;
+			     vpp = &(*vpp)->next_variable) {
+				vp = *vpp;
 
-                        /* Do real work */
-                        vresp = &answer->var;
-                        /* Loop through all variables */
-                        for (vpp = &pdu->var;
-                             *vpp;
-                             vpp = &(*vpp)->next) {
-                                vp = *vpp;
+				sf = snmp_tree_sf(mib_tree, 
+						  vp->name, vp->name_length);
+				vnew = sf(vp, NULL);
+				*vresp = vnew;
+				vresp = &vnew->next_variable;
+			}
 
-                                vnew = vp;
-                                mib_set(mib_tree, &vnew);
+			debug(1, ("success"));
+			return answer;
 
-                                *vresp = vnew;
-                                vresp = &vnew->next;
-                        }
+		case SNMP_PDU_GET:
+			debug(1, ("GetRequest-PDU"));
 
-                        GRAD_DEBUG(1, "success");
-                        return answer;
+			vresp = &answer->variables;
+			/* Loop through all variables */
+			for (vpp = &pdu->variables;
+			     *vpp;
+			     vpp = &(*vpp)->next_variable) {
+				vp = *vpp;
 
-                case SNMP_PDU_GET:
-                        GRAD_DEBUG(1, "GetRequest-PDU");
+				index++;
 
-                        vresp = &answer->var;
-                        /* Loop through all variables */
-                        for (vpp = &pdu->var; *vpp; vpp = &(*vpp)->next) {
-                                vp = *vpp;
+				pf = snmp_tree_pf(mib_tree,
+						  vp->name, vp->name_length);
+				if (!pf) {
+					answer->errstat = SNMP_ERR_NOSUCHNAME;
+					debug(1, ("No such oid"));
+				} else
+					vnew = (*pf)(vp, &answer->errstat);
 
-                                index++;
+				/* Was there an error? */
+				if (answer->errstat != SNMP_ERR_NOERROR ||
+				    vnew == NULL) {
+					answer->errindex = index;
+					debug(1, ("returning"));
+					/* Just copy the rest of the variables.  Quickly. */
+					*vresp = vp;
+					*vpp = NULL;
+					return answer;
+				}
+				/* No error.
+				 * Insert this var at the end, and move on
+				 * to the next.
+				 */
+				*vresp = vnew;
+				vresp = &vnew->next_variable;
+			}
+			return answer;
 
-                                vnew = vp;
-                                mib_get(mib_tree, &vnew,
-                                        &answer->err_stat);
-                                
-                                /* Was there an error? */
-                                if (answer->err_stat != SNMP_ERR_NOERROR
-                                    || vnew == NULL) {
-                                        answer->err_ind = index;
-                                        GRAD_DEBUG(1,"returning");
-                                        /* preserve the rest of vars */
-                                        *vresp = snmp_var_dup_list(vp);
-                                        return answer;
-                                }
-                                /* No error.
-                                 * Insert this var at the end, and move on
-                                 * to the next.
-                                 */
-                                *vresp = vnew;
-                                vresp = &vnew->next;
-                        }
-                        return answer;
+		case SNMP_PDU_GETNEXT:
+			debug(1, ("GetNextRequest-PDU"));
+			
+			pf = snmp_tree_next(mib_tree,
+					    pdu->variables->name,
+					    pdu->variables->name_length,
+					    &nextoid,
+					    (int *) & nextoid_len);
 
-                case SNMP_PDU_GETNEXT:
-                        GRAD_DEBUG(1, "GetNextRequest-PDU");
+			if (!pf) {
+				answer->errstat = SNMP_ERR_NOSUCHNAME;
+				debug(1, ("No such oid"));
+			} else {
+				efree(pdu->variables->name);
+				pdu->variables->name = dup_oid(nextoid, nextoid_len);
+				pdu->variables->name_length = nextoid_len;
+				vnew = (*pf)(pdu->variables, &answer->errstat);
+			}
 
-                        vresp = &answer->var;
-                        /* Loop through all variables */
-                        for (vpp = &pdu->var; *vpp; vpp = &(*vpp)->next) {
-                                vp = *vpp;
+			/* Was there an error? */
+			if (answer->errstat != SNMP_ERR_NOERROR) {
+				answer->errindex = 1;
+				answer->variables = pdu->variables;
+				pdu->variables = NULL;
+			} else {
+				answer->variables = vnew;
+			}
+			break;
 
-                                index++;
-                                vnew = vp;
-                                mib_get_next(mib_tree, &vnew,
-                                             &answer->err_stat);
-                                /* Was there an error? */
-                                if (answer->err_stat != SNMP_ERR_NOERROR
-                                    || vnew == NULL) {
-                                        answer->err_ind = index;
-                                        GRAD_DEBUG1(1, 
-                                                    "returning: err_stat=%d",
-						     answer->err_stat);
-                                        /* preserve the rest of vars */
-                                        *vresp = snmp_var_dup_list(vp);
-                                        return answer;
-                                }
-                                /* No error.
-                                 * Insert this var at the end, and move on
-                                 * to the next.
-                                 */
-                                *vresp = vnew;
-                                vresp = &vnew->next;
-                        }
-                        break;
-                        
-                default:
-                        snmp_pdu_free(answer);
-                        answer = NULL;
-                }
-        }
-        return answer;
+		default:
+			snmp_free_pdu(answer);
+			answer = NULL;
+		}
+	}
+	return answer;
 }
 
-/* ************************************************************************* */
 
-grad_counter_t
-timeval_diff(struct timeval *tva, struct timeval *tvb)
+counter
+timeval_diff(tva, tvb)
+	struct timeval *tva, *tvb;
 {
-        return  (tva->tv_sec - tvb->tv_sec)*100 +
-                (tva->tv_usec - tvb->tv_usec)/10000;
+	return  (tva->tv_sec - tvb->tv_sec)*100 +
+		(tva->tv_usec - tvb->tv_usec)/10000;
 }
 
-serv_stat
-abridge_server_state()
+
+variable_list *
+snmp_acct_var(list, errp)
+	variable_list *list;
+	int *errp;
 {
-        switch (server_stat->auth.status) {
-        case serv_init:
-        case serv_running:
-                return server_stat->auth.status;
-        case serv_other:
-        default:
-                return serv_other;
-        }
+	variable_list *ret;
+	struct timeval tv;
+	struct timezone tz;
+	char *p;
+	
+	ret = snmp_var_new(list->name, list->name_length);
+	*errp = SNMP_ERR_NOERROR;
+	switch (list->name[MIB_POS_radiusAccServ]) {
+	case MIB_KEY_radiusAccServIdent:
+		p = make_server_ident();
+		ret->type = ASN_OCTET_STR;
+		ret->val_len = strlen(p);
+		ret->val.string = p;
+		break;
+
+	case MIB_KEY_radiusAccServUpTime:
+		gettimeofday(&tv, &tz);
+		ret->type = SMI_TIMETICKS;
+		ret->val_len = sizeof(counter);
+		ret->val.integer = emalloc(ret->val_len);
+		*ret->val.integer = timeval_diff(&tv, &server_stat->start_time);
+		break;
+		
+	case MIB_KEY_radiusAccServResetTime:
+		gettimeofday(&tv, &tz);
+		ret->type = SMI_TIMETICKS;
+		ret->val_len = sizeof(counter);
+		ret->val.integer = emalloc(ret->val_len);
+		*ret->val.integer = timeval_diff(&tv, &server_stat->acct.reset_time);
+		break;
+
+	case MIB_KEY_radiusAccServConfigReset:
+		ret->type = ASN_INTEGER;
+		ret->val_len = sizeof(counter);
+		ret->val.integer = emalloc(ret->val_len);
+		*ret->val.integer = server_stat->acct.status;
+		break;
+		
+	case MIB_KEY_radiusAccServTotalRequests:
+		ret->type = SMI_COUNTER32;
+		ret->val_len = sizeof(counter);
+		ret->val.integer = emalloc(ret->val_len);
+		*ret->val.integer = server_stat->acct.num_req;
+		break;
+		
+	case MIB_KEY_radiusAccServTotalInvalidRequests:
+		ret->type = SMI_COUNTER32;
+		ret->val_len = sizeof(counter);
+		ret->val.integer = emalloc(ret->val_len);
+		*ret->val.integer = server_stat->acct.num_invalid_req;
+		break;
+		
+	case MIB_KEY_radiusAccServTotalDupRequests:
+		ret->type = SMI_COUNTER32;
+		ret->val_len = sizeof(counter);
+		ret->val.integer = emalloc(ret->val_len);
+		*ret->val.integer = server_stat->acct.num_dup_req;
+		break;
+		
+	case MIB_KEY_radiusAccServTotalResponses:
+		ret->type = SMI_COUNTER32;
+		ret->val_len = sizeof(counter);
+		ret->val.integer = emalloc(ret->val_len);
+		*ret->val.integer = server_stat->acct.num_resp;
+		break;
+		
+	case MIB_KEY_radiusAccServTotalMalformedRequests:
+		ret->type = SMI_COUNTER32;
+		ret->val_len = sizeof(counter);
+		ret->val.integer = emalloc(ret->val_len);
+		*ret->val.integer = server_stat->acct.num_bad_req;
+		break;
+		
+	case MIB_KEY_radiusAccServTotalBadAuthenticators:
+		ret->type = SMI_COUNTER32;
+		ret->val_len = sizeof(counter);
+		ret->val.integer = emalloc(ret->val_len);
+		*ret->val.integer = server_stat->acct.num_bad_sign;
+		break;
+		
+	case MIB_KEY_radiusAccServTotalPacketsDropped:
+		ret->type = SMI_COUNTER32;
+		ret->val_len = sizeof(counter);
+		ret->val.integer = emalloc(ret->val_len);
+		*ret->val.integer = server_stat->acct.num_dropped;
+		break;
+		
+	case MIB_KEY_radiusAccServTotalNoRecords:
+		ret->type = SMI_COUNTER32;
+		ret->val_len = sizeof(counter);
+		ret->val.integer = emalloc(ret->val_len);
+		*ret->val.integer = server_stat->acct.num_norecords;
+		break;
+		
+	case MIB_KEY_radiusAccServTotalUnknownTypes:
+		ret->type = SMI_COUNTER32;
+		ret->val_len = sizeof(counter);
+		ret->val.integer = emalloc(ret->val_len);
+		*ret->val.integer = server_stat->acct.num_unknowntypes;
+		break;
+		
+	default:
+		*errp = SNMP_ERR_NOSUCHNAME;
+		snmp_var_free(ret);
+		return NULL;
+	}
+	return ret;
 }
 
-/* ************************************************************************* */
-/* Auth sub-tree */
-
-struct snmp_var *snmp_auth_var_get(subid_t subid, oid_t oid, int *errp);
-int snmp_auth_var_set(subid_t subid, struct snmp_var **vp, int *errp);
-
-/* Handler function for fixed oids from the authentication subtree */
-int
-snmp_auth_handler(enum mib_node_cmd cmd, void *closure,
-		  subid_t subid, struct snmp_var **varp, int *errp)
+Mib_tree_node *
+snmp_acct_get(node, name, name_length)
+	Mib_tree_node *node;
+	oid *name;
+	int name_length;
 {
-        oid_t oid = (*varp)->name;
-        
-        switch (cmd) {
-        case MIB_NODE_GET:
-                if ((*varp = snmp_auth_var_get(subid, oid, errp)) == NULL)
-                        return -1;
-                break;
-                
-        case MIB_NODE_SET:
-                return snmp_auth_var_set(subid, varp, errp);
-                
-        case MIB_NODE_SET_TRY:
-                return snmp_auth_var_set(subid, varp, errp);
-                
-        case MIB_NODE_RESET:
-                break;
-                
-        default: /* unused: should never get there */
-                abort();
+	int ind = name[MIB_POS_radiusAccClient_INDEX];
+	NAS *nas = findnasbyindex(ind);
 
-        }
-        
-        return 0;
-}
-
-struct snmp_var *
-snmp_auth_var_get(subid_t subid, oid_t oid, int *errp)
-{
-        struct snmp_var *ret;
-        struct timeval tv;
-        struct timezone tz;
-        char *p;
-        
-        ret = snmp_var_create(oid);
-        *errp = SNMP_ERR_NOERROR;
-
-        switch (subid) {
-                
-        case MIB_KEY_AuthServIdent:
-                p = make_server_ident();
-                ret->type = ASN_OCTET_STR;
-                ret->val_length = strlen(p);
-                ret->var_str = snmp_strdup(p);
-                grad_free(p);
-                break;
-
-        case MIB_KEY_AuthServUpTime:
-                gettimeofday(&tv, &tz);
-                ret->type = SMI_TIMETICKS;
-                ret->val_length = sizeof(grad_counter_t);
-                ret->var_int = timeval_diff(&tv, &server_stat->start_time);
-                break;
-
-        case MIB_KEY_AuthServResetTime:
-                gettimeofday(&tv, &tz);
-                ret->type = SMI_TIMETICKS;
-                ret->val_length = sizeof(grad_counter_t);
-                ret->var_int = timeval_diff(&tv,
-                                            &server_stat->auth.reset_time);
-                break;
-
-        case MIB_KEY_AuthServConfigReset:
-                ret->type = ASN_INTEGER;
-                ret->val_length = sizeof(grad_counter_t);
-                ret->var_int = abridge_server_state();
-                break;
-
-        case MIB_KEY_AuthServTotalAccessRequests:
-                ret->type = SMI_COUNTER32;
-                ret->val_length = sizeof(grad_counter_t);
-                ret->var_int = server_stat->auth.num_access_req;
-                break;
-
-        case MIB_KEY_AuthServTotalInvalidRequests:
-                ret->type = SMI_COUNTER32;
-                ret->val_length = sizeof(grad_counter_t);
-                ret->var_int = server_stat->auth.num_invalid_req;
-                break;
-
-        case MIB_KEY_AuthServTotalDupAccessRequests:
-                ret->type = SMI_COUNTER32;
-                ret->val_length = sizeof(grad_counter_t);
-                ret->var_int = server_stat->auth.num_dup_req;
-                break;
-
-        case MIB_KEY_AuthServTotalAccessAccepts:
-                ret->type = SMI_COUNTER32;
-                ret->val_length = sizeof(grad_counter_t);
-                ret->var_int = server_stat->auth.num_accepts;
-                break;
-
-        case MIB_KEY_AuthServTotalAccessRejects:
-                ret->type = SMI_COUNTER32;
-                ret->val_length = sizeof(grad_counter_t);
-                ret->var_int = server_stat->auth.num_rejects;
-                break;
-
-        case MIB_KEY_AuthServTotalAccessChallenges:
-                ret->type = SMI_COUNTER32;
-                ret->val_length = sizeof(grad_counter_t);
-                ret->var_int = server_stat->auth.num_challenges;
-                break;
-
-        case MIB_KEY_AuthServTotalMalformedAccessRequests:
-                ret->type = SMI_COUNTER32;
-                ret->val_length = sizeof(grad_counter_t);
-                ret->var_int = server_stat->auth.num_bad_req;
-                break;
-
-        case MIB_KEY_AuthServTotalBadAuthenticators:
-                ret->type = SMI_COUNTER32;
-                ret->val_length = sizeof(grad_counter_t);
-                ret->var_int = server_stat->auth.num_bad_auth;
-                break;
-                
-        case MIB_KEY_AuthServTotalPacketsDropped:
-                ret->type = SMI_COUNTER32;
-                ret->val_length = sizeof(grad_counter_t);
-                ret->var_int = server_stat->auth.num_dropped;
-                break;
-
-        case MIB_KEY_AuthServTotalUnknownTypes:
-                ret->type = SMI_COUNTER32;
-                ret->val_length = sizeof(grad_counter_t);
-                ret->var_int = server_stat->auth.num_unknowntypes;
-                break;
-                
-        default:
-                *errp = SNMP_ERR_NOSUCHNAME;
-                snmp_var_free(ret);
-                return NULL;
-        }
-        return ret;
+	if (!nas)
+		return 0;
+	node->name[MIB_POS_radiusAccClient_INDEX] = ind;
+	return node;
 }
 
 int
-snmp_auth_var_set(subid_t subid, struct snmp_var **vp, int *errp)
+oidcmp(a, b, len)
+	oid *a, *b;
+	int len;
 {
-        if (errp) { /* just test */
-                *errp = SNMP_ERR_NOERROR;
-                switch (subid) {
-                
-                case MIB_KEY_AccServConfigReset:
-                        if ((*vp)->type != ASN_INTEGER ||
-                            (*vp)->var_int != serv_reset) {
-                                *errp = SNMP_ERR_BADVALUE;
-                                *vp = NULL;
-                        }
-                        break;
-                default:
-                        *errp = SNMP_ERR_BADVALUE;
-                        (*vp) = NULL;
-                }
-        } else {
-                /* do set it */
-                *vp = snmp_var_dup(*vp);
-                
-                switch (subid) {
-                        
-                case MIB_KEY_AccServConfigReset:
-                        server_stat->auth.status = serv_init;
-                        grad_log(L_INFO,
-                                 _("acct server re-initializing on SNMP request"));
-                        break;
-
-                }
-        }
-        return (*vp == NULL);
+	for (; len; len--) {
+		if (*a++ != *b++)
+			return len;
+	}
+	return 0;
 }
 
-/* Variable oids */
-
-void get_auth_nasstat(grad_nas_t *nas, struct snmp_var *var, int ind);
-int snmp_auth_v_handler(enum mib_node_cmd cmd, void *closure,
-                        subid_t subid, struct snmp_var **varp,
-                        int *errp);
-struct snmp_var *snmp_auth_var_v_get(subid_t subid, struct snmp_var *var,
-                                     int *errp);
-int snmp_auth_var_next(subid_t subid, struct auth_mib_data *closure);
-
-/* Handler function for variable oid of the authentication subtree */ 
+/* Compair oids of two variable lists. Order is significant.
+ * Return 0 if both lists match, 1 otherwise.
+ */
 int
-snmp_auth_v_handler(enum mib_node_cmd cmd, void *unused, subid_t subid,
-		    struct snmp_var **varp, int *errp)
+variable_cmp(v1, v2)
+	variable_list *v1, *v2;
 {
-        struct auth_mib_data *data = (struct auth_mib_data *)
-                                            snmpserv_get_data();
-        switch (cmd) {
-        case MIB_NODE_GET:
-                if ((*varp = snmp_auth_var_v_get(subid, *varp, errp)) == NULL)
-                        return -1;
-                break;
-                
-        case MIB_NODE_SET:
-        case MIB_NODE_SET_TRY:
-                /* None of these can be set */
-                if (errp)
-                        *errp = SNMP_ERR_NOSUCHNAME;
-                return -1;
-                
-        case MIB_NODE_COMPARE: 
-                return 0;
-                
-        case MIB_NODE_NEXT:
-                return snmp_auth_var_next(subid+1, data);
-
-        case MIB_NODE_GET_SUBID:
-                return data->nas_index;
-                
-        case MIB_NODE_RESET:
-                data->nas_index = 1;
-                break;
-                
-        }
-        
-        return 0;
+	while (v1) {
+		if (v1->name_length != v2->name_length ||
+		    oidcmp(v1->name, v2->name, v1->name_length))
+		    return 1;
+		v1 = v1->next_variable;
+		v2 = v2->next_variable;
+	}
+	return !(v1 == NULL && v2 == NULL);
 }
 
-int
-snmp_auth_var_next(subid_t subid, struct auth_mib_data *closure)
+Mib_tree_node *
+snmp_acct_getnext(node, name, name_length)
+	Mib_tree_node *node;
+	oid *name;
+	int name_length;
 {
-        if (!nas_lookup_index(subid)) 
-                return -1;
+	int ind;
+	NAS *nas;
+	char buf1[MAXOIDLEN], buf2[MAXOIDLEN];
+	
+	debug(2, ("node %s, name %s",
+		 sprint_oid(buf1, sizeof(buf1), node->name, node->len),
+		 sprint_oid(buf2, sizeof(buf2), name, name_length)));
 
-        closure->nas_index = subid;
-        return 0;
-}
+	if (oidcmp(name, node->name, node->len-1)) {
+		ind = 1;
+	} else {
+		ind = name[MIB_POS_radiusAccClient_INDEX] + 1;
+	} 
+	nas = findnasbyindex(ind);
+	
+	if (!nas) {
+		debug(2,("no more nodes"));
+ 		return 0;
+	}
+	debug(2,("NAS %d: %s", ind, nas->shortname));
 
-struct snmp_var *
-snmp_auth_var_v_get(subid_t subid, struct snmp_var *var, int *errp)
-{
-        struct snmp_var *ret;
-        subid_t key;
-        grad_nas_t *nas;
-        
-        ret = snmp_var_create(var->name);
-        *errp = SNMP_ERR_NOERROR;
-
-        switch (key = SUBID(var->name, OIDLEN(var->name)-2)) {
-        case MIB_KEY_AuthClientIndex:
-        case MIB_KEY_AuthClientAddress:
-        case MIB_KEY_AuthClientID:
-        case MIB_KEY_AuthServAccessRequests:
-        case MIB_KEY_AuthServDupAccessRequests:
-        case MIB_KEY_AuthServAccessAccepts:
-        case MIB_KEY_AuthServAccessRejects:
-        case MIB_KEY_AuthServAccessChallenges:
-        case MIB_KEY_AuthServMalformedAccessRequests:
-        case MIB_KEY_AuthServBadAuthenticators:
-        case MIB_KEY_AuthServPacketsDropped:
-        case MIB_KEY_AuthServUnknownTypes:
-                if ((nas = nas_lookup_index(subid)) != NULL &&
-                    nas->app_data) {
-                        get_auth_nasstat(nas, ret, key);
-                        break;
-                }
-                /*FALLTHRU*/
-        default:
-                *errp = SNMP_ERR_NOSUCHNAME;
-                snmp_var_free(ret);
-                return NULL;
-        }
-        return ret;
+	node->name[MIB_POS_radiusAccClient_INDEX] = ind;
+	return node;
 }
 
 void
-get_auth_nasstat(grad_nas_t *nas, struct snmp_var *var, int key)
+get_acct_nasstat(nas, var, ind)
+	NAS *nas;
+	variable_list *var;
+	int ind;
 {
-        struct nas_stat *statp = nas->app_data;
-        
-        switch (key) {
-        case MIB_KEY_AuthClientIndex:
-                var->type = ASN_INTEGER;
-                var->val_length = sizeof(int);
-                var->var_int = statp->index;
-                break;
-                
-        case MIB_KEY_AuthClientAddress:
-                var->type = SMI_IPADDRESS;
-                var->val_length = sizeof(grad_uint32_t);
-                var->var_str = snmp_alloc(sizeof(grad_uint32_t));
-                *(grad_uint32_t*)var->var_str = ntohl(statp->ipaddr);
-                break;
+	switch (ind) {
+	case MIB_KEY_radiusAccClientIndex:
+		var->type = ASN_INTEGER;
+		var->val_len = sizeof(int);
+		var->val.integer = emalloc(var->val_len);
+		*var->val.integer = nas->nas_stat->index;
+		break;
 
-        case MIB_KEY_AuthClientID:
-                var->type = ASN_OCTET_STR;
-                var->val_length = strlen(nas->longname);
-                var->var_str = snmp_strdup(nas->longname);
-                break;
+	case MIB_KEY_radiusAccClientAddress:
+		var->type = SMI_IPADDRESS;
+		var->val_len = sizeof(UINT4);
+		var->val.integer = emalloc(var->val_len);
+		*var->val.integer = ntohl(nas->nas_stat->ipaddr);
+		break;
 
-        case MIB_KEY_AuthServAccessRequests:
-                var->type = SMI_COUNTER32;
-                var->val_length = sizeof(grad_counter_t);
-                var->var_int = statp->auth.num_access_req;
-                break;
+	case MIB_KEY_radiusAccClientID:
+		var->type = ASN_OCTET_STR;
+		var->val_len = strlen(nas->longname)+1;
+		var->val.string = estrdup(nas->longname);
+		break;
 
-        case MIB_KEY_AuthServDupAccessRequests:
-                var->type = SMI_COUNTER32;
-                var->val_length = sizeof(grad_counter_t);
-                var->var_int = statp->auth.num_dup_req;
-                break;
+	case MIB_KEY_radiusAccServPacketsDropped:
+		var->type = SMI_COUNTER32;
+		var->val_len = sizeof(counter);
+		var->val.integer = emalloc(var->val_len);
+		*var->val.integer = nas->nas_stat->acct.num_dropped;
+		break;
 
-        case MIB_KEY_AuthServAccessAccepts:
-                var->type = SMI_COUNTER32;
-                var->val_length = sizeof(grad_counter_t);
-                var->var_int = statp->auth.num_accepts;
-                break;
+	case MIB_KEY_radiusAccServRequests:
+		var->type = SMI_COUNTER32;
+		var->val_len = sizeof(counter);
+		var->val.integer = emalloc(var->val_len);
+		*var->val.integer = nas->nas_stat->acct.num_req;
+		break;
 
-        case MIB_KEY_AuthServAccessRejects:
-                var->type = SMI_COUNTER32;
-                var->val_length = sizeof(grad_counter_t);
-                var->var_int = statp->auth.num_rejects;
-                break;
+	case MIB_KEY_radiusAccServDupRequests:
+		var->type = SMI_COUNTER32;
+		var->val_len = sizeof(counter);
+		var->val.integer = emalloc(var->val_len);
+		*var->val.integer = nas->nas_stat->acct.num_dup_req;
+		break;
 
-        case MIB_KEY_AuthServAccessChallenges:
-                var->type = SMI_COUNTER32;
-                var->val_length = sizeof(grad_counter_t);
-                var->var_int = statp->auth.num_challenges;
-                break;
+	case MIB_KEY_radiusAccServResponses:
+		var->type = SMI_COUNTER32;
+		var->val_len = sizeof(counter);
+		var->val.integer = emalloc(var->val_len);
+		*var->val.integer = nas->nas_stat->acct.num_resp;
+		break;
 
-        case MIB_KEY_AuthServMalformedAccessRequests:
-                var->type = SMI_COUNTER32;
-                var->val_length = sizeof(grad_counter_t);
-                var->var_int = statp->auth.num_bad_req;
-                break;
+	case MIB_KEY_radiusAccServBadAuthenticators:
+		var->type = SMI_COUNTER32;
+		var->val_len = sizeof(counter);
+		var->val.integer = emalloc(var->val_len);
+		*var->val.integer = nas->nas_stat->acct.num_bad_sign;
+		break;
 
-        case MIB_KEY_AuthServBadAuthenticators:
-                var->type = SMI_COUNTER32;
-                var->val_length = sizeof(grad_counter_t);
-                var->var_int = statp->auth.num_bad_auth;
-                break;
+	case MIB_KEY_radiusAccServMalformedRequests:
+		var->type = SMI_COUNTER32;
+		var->val_len = sizeof(counter);
+		var->val.integer = emalloc(var->val_len);
+		*var->val.integer = nas->nas_stat->acct.num_bad_req;
+		break;
 
-        case MIB_KEY_AuthServPacketsDropped:
-                var->type = SMI_COUNTER32;
-                var->val_length = sizeof(grad_counter_t);
-                var->var_int = statp->auth.num_dropped;
-                break;
+	case MIB_KEY_radiusAccServNoRecords:
+		var->type = SMI_COUNTER32;
+		var->val_len = sizeof(counter);
+		var->val.integer = emalloc(var->val_len);
+		*var->val.integer = nas->nas_stat->acct.num_norecords;
+		break;
 
-        case MIB_KEY_AuthServUnknownTypes:
-                var->type = SMI_COUNTER32;
-                var->val_length = sizeof(grad_counter_t);
-                var->var_int = statp->auth.num_unknowntypes;
-                break;
-                
-        }
+	case MIB_KEY_radiusAccServUnknownTypes:         
+		var->type = SMI_COUNTER32;
+		var->val_len = sizeof(counter);
+		var->val.integer = emalloc(var->val_len);
+		*var->val.integer = nas->nas_stat->acct.num_unknowntypes;
+		break;
+	}
 }
 
-
-/* ************************************************************************* */
-/* Accounting sub-tree */
-struct snmp_var *snmp_acct_var_get(subid_t subid, oid_t oid, int *errp);
-int snmp_acct_var_set(subid_t subid, struct snmp_var **vp, int *errp);
-
-/* Handler function for fixed oids from the authentication subtree */
-
-int
-snmp_acct_handler(enum mib_node_cmd cmd, void *closure, subid_t subid,
-		  struct snmp_var **varp, int *errp)
+variable_list *
+snmp_acct_client_var(list, errp)
+	variable_list *list;
+	int *errp;
 {
-        oid_t oid = (*varp)->name;
-        
-        switch (cmd) {
-        case MIB_NODE_GET:
-                if ((*varp = snmp_acct_var_get(subid, oid, errp)) == NULL)
-                        return -1;
-                break;
-                
-        case MIB_NODE_SET:
-                return snmp_acct_var_set(subid, varp, errp);
-                
-        case MIB_NODE_SET_TRY:
-                return snmp_acct_var_set(subid, varp, errp);
-                
-        case MIB_NODE_RESET:
-                break;
-                
-        default: /* unused: should never get there */
-                abort();
-
-        }
-        
-        return 0;
+	variable_list *ret;
+	NAS *nas;
+	
+	ret = snmp_var_new(list->name, list->name_length);
+	*errp = SNMP_ERR_NOERROR;
+	switch (list->name[MIB_POS_radiusAuthClient]) {
+	case MIB_KEY_radiusAccClientIndex:
+	case MIB_KEY_radiusAccClientAddress:
+	case MIB_KEY_radiusAccClientID:
+	case MIB_KEY_radiusAccServPacketsDropped:
+	case MIB_KEY_radiusAccServRequests:
+	case MIB_KEY_radiusAccServDupRequests:
+	case MIB_KEY_radiusAccServResponses:
+	case MIB_KEY_radiusAccServBadAuthenticators:
+	case MIB_KEY_radiusAccServMalformedRequests:
+	case MIB_KEY_radiusAccServNoRecords:
+	case MIB_KEY_radiusAccServUnknownTypes:         
+		if (list->name_length == MIB_POS_radiusAccClient_INDEX+1 &&
+		    (nas = findnasbyindex(list->name[MIB_POS_radiusAccClient_INDEX])) != NULL &&
+		    nas->nas_stat) {
+ 			get_acct_nasstat(nas, ret,
+					 list->name[MIB_POS_radiusAccClient]);
+			break;
+		}
+		/*FALLTHRU*/
+	default:
+		*errp = SNMP_ERR_NOSUCHNAME;
+		snmp_var_free(ret);
+		return NULL;
+	}
+	return ret;
 }
 
-struct snmp_var *
-snmp_acct_var_get(subid_t subid, oid_t oid, int *errp)
+variable_list *
+snmp_auth_compliance(list, errp)
+	variable_list *list;
+	int *errp;
 {
-        struct snmp_var *ret;
-        struct timeval tv;
-        struct timezone tz;
-        char *p;
-        
-        ret = snmp_var_create(oid);
-        *errp = SNMP_ERR_NOERROR;
-
-        switch (subid) {
-
-        case MIB_KEY_AccServIdent:
-                p = make_server_ident();
-                ret->type = ASN_OCTET_STR;
-                ret->val_length = strlen(p);
-                ret->var_str = snmp_strdup(p);
-                grad_free(p);
-                break;
-
-        case MIB_KEY_AccServUpTime:
-                gettimeofday(&tv, &tz);
-                ret->type = SMI_TIMETICKS;
-                ret->val_length = sizeof(grad_counter_t);
-                ret->var_int = timeval_diff(&tv, &server_stat->start_time);
-                break;
-                
-        case MIB_KEY_AccServResetTime:
-                gettimeofday(&tv, &tz);
-                ret->type = SMI_TIMETICKS;
-                ret->val_length = sizeof(grad_counter_t);
-                ret->var_int = timeval_diff(&tv, &server_stat->acct.reset_time);
-                break;
-
-        case MIB_KEY_AccServConfigReset:
-                ret->type = ASN_INTEGER;
-                ret->val_length = sizeof(grad_counter_t);
-                ret->var_int = abridge_server_state();
-                break;
-                
-        case MIB_KEY_AccServTotalRequests:
-                ret->type = SMI_COUNTER32;
-                ret->val_length = sizeof(grad_counter_t);
-                ret->var_int = server_stat->acct.num_req;
-                break;
-                
-        case MIB_KEY_AccServTotalInvalidRequests:
-                ret->type = SMI_COUNTER32;
-                ret->val_length = sizeof(grad_counter_t);
-                ret->var_int = server_stat->acct.num_invalid_req;
-                break;
-                
-        case MIB_KEY_AccServTotalDupRequests:
-                ret->type = SMI_COUNTER32;
-                ret->val_length = sizeof(grad_counter_t);
-                ret->var_int = server_stat->acct.num_dup_req;
-                break;
-                
-        case MIB_KEY_AccServTotalResponses:
-                ret->type = SMI_COUNTER32;
-                ret->val_length = sizeof(grad_counter_t);
-                ret->var_int = server_stat->acct.num_resp;
-                break;
-                
-        case MIB_KEY_AccServTotalMalformedRequests:
-                ret->type = SMI_COUNTER32;
-                ret->val_length = sizeof(grad_counter_t);
-                ret->var_int = server_stat->acct.num_bad_req;
-                break;
-                
-        case MIB_KEY_AccServTotalBadAuthenticators:
-                ret->type = SMI_COUNTER32;
-                ret->val_length = sizeof(grad_counter_t);
-                ret->var_int = server_stat->acct.num_bad_sign;
-                break;
-                
-        case MIB_KEY_AccServTotalPacketsDropped:
-                ret->type = SMI_COUNTER32;
-                ret->val_length = sizeof(grad_counter_t);
-                ret->var_int = server_stat->acct.num_dropped;
-                break;
-                
-        case MIB_KEY_AccServTotalNoRecords:
-                ret->type = SMI_COUNTER32;
-                ret->val_length = sizeof(grad_counter_t);
-                ret->var_int = server_stat->acct.num_norecords;
-                break;
-                
-        case MIB_KEY_AccServTotalUnknownTypes:
-                ret->type = SMI_COUNTER32;
-                ret->val_length = sizeof(grad_counter_t);
-                ret->var_int = server_stat->acct.num_unknowntypes;
-                break;
-                
-        default:
-                *errp = SNMP_ERR_NOSUCHNAME;
-                snmp_var_free(ret);
-                return NULL;
-        }
-        return ret;
+	*errp = SNMP_ERR_NOERROR;
+	return NULL;
 }
 
-int
-snmp_acct_var_set(subid_t subid, struct snmp_var **vp, int *errp)
+variable_list *
+snmp_auth_mib_group(list, errp)
+	variable_list *list;
+	int *errp;
 {
-        if (errp) { /* just test */
-                *errp = SNMP_ERR_NOERROR;
-                switch (subid) {
-                
-                case MIB_KEY_AuthServConfigReset:
-                        if ((*vp)->type != ASN_INTEGER ||
-                            (*vp)->var_int != serv_reset) {
-                                *errp = SNMP_ERR_BADVALUE;
-                                *vp = NULL;
-                        }
-                        break;
-                default:
-                        *errp = SNMP_ERR_BADVALUE;
-                        (*vp) = NULL;
-                }
-        } else {
-                /* do set it */
-                *vp = snmp_var_dup(*vp);
-                
-                switch (subid) {
-
-                case MIB_KEY_AuthServConfigReset:
-                        server_stat->auth.status = serv_init;
-                        grad_log(L_INFO,
-                                 _("auth server re-initializing on SNMP request"));
-                        break;
-
-                }
-        }
-        return (*vp == NULL);
+	*errp = SNMP_ERR_NOERROR;
+	return NULL;
 }
 
-void get_acct_nasstat(grad_nas_t *nas, struct snmp_var *var, int key);
-int snmp_acct_v_handler(enum mib_node_cmd cmd, void *closure,
-                        subid_t subid, struct snmp_var **varp,
-                        int *errp);
-struct snmp_var *snmp_acct_var_v_get(subid_t subid, struct snmp_var *var,
-                                     int *errp);
-
-/* Handler function for variable oid of the authentication subtree */ 
-int
-snmp_acct_v_handler(enum mib_node_cmd cmd, void *unused, subid_t subid,
-		    struct snmp_var **varp, int *errp)
+variable_list *
+snmp_auth_var(list, errp)
+	variable_list *list;
+	int *errp;
 {
-        struct auth_mib_data *data = (struct auth_mib_data *)
-                                        snmpserv_get_data();
-        switch (cmd) {
-        case MIB_NODE_GET:
-                if ((*varp = snmp_acct_var_v_get(subid, *varp, errp)) == NULL)
-                        return -1;
-                break;
-                
-        case MIB_NODE_SET:
-        case MIB_NODE_SET_TRY:
-                /* None of these can be set */
-                if (errp)
-                        *errp = SNMP_ERR_NOSUCHNAME;
-                return -1;
-                
-        case MIB_NODE_COMPARE: 
-                return 0;
-                
-        case MIB_NODE_NEXT:
-                return snmp_auth_var_next(subid+1, data);
-                
-        case MIB_NODE_GET_SUBID:
-                return data->nas_index;
-                
-        case MIB_NODE_RESET:
-                data->nas_index = 1;
-                break;
+	variable_list *ret;
+	struct timeval tv;
+	struct timezone tz;
+	char *p;
+	
+	ret = snmp_var_new(list->name, list->name_length);
+	*errp = SNMP_ERR_NOERROR;
+	switch (list->name[MIB_POS_radiusAuthServ]) {
+		
+	case MIB_KEY_radiusAuthServIdent:
+		p = make_server_ident();
+		ret->type = ASN_OCTET_STR;
+		ret->val_len = strlen(p);
+		ret->val.string = p;
+		break;
 
-        }
-        
-        return 0;
+	case MIB_KEY_radiusAuthServUpTime:
+		gettimeofday(&tv, &tz);
+		ret->type = SMI_TIMETICKS;
+		ret->val_len = sizeof(counter);
+		ret->val.integer = emalloc(ret->val_len);
+		*ret->val.integer = timeval_diff(&tv, &server_stat->start_time);
+		break;
+
+	case MIB_KEY_radiusAuthServResetTime:
+		gettimeofday(&tv, &tz);
+		ret->type = SMI_TIMETICKS;
+		ret->val_len = sizeof(counter);
+		ret->val.integer = emalloc(ret->val_len);
+		*ret->val.integer = timeval_diff(&tv, &server_stat->auth.reset_time);
+		break;
+
+	case MIB_KEY_radiusAuthServConfigReset:
+		ret->type = ASN_INTEGER;
+		ret->val_len = sizeof(counter);
+		ret->val.integer = emalloc(ret->val_len);
+		*ret->val.integer = server_stat->auth.status;
+		break;
+
+	case MIB_KEY_radiusAuthServTotalAccessRequests:
+		ret->type = SMI_COUNTER32;
+		ret->val_len = sizeof(counter);
+		ret->val.integer = emalloc(ret->val_len);
+		*ret->val.integer = server_stat->auth.num_access_req;
+		break;
+
+	case MIB_KEY_radiusAuthServTotalInvalidRequests:
+		ret->type = SMI_COUNTER32;
+		ret->val_len = sizeof(counter);
+		ret->val.integer = emalloc(ret->val_len);
+		*ret->val.integer = server_stat->auth.num_invalid_req;
+		break;
+
+	case MIB_KEY_radiusAuthServTotalDupAccessRequests:
+		ret->type = SMI_COUNTER32;
+		ret->val_len = sizeof(counter);
+		ret->val.integer = emalloc(ret->val_len);
+		*ret->val.integer = server_stat->auth.num_dup_req;
+		break;
+
+	case MIB_KEY_radiusAuthServTotalAccessAccepts:
+		ret->type = SMI_COUNTER32;
+		ret->val_len = sizeof(counter);
+		ret->val.integer = emalloc(ret->val_len);
+		*ret->val.integer = server_stat->auth.num_accepts;
+		break;
+
+	case MIB_KEY_radiusAuthServTotalAccessRejects:
+		ret->type = SMI_COUNTER32;
+		ret->val_len = sizeof(counter);
+		ret->val.integer = emalloc(ret->val_len);
+		*ret->val.integer = server_stat->auth.num_rejects;
+		break;
+
+	case MIB_KEY_radiusAuthServTotalAccessChallenges:
+		ret->type = SMI_COUNTER32;
+		ret->val_len = sizeof(counter);
+		ret->val.integer = emalloc(ret->val_len);
+		*ret->val.integer = server_stat->auth.num_challenges;
+		break;
+
+	case MIB_KEY_radiusAuthServTotalMalformedAccessRequests:
+		ret->type = SMI_COUNTER32;
+		ret->val_len = sizeof(counter);
+		ret->val.integer = emalloc(ret->val_len);
+		*ret->val.integer = server_stat->auth.num_bad_req;
+		break;
+
+	case MIB_KEY_radiusAuthServTotalBadAuthenticators:
+		ret->type = SMI_COUNTER32;
+		ret->val_len = sizeof(counter);
+		ret->val.integer = emalloc(ret->val_len);
+		*ret->val.integer = server_stat->auth.num_bad_auth;
+		break;
+		
+	case MIB_KEY_radiusAuthServTotalPacketsDropped:
+		ret->type = SMI_COUNTER32;
+		ret->val_len = sizeof(counter);
+		ret->val.integer = emalloc(ret->val_len);
+		*ret->val.integer = server_stat->auth.num_dropped;
+		break;
+
+	case MIB_KEY_radiusAuthServTotalUnknownTypes:
+		ret->type = SMI_COUNTER32;
+		ret->val_len = sizeof(counter);
+		ret->val.integer = emalloc(ret->val_len);
+		*ret->val.integer = server_stat->auth.num_unknowntypes;
+		break;
+		
+	default:
+		*errp = SNMP_ERR_NOSUCHNAME;
+		snmp_var_free(ret);
+		return NULL;
+	}
+	return ret;
 }
 
-struct snmp_var *
-snmp_acct_var_v_get(subid_t subid, struct snmp_var *var, int *errp)
+Mib_tree_node *
+snmp_auth_get(node, name, name_length)
+	Mib_tree_node *node;
+	oid *name;
+	int name_length;
 {
-        struct snmp_var *ret;
-        subid_t key;
-        grad_nas_t *nas;
-        
-        ret = snmp_var_create(var->name);
-        *errp = SNMP_ERR_NOERROR;
+	int ind = name[MIB_POS_radiusAuthClient_INDEX];
+	NAS *nas = findnasbyindex(ind);
 
-        switch (key = SUBID(var->name, OIDLEN(var->name)-2)) {
-        case MIB_KEY_AccClientIndex:
-        case MIB_KEY_AccClientAddress:
-        case MIB_KEY_AccClientID:
-        case MIB_KEY_AccServPacketsDropped:
-        case MIB_KEY_AccServRequests:
-        case MIB_KEY_AccServDupRequests:
-        case MIB_KEY_AccServResponses:
-        case MIB_KEY_AccServBadAuthenticators:
-        case MIB_KEY_AccServMalformedRequests:
-        case MIB_KEY_AccServNoRecords:
-        case MIB_KEY_AccServUnknownTypes:         
-                if ((nas = nas_lookup_index(subid)) != NULL &&
-                     nas->app_data) {
-                        get_acct_nasstat(nas, ret, key);
-                        break;
-                }
-                /*FALLTHRU*/
-        default:
-                *errp = SNMP_ERR_NOSUCHNAME;
-                snmp_var_free(ret);
-                return NULL;
-        }
-        return ret;
+	if (!nas)
+		return 0;
+	node->name[MIB_POS_radiusAuthClient_INDEX] = ind;
+	return node;
+}
+
+Mib_tree_node *
+snmp_auth_getnext(node, name, name_length)
+	Mib_tree_node *node;
+	oid *name;
+	int name_length;
+{
+	int ind;
+	NAS *nas;
+	char buf1[MAXOIDLEN], buf2[MAXOIDLEN];
+	
+	debug(2,
+		("node %s, name %s",
+		 sprint_oid(buf1, sizeof(buf1), node->name, node->len),
+		 sprint_oid(buf2, sizeof(buf2), name, name_length)));
+
+	if (oidcmp(name, node->name, node->len-1)) {
+		ind = 1;
+	} else {
+		ind = name[MIB_POS_radiusAuthClient_INDEX] + 1;
+	} 
+	nas = findnasbyindex(ind);
+
+	if (!nas) {
+		debug(2,("no more nodes"));
+		return 0;
+	}
+	debug(2, ("NAS %d: %s", ind, nas->shortname));
+
+	node->name[MIB_POS_radiusAuthClient_INDEX] = ind;
+	return node;
 }
 
 void
-get_acct_nasstat(grad_nas_t *nas, struct snmp_var *var, int key)
+get_nasstat(nas, var, ind)
+	NAS *nas;
+	variable_list *var;
+	int ind;
 {
-        struct nas_stat *statp = nas->app_data;
-        
-        switch (key) {
-        case MIB_KEY_AccClientIndex:
-                var->type = ASN_INTEGER;
-                var->val_length = sizeof(int);
-                var->var_int = statp->index;
-                break;
+	switch (ind) {
+	case MIB_KEY_radiusAuthClientIndex:
+		var->type = ASN_INTEGER;
+		var->val_len = sizeof(int);
+		var->val.integer = emalloc(var->val_len);
+		*var->val.integer = nas->nas_stat->index;
+		break;
+		
+	case MIB_KEY_radiusAuthClientAddress:
+		var->type = SMI_IPADDRESS;
+		var->val_len = sizeof(UINT4);
+		var->val.integer = emalloc(var->val_len);
+		*var->val.integer = ntohl(nas->nas_stat->ipaddr);
+		break;
 
-        case MIB_KEY_AccClientAddress:
-                var->type = SMI_IPADDRESS;
-                var->val_length = sizeof(grad_uint32_t);
-                var->var_str = snmp_alloc(sizeof(grad_uint32_t));
-                *(grad_uint32_t*)var->var_str = ntohl(statp->ipaddr);
-                break;
+	case MIB_KEY_radiusAuthClientID:
+		var->type = ASN_OCTET_STR;
+		var->val_len = strlen(nas->longname)+1;
+		var->val.string = estrdup(nas->longname);
+		break;
 
-        case MIB_KEY_AccClientID:
-                var->type = ASN_OCTET_STR;
-                var->val_length = strlen(nas->longname);
-                var->var_str = snmp_strdup(nas->longname);
-                break;
+	case MIB_KEY_radiusAuthServAccessRequests:
+		var->type = SMI_COUNTER32;
+		var->val_len = sizeof(counter);
+		var->val.integer = emalloc(var->val_len);
+		*var->val.integer = nas->nas_stat->auth.num_access_req;
+		break;
 
-        case MIB_KEY_AccServPacketsDropped:
-                var->type = SMI_COUNTER32;
-                var->val_length = sizeof(grad_counter_t);
-                var->var_int = statp->acct.num_dropped;
-                break;
+	case MIB_KEY_radiusAuthServDupAccessRequests:
+		var->type = SMI_COUNTER32;
+		var->val_len = sizeof(counter);
+		var->val.integer = emalloc(var->val_len);
+		*var->val.integer = nas->nas_stat->auth.num_dup_req;
+		break;
 
-        case MIB_KEY_AccServRequests:
-                var->type = SMI_COUNTER32;
-                var->val_length = sizeof(grad_counter_t);
-                var->var_int = statp->acct.num_req;
-                break;
+	case MIB_KEY_radiusAuthServAccessAccepts:
+		var->type = SMI_COUNTER32;
+		var->val_len = sizeof(counter);
+		var->val.integer = emalloc(var->val_len);
+		*var->val.integer = nas->nas_stat->auth.num_accepts;
+		break;
 
-        case MIB_KEY_AccServDupRequests:
-                var->type = SMI_COUNTER32;
-                var->val_length = sizeof(grad_counter_t);
-                var->var_int = statp->acct.num_dup_req;
-                break;
+	case MIB_KEY_radiusAuthServAccessRejects:
+		var->type = SMI_COUNTER32;
+		var->val_len = sizeof(counter);
+		var->val.integer = emalloc(var->val_len);
+		*var->val.integer = nas->nas_stat->auth.num_rejects;
+		break;
 
-        case MIB_KEY_AccServResponses:
-                var->type = SMI_COUNTER32;
-                var->val_length = sizeof(grad_counter_t);
-                var->var_int = statp->acct.num_resp;
-                break;
+	case MIB_KEY_radiusAuthServAccessChallenges:
+		var->type = SMI_COUNTER32;
+		var->val_len = sizeof(counter);
+		var->val.integer = emalloc(var->val_len);
+		*var->val.integer = nas->nas_stat->auth.num_challenges;
+		break;
 
-        case MIB_KEY_AccServBadAuthenticators:
-                var->type = SMI_COUNTER32;
-                var->val_length = sizeof(grad_counter_t);
-                var->var_int = statp->acct.num_bad_sign;
-                break;
+	case MIB_KEY_radiusAuthServMalformedAccessRequests:
+		var->type = SMI_COUNTER32;
+		var->val_len = sizeof(counter);
+		var->val.integer = emalloc(var->val_len);
+		*var->val.integer = nas->nas_stat->auth.num_bad_req;
+		break;
 
-        case MIB_KEY_AccServMalformedRequests:
-                var->type = SMI_COUNTER32;
-                var->val_length = sizeof(grad_counter_t);
-                var->var_int = statp->acct.num_bad_req;
-                break;
+	case MIB_KEY_radiusAuthServBadAuthenticators:
+		var->type = SMI_COUNTER32;
+		var->val_len = sizeof(counter);
+		var->val.integer = emalloc(var->val_len);
+		*var->val.integer = nas->nas_stat->auth.num_bad_auth;
+		break;
 
-        case MIB_KEY_AccServNoRecords:
-                var->type = SMI_COUNTER32;
-                var->val_length = sizeof(grad_counter_t);
-                var->var_int = statp->acct.num_norecords;
-                break;
+	case MIB_KEY_radiusAuthServPacketsDropped:
+		var->type = SMI_COUNTER32;
+		var->val_len = sizeof(counter);
+		var->val.integer = emalloc(var->val_len);
+		*var->val.integer = nas->nas_stat->auth.num_dropped;
+		break;
 
-        case MIB_KEY_AccServUnknownTypes:         
-                var->type = SMI_COUNTER32;
-                var->val_length = sizeof(grad_counter_t);
-                var->var_int = statp->acct.num_unknowntypes;
-                break;
-        }
-}
-
-/* ************************************************************************* */
-/* Server */
-struct snmp_var *snmp_serv_var_get(subid_t subid, oid_t oid, int *errp);
-int snmp_serv_var_set(subid_t subid, struct snmp_var **vp, int *errp);
-
-/* Handler function for fixed oids from the server subtree */
-
-int
-snmp_serv_handler(enum mib_node_cmd cmd, void *closure,
-		  subid_t subid, struct snmp_var **varp, int *errp)
-{
-        oid_t oid = (*varp)->name;
-        
-        switch (cmd) {
-        case MIB_NODE_GET:
-                if ((*varp = snmp_serv_var_get(subid, oid, errp)) == NULL)
-                        return -1;
-                break;
-                
-        case MIB_NODE_SET:
-                return snmp_serv_var_set(subid, varp, errp);
-                
-        case MIB_NODE_SET_TRY:
-                return snmp_serv_var_set(subid, varp, errp);
-                
-        case MIB_NODE_RESET:
-                break;
-                
-        default: /* unused: should never get there */
-                abort();
-
-        }
-        
-        return 0;
-}
-
-struct snmp_var *
-snmp_serv_var_get(subid_t subid, oid_t oid, int *errp)
-{
-        struct snmp_var *ret;
-        struct timeval tv;
-        struct timezone tz;
-        
-        ret = snmp_var_create(oid);
-        *errp = SNMP_ERR_NOERROR;
-
-        switch (subid) {
-
-        case MIB_KEY_radiusServerUpTime:
-                gettimeofday(&tv, &tz);
-                ret->type = SMI_TIMETICKS;
-                ret->val_length = sizeof(grad_counter_t);
-                ret->var_int = timeval_diff(&tv, &server_stat->start_time);
-                break;
-
-        case MIB_KEY_radiusServerResetTime:
-                gettimeofday(&tv, &tz);
-                ret->type = SMI_TIMETICKS;
-                ret->val_length = sizeof(grad_counter_t);
-                ret->var_int = timeval_diff(&tv,
-                                            &server_stat->auth.reset_time);
-                break;
-
-        case MIB_KEY_radiusServerState:
-                ret->type = ASN_INTEGER;
-                ret->val_length = sizeof(grad_counter_t);
-                ret->var_int = server_stat->auth.status;/*FIXME*/
-                break;
-        default:
-                *errp = SNMP_ERR_NOSUCHNAME;
-                snmp_var_free(ret);
-                return NULL;
-        }
-        return ret;
-}
-
-int
-snmp_serv_var_set(subid_t subid, struct snmp_var **vp, int *errp)
-{
-        if (errp) { /* just test */
-                *errp = SNMP_ERR_NOERROR;
-                switch (subid) {
-                
-                case MIB_KEY_radiusServerState:
-                        if ((*vp)->type != ASN_INTEGER) {
-                                *errp = SNMP_ERR_BADVALUE;
-                                *vp = NULL;
-                        } else {
-                                switch ((*vp)->var_int) {
-                                case serv_reset:
-                                case serv_init:
-                                case serv_running:
-                                case serv_suspended:
-                                case serv_shutdown:
-                                        break;
-                                default:
-                                        *errp = SNMP_ERR_BADVALUE;
-                                        *vp = NULL;
-                                }
-                        }
-                        break;
-                default:
-                        *errp = SNMP_ERR_BADVALUE;
-                        (*vp) = NULL;
-                }
-        } else {
-                /* do set it */
-                *vp = snmp_var_dup(*vp);
-                
-                switch (subid) {
-
-                case MIB_KEY_radiusServerState:
-                        server_stat->auth.status = (*vp)->var_int;
-                        switch ((*vp)->var_int) {
-                        case serv_reset:
-                                grad_log(L_NOTICE,
-                                         _("server re-initializing on SNMP request"));
-                                break;
-                        case serv_init:
-                                grad_log(L_NOTICE,
-                                         _("server restart on SNMP request"));
-                                break;
-                        case serv_running:
-                                grad_log(L_NOTICE,
-                                         _("server continuing on SNMP request"));
-                                break;
-                        case serv_suspended:
-                                grad_log(L_NOTICE,
-                                         _("server suspending on SNMP request"));
-                                break;
-                        case serv_shutdown:
-                                grad_log(L_NOTICE,
-                                         _("server shutting down on SNMP request"));
-                                break;
-                        }
-                        break;
-
-                }
-        }
-        return (*vp == NULL);
+	case MIB_KEY_radiusAuthServUnknownTypes:
+		var->type = SMI_COUNTER32;
+		var->val_len = sizeof(counter);
+		var->val.integer = emalloc(var->val_len);
+		*var->val.integer = nas->nas_stat->auth.num_unknowntypes;
+		break;
+		
+	}
 }
 
 
-/* ************************************************************************* */
-/* Statistics */
-struct snmp_var *snmp_stat_var_get(subid_t subid, oid_t oid, int *errp);
-int snmp_stat_var_set(subid_t subid, struct snmp_var **vp, int *errp);
-
-/* Handler function for fixed oids from the authentication subtree */
-
-int
-snmp_stat_handler(enum mib_node_cmd cmd, void *closure, subid_t subid,
-		  struct snmp_var **varp, int *errp)
+variable_list *
+snmp_auth_client_var(list, errp)
+	variable_list *list;
+	int *errp;
 {
-        oid_t oid = (*varp)->name;
-        
-        switch (cmd) {
-        case MIB_NODE_GET:
-                if ((*varp = snmp_stat_var_get(subid, oid, errp)) == NULL)
-                        return -1;
-                break;
-                
-        case MIB_NODE_SET:
-        case MIB_NODE_SET_TRY:
-                /*FIXME: return snmp_stat_var_set(subid, varp, errp); */
-                *errp = SNMP_ERR_BADVALUE;
-                return -1;
-                
-        case MIB_NODE_RESET:
-                break;
-                
-        default: /* unused: should never get there */
-                abort();
-
-        }
-        
-        return 0;
+	variable_list *ret;
+	NAS *nas;
+	
+	ret = snmp_var_new(list->name, list->name_length);
+	*errp = SNMP_ERR_NOERROR;
+	switch (list->name[MIB_POS_radiusAuthClient]) {
+	case MIB_KEY_radiusAuthClientIndex:
+	case MIB_KEY_radiusAuthClientAddress:
+	case MIB_KEY_radiusAuthClientID:
+	case MIB_KEY_radiusAuthServAccessRequests:
+	case MIB_KEY_radiusAuthServDupAccessRequests:
+	case MIB_KEY_radiusAuthServAccessAccepts:
+	case MIB_KEY_radiusAuthServAccessRejects:
+	case MIB_KEY_radiusAuthServAccessChallenges:
+	case MIB_KEY_radiusAuthServMalformedAccessRequests:
+	case MIB_KEY_radiusAuthServBadAuthenticators:
+	case MIB_KEY_radiusAuthServPacketsDropped:
+	case MIB_KEY_radiusAuthServUnknownTypes:
+		if (list->name_length == MIB_POS_radiusAuthClient_INDEX+1 &&
+		    (nas = findnasbyindex(list->name[MIB_POS_radiusAuthClient_INDEX])) != NULL &&
+		    nas->nas_stat) {
+ 			get_nasstat(nas, ret,
+				    list->name[MIB_POS_radiusAuthClient]);
+			break;
+		}
+		/*FALLTHRU*/
+	default:
+		*errp = SNMP_ERR_NOSUCHNAME;
+		snmp_var_free(ret);
+		return NULL;
+	}
+	return ret;
 }
 
-struct snmp_var *
-snmp_stat_var_get(subid_t subid, oid_t oid, int *errp)
+variable_list *
+snmp_auth_set(vp, errp)
+	variable_list *vp;
+	int *errp;
 {
-        struct snmp_var *ret;
-        struct timeval tv;
-        struct timezone tz;
-        char *p;
-        
-        ret = snmp_var_create(oid);
-        *errp = SNMP_ERR_NOERROR;
+	if (errp) { /* just test */
+		*errp = SNMP_ERR_NOERROR;
+		switch (vp->name[MIB_POS_radiusAuthServ]) {
+		
+		case MIB_KEY_radiusAuthServConfigReset:
+			if (vp->type != ASN_INTEGER ||
+			    vp->val_len != sizeof(int) ||
+			    *vp->val.integer != serv_reset) {
+				*errp = SNMP_ERR_BADVALUE;
+				vp = NULL;
+			}
+			break;
+		default:
+			*errp = SNMP_ERR_BADVALUE;
+			vp = NULL;
+		}
+	} else {
+		vp = snmp_var_clone(vp);
 
-        switch (subid) {
+		switch (vp->name[MIB_POS_radiusAuthServ]) {
 
-        case MIB_KEY_StatIdent:
-                p = make_server_ident();
-                ret->type = ASN_OCTET_STR;
-                ret->val_length = strlen(p);
-                ret->var_str = snmp_strdup(p);
-                grad_free(p);
-                break;
+		case MIB_KEY_radiusAuthServConfigReset:
+			server_stat->auth.status = serv_init;
+			radlog(L_INFO, _("auth server re-initializing on SNMP request"));
+			break;
 
-        case MIB_KEY_StatUpTime:
-                gettimeofday(&tv, &tz);
-                ret->type = SMI_TIMETICKS;
-                ret->val_length = sizeof(grad_counter_t);
-                ret->var_int = timeval_diff(&tv, &radstat.start_time);
-                break;
-
-        case MIB_KEY_StatConfigReset:
-                ret->type = ASN_INTEGER;
-                ret->val_length = sizeof(grad_counter_t);
-                ret->var_int = serv_running;;
-                break;
-
-        case MIB_KEY_StatTotalLines:
-                ret->type = SMI_COUNTER32;
-                ret->val_length = sizeof(grad_counter_t);
-                stat_count_ports();
-                ret->var_int = radstat.port_active_count
-                            + radstat.port_idle_count;
-                break;
-
-        case MIB_KEY_StatTotalLinesInUse:
-                ret->type = SMI_COUNTER32;
-                ret->val_length = sizeof(grad_counter_t);
-                stat_count_ports();
-                ret->var_int = radstat.port_active_count;
-                break;
-
-        case MIB_KEY_StatTotalLinesIdle:
-                ret->type = SMI_COUNTER32;
-                ret->val_length = sizeof(grad_counter_t);
-                stat_count_ports();
-                ret->var_int = radstat.port_idle_count;
-                break;
-                
-        default:
-                *errp = SNMP_ERR_NOSUCHNAME;
-                snmp_var_free(ret);
-                return NULL;
-        }
-        return ret;
+		}
+	}
+	return vp;
 }
 
-int
-snmp_stat_nas(int num, enum mib_node_cmd cmd, struct nas_data *closure,
-	      subid_t subid, struct snmp_var **varp, int *errp)
+variable_list *
+snmp_acct_set(vp, errp)
+	variable_list *vp;
+	int *errp;
 {
-        grad_nas_t *nas;
-        struct nas_stat *nsp;
-        grad_uint32_t ip;
-        struct snmp_var *var;
-        int len;
-        
-        switch (cmd) {
-        case MIB_NODE_GET:
-                if (SUBID((*varp)->name, 6) == 9163)
-                        len = LEN_grad_NASIndex4;
-                else
-                        len = LEN_NASIndex4;
-                        
-                if (num != 3 || OIDLEN((*varp)->name) != len) {
-                        *errp = SNMP_ERR_NOSUCHNAME;
-                        return -1;
-                }
-                ip = (closure->quad[0]<<24)+
-                        (closure->quad[1]<<16)+
-                        (closure->quad[2]<<8) +
-                        closure->quad[3];
+	if (errp) { /* just test */
+		*errp = SNMP_ERR_NOERROR;
+		switch (vp->name[MIB_POS_radiusAccServ]) {
+		
+		case MIB_KEY_radiusAccServConfigReset:
+			if (vp->type != ASN_INTEGER ||
+			    vp->val_len != sizeof(int) ||
+			    *vp->val.integer != serv_reset) {
+				*errp = SNMP_ERR_BADVALUE;
+				vp = NULL;
+			}
+			break;
 
-                if ((nsp = find_nas_stat(ip)) == NULL) {
-                        *errp = SNMP_ERR_NOSUCHNAME;
-                        return -1;
-                }
+		default:
+			*errp = SNMP_ERR_BADVALUE;
+			vp = NULL;
+		}
+	} else {
+		vp = snmp_var_clone(vp);
+		switch (vp->name[MIB_POS_radiusAccServ]) {
 
-                *errp = SNMP_ERR_NOERROR;
-                var = snmp_var_create((*varp)->name);
-                var->type = ASN_INTEGER;
-                var->val_length = sizeof(int);
-                var->var_int = nsp->index;
+		case MIB_KEY_radiusAccServConfigReset:
+			server_stat->auth.status = serv_init;
+			radlog(L_INFO, _("acct server re-initializing on SNMP request"));
+			break;
 
-                *varp = var;
-                break;
-                
-        case MIB_NODE_SET:
-        case MIB_NODE_SET_TRY:
-                /* None of these can be set */
-                if (errp)
-                        *errp = SNMP_ERR_NOSUCHNAME;
-                return -1;
-                
-        case MIB_NODE_COMPARE:
-                closure->quad[num] = subid;
-                return 0;
-                
-        case MIB_NODE_NEXT:
-                if (num != 3)
-                        return  -1; 
-
-                ip = (closure->quad[0]<<24)+
-                        (closure->quad[1]<<16)+
-                        (closure->quad[2]<<8) +
-                        closure->quad[3];
-
-                if ((nas = grad_nas_lookup_ip(ip)) == NULL) {
-                        return -1;
-                }
-                
-                nsp = nas->app_data;
-                if ((nas = nas_lookup_index(nsp->index+1)) == NULL) {
-                        return -1;
-                }
-
-		/* FIXME: MIBS do not reflect netmask */
-                for (num = 0; num < 4; num++)
-                        closure->quad[num] = (nas->netdef.ipaddr >>
-                                              (8*(3-num))) & 0xff;
-                
-                break;
-                
-        case MIB_NODE_GET_SUBID:
-                return closure->quad[num];
-                
-        case MIB_NODE_RESET:
-                if (num == 0) {
-                        if (nas = nas_lookup_index(1))
-                                for (num = 0; num < 4; num++)
-                                        closure->quad[num] =
-						(nas->netdef.ipaddr >>
-                                                          (8*(3-num))) & 0xff;
-                }
-                break;
-
-        }
-        
-        return 0;
+		}
+	}
+	return vp;
 }
 
-int
-snmp_stat_nas1(enum mib_node_cmd cmd, void *unused,
-	       subid_t subid, struct snmp_var **varp, int *errp)
+variable_list *
+snmp_stat_var(list, errp)
+	variable_list *list;
+	int *errp;
 {
-        return snmp_stat_nas(0, cmd,
-                             (struct nas_data*)snmpserv_get_data(), subid,
-                             varp, errp);
-}
+	variable_list *ret;
+	struct timeval tv;
+	struct timezone tz;
+	char *p;
+	
+	ret = snmp_var_new(list->name, list->name_length);
+	*errp = SNMP_ERR_NOERROR;
 
-int
-snmp_stat_nas2(enum mib_node_cmd cmd, void *unused,
-	       subid_t subid, struct snmp_var **varp, int *errp)
-{
-        return snmp_stat_nas(1, cmd,
-                             (struct nas_data*)snmpserv_get_data(), subid,
-                             varp, errp);
-}
+	switch (list->name[MIB_POS_radiusStatServ]) {
+		
+	case MIB_KEY_radiusStatIdent:
+		p = make_server_ident();
+		ret->type = ASN_OCTET_STR;
+		ret->val_len = strlen(p);
+		ret->val.string = p;
+		break;
 
-int
-snmp_stat_nas3(enum mib_node_cmd cmd, void *unused,
-	       subid_t subid, struct snmp_var **varp, int *errp)
-{
-        return snmp_stat_nas(2, cmd,
-                             (struct nas_data*)snmpserv_get_data(), subid,
-                             varp, errp);
-}
+	case MIB_KEY_radiusStatUpTime:
+		gettimeofday(&tv, &tz);
+		ret->type = SMI_TIMETICKS;
+		ret->val_len = sizeof(counter);
+		ret->val.integer = emalloc(ret->val_len);
+		*ret->val.integer = timeval_diff(&tv, &radstat.start_time);
+		break;
 
-int
-snmp_stat_nas4(enum mib_node_cmd cmd, void *unused,
-	       subid_t subid, struct snmp_var **varp, int *errp)
-{
-        return snmp_stat_nas(3, cmd,
-                             (struct nas_data*)snmpserv_get_data(), subid,
-                             varp, errp);
-}
+	case MIB_KEY_radiusStatConfigReset:
+		ret->type = ASN_INTEGER;
+		ret->val_len = sizeof(counter);
+		ret->val.integer = emalloc(ret->val_len);
+		*ret->val.integer = serv_running;;
+		break;
 
+	case MIB_KEY_radiusStatTotalLines:
+		ret->type = SMI_COUNTER32;
+		ret->val_len = sizeof(counter);
+		ret->val.integer = emalloc(ret->val_len);
+		stat_count_ports();
+		*ret->val.integer = radstat.port_active_count
+			            + radstat.port_idle_count;
+		break;
 
-void get_stat_nasstat(grad_nas_t *nas, struct snmp_var *var, int ind);
-struct snmp_var *snmp_nas_table_get(subid_t subid, oid_t oid, int *errp);
+	case MIB_KEY_radiusStatTotalLinesInUse:
+		ret->type = SMI_COUNTER32;
+		ret->val_len = sizeof(counter);
+		ret->val.integer = emalloc(ret->val_len);
+		stat_count_ports();
+		*ret->val.integer = radstat.port_active_count;
+		break;
 
-int
-snmp_nas_table(enum mib_node_cmd cmd, void *unused,
-	       subid_t subid, struct snmp_var **varp, int *errp)
-{
-        struct nas_table_data *data = (struct nas_table_data*)
-                                         snmpserv_get_data();
-        switch (cmd) {
-        case MIB_NODE_GET:
-                if ((*varp = snmp_nas_table_get(subid, (*varp)->name, errp))
-                    == NULL)
-                        return -1;
-                break;
-                
-        case MIB_NODE_SET:
-        case MIB_NODE_SET_TRY:
-                /* None of these can be set */
-                if (errp)
-                        *errp = SNMP_ERR_NOSUCHNAME;
-                return -1;
-                
-        case MIB_NODE_NEXT:
-                if (!nas_lookup_index(subid+1))
-                        return -1;
-                data->row = subid+1;
-                break;
-                        
-        case MIB_NODE_RESET:
-                data->row = 1; 
-                break;
-
-        case MIB_NODE_GET_SUBID:
-                return data->row;
-
-        case MIB_NODE_COMPARE:
-                return 0;
-                
-        default: /* unused: should never get there */
-                abort();
-
-        }
-        
-        return 0;
-        
-}
-
-struct snmp_var *
-snmp_nas_table_get(subid_t subid, oid_t oid, int *errp)
-{
-        struct snmp_var *ret;
-        subid_t key;
-        grad_nas_t *nas;
-        
-        ret = snmp_var_create(oid);
-        *errp = SNMP_ERR_NOERROR;
-
-        switch (key = SUBID(oid, OIDLEN(oid)-2)) {
-        case MIB_KEY_NASAddress:
-        case MIB_KEY_NASID:
-        case MIB_KEY_NASLines:
-        case MIB_KEY_NASLinesInUse:
-        case MIB_KEY_NASLinesIdle:
-                if ((nas = nas_lookup_index(subid)) != NULL && nas->app_data) {
-                        get_stat_nasstat(nas, ret, key);
-                        break;
-                }
-                /*FALLTHRU*/
-        default:
-                *errp = SNMP_ERR_NOSUCHNAME;
-                snmp_var_free(ret);
-                return NULL;
-        }
-        return ret;
+	case MIB_KEY_radiusStatTotalLinesIdle:
+		ret->type = SMI_COUNTER32;
+		ret->val_len = sizeof(counter);
+		ret->val.integer = emalloc(ret->val_len);
+		stat_count_ports();
+		*ret->val.integer = radstat.port_idle_count;
+		break;
+		
+	default:
+		*errp = SNMP_ERR_NOSUCHNAME;
+		snmp_var_free(ret);
+		return NULL;
+	}
+	return ret;
 }
 
 void
-get_stat_nasstat(grad_nas_t *nas, struct snmp_var *var, int ind)
+get_stat_nasstat(nas, var, ind)
+	NAS *nas;
+	variable_list *var;
+	int ind;
 {
-        struct nas_stat *statp = nas->app_data;
-        
-        switch (ind) {
-        case MIB_KEY_NASAddress:
-                var->type = SMI_IPADDRESS;
-                var->val_length = sizeof(grad_uint32_t);
-                var->var_str = snmp_alloc(sizeof(grad_uint32_t));
-                *(grad_uint32_t*)var->var_str = ntohl(statp->ipaddr);
-                break;
+	switch (ind) {
+	case MIB_KEY_NASIndex:
+		var->type = ASN_INTEGER;
+		var->val_len = sizeof(int);
+		var->val.integer = emalloc(var->val_len);
+		*var->val.integer = nas->nas_stat->index;
+		break;
 
-        case MIB_KEY_NASID:
-                var->type = ASN_OCTET_STR;
-                var->val_length = strlen(nas->longname);
-                var->var_str = snmp_strdup(nas->longname);
-                break;
+	case MIB_KEY_NASAddress:
+		var->type = SMI_IPADDRESS;
+		var->val_len = sizeof(UINT4);
+		var->val.integer = emalloc(var->val_len);
+		*var->val.integer = ntohl(nas->nas_stat->ipaddr);
+		break;
 
-        case MIB_KEY_NASLines:
-                stat_count_ports();
-                var->type = SMI_COUNTER32;
-                var->val_length = sizeof(grad_counter_t);
-                var->var_int = statp->ports_active +
-                               statp->ports_idle;
-                break;
+	case MIB_KEY_NASID:
+		var->type = ASN_OCTET_STR;
+		var->val_len = strlen(nas->longname)+1;
+		var->val.string = estrdup(nas->longname);
+		break;
 
-        case MIB_KEY_NASLinesInUse:
-                stat_count_ports();
-                var->type = SMI_COUNTER32;
-                var->val_length = sizeof(grad_counter_t);
-                var->var_int = statp->ports_active;
-                break;
+	case MIB_KEY_NASLines:
+		var->type = SMI_COUNTER32;
+		var->val_len = sizeof(counter);
+		var->val.integer = emalloc(var->val_len);
+		*var->val.integer = nas->nas_stat->ports_active + nas->nas_stat->ports_idle;
+		break;
 
-        case MIB_KEY_NASLinesIdle:
-                stat_count_ports();
-                var->type = SMI_COUNTER32;
-                var->val_length = sizeof(grad_counter_t);
-                var->var_int = statp->ports_idle;
-                break;
+	case MIB_KEY_NASLinesInUse:
+		var->type = SMI_COUNTER32;
+		var->val_len = sizeof(counter);
+		var->val.integer = emalloc(var->val_len);
+		*var->val.integer = nas->nas_stat->ports_active;
+		break;
 
-        }
+	case MIB_KEY_NASLinesIdle:
+		var->type = SMI_COUNTER32;
+		var->val_len = sizeof(counter);
+		var->val.integer = emalloc(var->val_len);
+		*var->val.integer = nas->nas_stat->ports_idle;
+		break;
+
+	}
 }
 
-/*ARGSUSED*/
-int
-snmp_port_index1(enum mib_node_cmd cmd, void *unused,
-		 subid_t subid, struct snmp_var **varp, int *errp)
+variable_list *
+snmp_stat_client_var(list, errp)
+	variable_list *list;
+	int *errp;
 {
-        grad_nas_t *nas;
-        struct port_data *pind = (struct port_data*)snmpserv_get_data();
-        
-        switch (cmd) {
-        case MIB_NODE_GET:
-                *errp = SNMP_ERR_NOSUCHNAME;
-                return -1;
-                
-        case MIB_NODE_SET:
-        case MIB_NODE_SET_TRY:
-                /* None of these can be set */
-                if (errp)
-                        *errp = SNMP_ERR_NOSUCHNAME;
-                return -1;
-                
-        case MIB_NODE_COMPARE:
-                pind->nas_index = subid;
-                return 0;
-                
-        case MIB_NODE_NEXT:
-                return  -1; 
-                
-        case MIB_NODE_GET_SUBID:
-                return pind->nas_index;
-                
-        case MIB_NODE_RESET:
-                pind->nas_index = 1;
-                while ((nas = nas_lookup_index(pind->nas_index)) && 
-                       (pind->port_no = stat_get_next_port_no(nas, 0)) == 0)
-                        pind->nas_index++;
-                break; 
-        }
-        
-        return 0;
+	variable_list *ret;
+	NAS *nas;
+	
+	ret = snmp_var_new(list->name, list->name_length);
+	*errp = SNMP_ERR_NOERROR;
+
+	switch (list->name[MIB_POS_radiusStatNASEntry]) {
+	case MIB_KEY_NASIndex:
+	case MIB_KEY_NASAddress:
+	case MIB_KEY_NASID:
+	case MIB_KEY_NASLines:
+	case MIB_KEY_NASLinesInUse:
+	case MIB_KEY_NASLinesIdle:
+		if (list->name_length == MIB_POS_radiusStatNASEntry_INDEX+1 &&
+		    (nas = findnasbyindex(list->name[MIB_POS_radiusStatNASEntry_INDEX])) != NULL &&
+		    nas->nas_stat) {
+ 			get_stat_nasstat(nas, ret,
+					 list->name[MIB_POS_radiusStatNASEntry]);
+			break;
+		}
+		/*FALLTHRU*/
+	default:
+		*errp = SNMP_ERR_NOSUCHNAME;
+		snmp_var_free(ret);
+		return NULL;
+	}
+	return ret;
 }
 
-int
-snmp_port_index2(enum mib_node_cmd cmd, void *unused,
-		 subid_t subid, struct snmp_var **varp, int *errp)
+Mib_tree_node *
+snmp_stat_get(node, name, name_length)
+	Mib_tree_node *node;
+	oid *name;
+	int name_length;
 {
-        grad_nas_t *nas;
-        int index;
-        struct snmp_var *var;
-        struct port_data *pind = (struct port_data*)snmpserv_get_data();
-        
-        switch (cmd) {
-        case MIB_NODE_GET:
-                if ((nas = nas_lookup_index(pind->nas_index)) == NULL ||
-                    (index = stat_get_port_index(nas, pind->port_no)) == 0) {
-                        *errp = SNMP_ERR_NOSUCHNAME;
-                        return -1;
-                }
-                *errp = SNMP_ERR_NOERROR;
-                var = snmp_var_create((*varp)->name);
-                var->type = ASN_INTEGER;
-                var->val_length = sizeof(int);
-                var->var_int = index;
-                *varp = var;
-                break;
-                
-        case MIB_NODE_SET:
-        case MIB_NODE_SET_TRY:
-                /* None of these can be set */
-                if (errp)
-                        *errp = SNMP_ERR_NOSUCHNAME;
-                return -1;
-                
-        case MIB_NODE_COMPARE:
-                pind->port_no = subid;
-                return 0;
-                
-        case MIB_NODE_NEXT:
-                if ((nas = nas_lookup_index(pind->nas_index)) == NULL)
-                        return -1;
-                index = stat_get_next_port_no(nas, pind->port_no);
-                if (index > 0) {
-                        pind->port_no = index;
-                        break;
-                }
-                /* move to next nas */
-                while ((nas = nas_lookup_index(++pind->nas_index)) && 
-                       (pind->port_no = stat_get_next_port_no(nas, 0)) == 0)
-                        ;
+	int ind = name[MIB_POS_radiusStatNASEntry_INDEX];
+	NAS *nas = findnasbyindex(ind);
 
-                if (nas && pind->port_no > 0)
-                        break;
-
-                return -1;
-                
-        case MIB_NODE_GET_SUBID:
-                return pind->port_no;
-                
-        case MIB_NODE_RESET:
-                break; 
-        }
-        
-        return 0;
+	if (!nas)
+		return 0;
+	node->name[MIB_POS_radiusStatNASEntry_INDEX] = ind;
+	return node;
 }
 
-struct snmp_var *snmp_port_get(subid_t subid, struct snmp_var *var, int *errp);
-void get_port_stat(PORT_STAT *port, struct snmp_var *var, subid_t key);
-
-int
-snmp_port_table(enum mib_node_cmd cmd, void *unused,
-		subid_t subid, struct snmp_var **varp, int *errp)
+Mib_tree_node *
+snmp_stat_getnext(node, name, name_length)
+	Mib_tree_node *node;
+	oid *name;
+	int name_length;
 {
-        struct port_table_data *p = (struct port_table_data*)
-                                         snmpserv_get_data();
-        
-        switch (cmd) {
-        case MIB_NODE_GET:
-                if ((*varp = snmp_port_get(subid, *varp, errp)) == NULL)
-                        return -1;
-                break;
-                
-        case MIB_NODE_SET:
-        case MIB_NODE_SET_TRY:
-                /* None of these can be set */
-                if (errp)
-                        *errp = SNMP_ERR_NOSUCHNAME;
-                return -1;
-                
-        case MIB_NODE_COMPARE: 
-                return 0;
-                
-        case MIB_NODE_NEXT:
-                if (findportbyindex(subid+1)) {
-                        p->port_index = subid+1;
-                        return 0;
-                }
-                return -1;
-                
-        case MIB_NODE_GET_SUBID:
-                return p->port_index;
-                
-        case MIB_NODE_RESET:
-                p->port_index = 1;
-                break;
+	int ind;
+	NAS *nas;
+	char buf1[MAXOIDLEN], buf2[MAXOIDLEN];
+	
+	debug(2, ("node %s, name %s",
+		 sprint_oid(buf1, sizeof(buf1), node->name, node->len),
+		 sprint_oid(buf2, sizeof(buf2), name, name_length)));
 
-        }
-        
-        return 0;
-}
+	if (oidcmp(name, node->name, node->len-1)) {
+		ind = 1;
+	} else {
+		ind = name[MIB_POS_radiusStatNASEntry_INDEX] + 1;
+	} 
+	nas = findnasbyindex(ind);
+	
+	if (!nas) {
+		debug(2,("no more nodes"));
+ 		return 0;
+	}
+	
+	debug(2, ("NAS %d: %s", ind, nas->shortname));
 
-struct snmp_var *
-snmp_port_get(subid_t subid, struct snmp_var *var, int *errp)
-{
-        struct snmp_var *ret;
-        subid_t key;
-        oid_t oid = var->name;
-        PORT_STAT *port;
-        
-        ret = snmp_var_create(oid);
-        *errp = SNMP_ERR_NOERROR;
-
-        switch (key = SUBID(oid, OIDLEN(oid)-2)) {
-
-        case MIB_KEY_StatPortNASIndex:
-        case MIB_KEY_StatPortID:
-        case MIB_KEY_StatPortFramedAddress:
-        case MIB_KEY_StatPortTotalLogins:                 
-        case MIB_KEY_StatPortStatus:        
-        case MIB_KEY_StatPortStatusChangeTimestamp:             
-        case MIB_KEY_StatPortUpTime:         
-        case MIB_KEY_StatPortLastLoginName:             
-        case MIB_KEY_StatPortLastLoginTimestamp:      
-        case MIB_KEY_StatPortLastLogoutTimestamp:      
-        case MIB_KEY_StatPortIdleTotalTime:     
-        case MIB_KEY_StatPortIdleMaxTime:      
-        case MIB_KEY_StatPortIdleMaxTimestamp:        
-        case MIB_KEY_StatPortInUseTotalTime:        
-        case MIB_KEY_StatPortInUseMaxTime:     
-        case MIB_KEY_StatPortInUseMaxTimestamp:       
-                if (port = findportbyindex(subid)) {
-                        get_port_stat(port, ret, key);
-                        break;
-                }
-                /*FALLTHRU*/
-                
-        default:
-                *errp = SNMP_ERR_NOSUCHNAME;
-                snmp_var_free(ret);
-                return NULL;
-        }
-        return ret;
+	node->name[MIB_POS_radiusStatNASEntry_INDEX] = ind;
+	return node;
 }
 
 #define TDIFF(tv, time) (tv.tv_sec - time)*100 + tv.tv_usec/10000;
 
+char *
+timestr(time)
+	time_t time;
+{
+	char *p;
+	int len;
+
+	if (time == 0)
+		return "N/A";
+	p = ctime(&time);
+	len = strlen(p);
+	if (len > 1) 
+		p[--len] = 0;
+	return p;
+}
+
 void
-get_port_stat(PORT_STAT *port, struct snmp_var *var, subid_t key)
+get_port_stat(port, var, ind)
+	PORT_STAT *port;
+	variable_list *var;
+	int ind;
 {
-        struct timeval tv;
-        struct timezone tz;
-        grad_nas_t *nas;
-        
-        switch (key) {
-
-        case MIB_KEY_StatPortNASIndex:
-                nas = grad_nas_lookup_ip(port->ip);
-                var->type = ASN_INTEGER;
-                var->val_length = sizeof(grad_counter_t);
-                if (nas && nas->app_data) {
-                        struct nas_stat *nsp = nas->app_data;
-                        var->var_int = nsp->index;
-                } else
-                        var->var_int = 0;
-                break;
-
-        case MIB_KEY_StatPortID:
-                var->type = ASN_INTEGER;
-                var->val_length = sizeof(grad_counter_t);
-                var->var_int = port->port_no;
-                break;
-
-        case MIB_KEY_StatPortFramedAddress:
-                var->type = SMI_IPADDRESS;
-                var->val_length = sizeof(grad_uint32_t);
-                var->var_str = snmp_alloc(sizeof(grad_uint32_t));
-                *(grad_uint32_t*)var->var_str = port->framed_address;
-                break;
-
-        case MIB_KEY_StatPortTotalLogins:                 
-                var->type = SMI_COUNTER32;
-                var->val_length = sizeof(grad_counter_t);
-                var->var_int = port->count;
-                break;
-                
-        case MIB_KEY_StatPortStatus:        
-                var->type = ASN_INTEGER;
-                var->val_length = sizeof(grad_counter_t);
-                var->var_int = port->active ? port_active : port_idle;
-                break;
-
-        case MIB_KEY_StatPortStatusChangeTimestamp:
-                var->type = ASN_INTEGER;
-                var->val_length = sizeof(int);
-                var->var_int = port->start;
-                break;
-
-        case MIB_KEY_StatPortUpTime:         
-                gettimeofday(&tv, &tz);
-                var->type = SMI_TIMETICKS;
-                var->val_length = sizeof(grad_counter_t);
-                var->var_int = TDIFF(tv, port->start);
-                break;
-                
-        case MIB_KEY_StatPortLastLoginName:             
-                var->type = ASN_OCTET_STR;
-                var->val_length = strlen(port->login);
-                var->var_str = snmp_strdup(port->login);
-                break;
-
-        case MIB_KEY_StatPortLastLoginTimestamp:
-                var->type = ASN_INTEGER;
-                var->val_length = sizeof(int);
-                var->var_int = port->lastin;
-                break;
-
-        case MIB_KEY_StatPortLastLogoutTimestamp:      
-                var->type = ASN_INTEGER;
-                var->val_length = sizeof(int);
-                var->var_int = port->lastout;
-                break;
-
-        case MIB_KEY_StatPortIdleTotalTime:     
-                var->type = SMI_TIMETICKS;
-                var->val_length = sizeof(grad_counter_t);
-                var->var_int = port->idle * 100;
-                break;
-                
-        case MIB_KEY_StatPortIdleMaxTime:      
-                var->type = SMI_TIMETICKS;
-                var->val_length = sizeof(grad_counter_t);
-                var->var_int = port->maxidle.time * 100;
-                break;
-                
-        case MIB_KEY_StatPortIdleMaxTimestamp:
-                var->type = ASN_INTEGER;
-                var->val_length = sizeof(int);
-                var->var_int = port->maxidle.start;
-                break;
-
-        case MIB_KEY_StatPortInUseTotalTime:        
-                var->type = SMI_TIMETICKS;
-                var->val_length = sizeof(grad_counter_t);
-                var->var_int = port->inuse * 100;
-                break;
-                
-        case MIB_KEY_StatPortInUseMaxTime:     
-                var->type = SMI_TIMETICKS;
-                var->val_length = sizeof(grad_counter_t);
-                var->var_int = port->maxinuse.time * 100;
-                break;
-                
-        case MIB_KEY_StatPortInUseMaxTimestamp:
-                var->type = ASN_INTEGER;
-                var->val_length = sizeof(int);
-                var->var_int = port->maxinuse.start;
-                break;
-        }
-}
-
-grad_nas_t *
-nas_lookup_index(int ind)
-{
-        grad_nas_t *nas;
-	grad_iterator_t *itr = grad_nas_iterator();
-        struct nas_stat *ns;
-        
-        for (nas = grad_iterator_first(itr); nas; nas = grad_iterator_next(itr)) {
-                ns = nas->app_data;
-                if (ns && ns->index == ind)
-                        break;
-        }
-	grad_iterator_destroy(&itr);
-        return nas;
-}
-
-
-/* *********************** SNMP Protocol Interface ************************* */
-
-/* Decode the SNMP request */
-static int
-snmp_decode(SNMP_REQ *req, u_char *buf, size_t len)
-{
-        struct snmp_pdu *pdu;
-        struct snmp_session sess;
-        int access;
-        char comm[128];
-        int comm_len;
-        char ipbuf[GRAD_IPV4_STRING_LENGTH];
-        
-        log_open(L_SNMP);
+	struct timeval tv;
+	struct timezone tz;
+	char *p;
+	NAS *nas;
 	
-        if ((pdu = snmp_pdu_create(0)) == NULL) {
-                grad_log(L_ERR,
-                         _("can't create SNMP PDU: %s"),
-                         snmp_strerror(snmp_errno));
-                return -1;
-        }
-        comm_len = sizeof(comm);
-        if (snmp_decode_request(&sess, pdu, buf, len, comm, &comm_len)) {
-                grad_log(L_ERR,
-                         _("can't decode SNMP packet from %s: %s"),
-		         grad_ip_iptostr(ntohl(req->addr.sin_addr.s_addr),
-				         ipbuf),
-		         snmp_strerror(snmp_errno));
-                return -1;
-        }
+	switch (ind) {
 
-        access = check_acl(req->addr.sin_addr.s_addr, comm);
-        if (!access) {
-                grad_log(L_NOTICE,
-                         _("DENIED attempt to access community %s from %s"),
-                         comm,
-                         grad_ip_iptostr(ntohl(req->addr.sin_addr.s_addr), 
-                                         ipbuf));
-                return 1;
-        }
-        req->pdu = pdu;
-        req->community = grad_estrdup(comm);
-        req->access = access;
-        return 0;
+	case MIB_KEY_radiusStatNASIndex:
+		nas = nas_find(port->ip);
+		var->type = ASN_INTEGER;
+		var->val_len = sizeof(counter);
+		var->val.integer = emalloc(var->val_len);
+		if (nas)
+			*var->val.integer = nas->nas_stat->index;
+		else
+			*var->val.integer = 0;
+		break;
+
+	case MIB_KEY_radiusStatPortID:
+		var->type = ASN_INTEGER;
+		var->val_len = sizeof(counter);
+		var->val.integer = emalloc(var->val_len);
+		*var->val.integer = port->port_no;
+		break;
+
+	case MIB_KEY_radiusStatPortFramedAddress:
+		var->type = SMI_IPADDRESS;
+		var->val_len = sizeof(UINT4);
+		var->val.integer = emalloc(var->val_len);
+		*var->val.integer = port->framed_address;
+		break;
+
+	case MIB_KEY_radiusStatPortTotalLogins:                 
+		var->type = SMI_COUNTER32;
+		var->val_len = sizeof(counter);
+		var->val.integer = emalloc(var->val_len);
+		*var->val.integer = port->count;
+		break;
+		
+	case MIB_KEY_radiusStatPortStatus:        
+		var->type = ASN_INTEGER;
+		var->val_len = sizeof(counter);
+		var->val.integer = emalloc(var->val_len);
+		*var->val.integer = port->active ? port_active : port_idle;
+		break;
+
+	case MIB_KEY_radiusStatPortStatusDate:
+		p = timestr(port->start);
+		var->type = ASN_OCTET_STR;
+		var->val_len = strlen(p)+1;
+		var->val.string = estrdup(p);
+		break;
+
+	case MIB_KEY_radiusStatPortUpTime:         
+		gettimeofday(&tv, &tz);
+		var->type = SMI_TIMETICKS;
+		var->val_len = sizeof(counter);
+		var->val.integer = emalloc(var->val_len);
+		*var->val.integer = TDIFF(tv, port->start);
+		break;
+		
+	case MIB_KEY_radiusStatPortLastLoginName:             
+		var->type = ASN_OCTET_STR;
+		var->val_len = strlen(port->login)+1;
+		var->val.string = estrdup(port->login);
+		break;
+
+	case MIB_KEY_radiusStatPortLastLoginDate:
+		p = timestr(port->lastin);
+		var->type = ASN_OCTET_STR;
+		var->val_len = strlen(p)+1;
+		var->val.string = estrdup(p);
+		break;
+
+	case MIB_KEY_radiusStatPortLastLogoutDate:      
+		p = timestr(port->lastout);
+		var->type = ASN_OCTET_STR;
+		var->val_len = strlen(p)+1;
+		var->val.string = estrdup(p);
+		break;
+
+	case MIB_KEY_radiusStatPortIdleTotalTime:     
+		var->type = SMI_TIMETICKS;
+		var->val_len = sizeof(counter);
+		var->val.integer = emalloc(var->val_len);
+		*var->val.integer = port->idle * 100;
+		break;
+		
+	case MIB_KEY_radiusStatPortIdleMaxTime:      
+		var->type = SMI_TIMETICKS;
+		var->val_len = sizeof(counter);
+		var->val.integer = emalloc(var->val_len);
+		*var->val.integer = port->maxidle.time * 100;
+		break;
+		
+	case MIB_KEY_radiusStatPortIdleMaxDate:
+		p = timestr(port->maxidle.start);
+		var->type = ASN_OCTET_STR;
+		var->val_len = strlen(p)+1;
+		var->val.string = estrdup(p);
+		break;
+
+	case MIB_KEY_radiusStatPortInUseTotalTime:        
+		var->type = SMI_TIMETICKS;
+		var->val_len = sizeof(counter);
+		var->val.integer = emalloc(var->val_len);
+		*var->val.integer = port->inuse * 100;
+		break;
+		
+	case MIB_KEY_radiusStatPortInUseMaxTime:     
+		var->type = SMI_TIMETICKS;
+		var->val_len = sizeof(counter);
+		var->val.integer = emalloc(var->val_len);
+		*var->val.integer = port->maxinuse.time * 100;
+		break;
+		
+	case MIB_KEY_radiusStatPortInUseMaxDate:
+		p = timestr(port->maxinuse.start);
+		var->type = ASN_OCTET_STR;
+		var->val_len = strlen(p)+1;
+		var->val.string = estrdup(p);
+		break;
+	}
 }
 
-int
-snmp_req_decode(const struct sockaddr_in *srv_sa,
-		const struct sockaddr_in *clt_sa,
-		void *input, size_t inputsize, void **output)
+variable_list *
+snmp_stat_port_var(list, errp)
+	variable_list *list;
+	int *errp;
 {
-        SNMP_REQ *req;
+	variable_list *ret;
+	PORT_STAT *port;
+	
+	ret = snmp_var_new(list->name, list->name_length);
+	*errp = SNMP_ERR_NOERROR;
 
-	req = grad_emalloc(sizeof *req);
-	req->addr = *clt_sa;
-        if (snmp_decode(req, input, inputsize)) {
-                grad_free(req);
-                return 1;
-        }
-	*output = req;
-	return 0;
+	switch (list->name[MIB_POS_NASPortEntry]) {
+
+	case MIB_KEY_radiusStatPortIndex:
+	case MIB_KEY_radiusStatNASIndex:
+	case MIB_KEY_radiusStatPortID:
+	case MIB_KEY_radiusStatPortFramedAddress:
+	case MIB_KEY_radiusStatPortTotalLogins:                 
+	case MIB_KEY_radiusStatPortStatus:        
+	case MIB_KEY_radiusStatPortStatusDate:             
+	case MIB_KEY_radiusStatPortUpTime:         
+	case MIB_KEY_radiusStatPortLastLoginName:             
+	case MIB_KEY_radiusStatPortLastLoginDate:      
+	case MIB_KEY_radiusStatPortLastLogoutDate:      
+	case MIB_KEY_radiusStatPortIdleTotalTime:     
+	case MIB_KEY_radiusStatPortIdleMaxTime:      
+	case MIB_KEY_radiusStatPortIdleMaxDate:        
+	case MIB_KEY_radiusStatPortInUseTotalTime:        
+	case MIB_KEY_radiusStatPortInUseMaxTime:     
+	case MIB_KEY_radiusStatPortInUseMaxDate:       
+
+		if (list->name_length == MIB_POS_NASPortEntry_INDEX+1 &&
+		    (port = findportbyindex(list->name[MIB_POS_NASPortEntry_INDEX])) != NULL) {
+ 			get_port_stat(port,
+				      ret,
+				      list->name[MIB_POS_radiusStatNASEntry]);
+			break;
+		}
+		/*FALLTHRU*/
+
+	default:
+		*errp = SNMP_ERR_NOSUCHNAME;
+		snmp_var_free(ret);
+		return NULL;
+	}
+	return ret;
 }
 
-int
-snmp_req_cmp(void *ap, void *bp)
+Mib_tree_node *
+snmp_stat_port_get(node, name, name_length)
+	Mib_tree_node *node;
+	oid *name;
+	int name_length;
 {
-        SNMP_REQ *a = ap, *b = bp;
-        return (a->addr.sin_addr.s_addr == b->addr.sin_addr.s_addr &&
-		a->pdu->req_id == b->pdu->req_id) ? RCMP_EQ : RCMP_NE;
+	int port_ind = name[MIB_POS_NASPortEntry_INDEX];
+
+	if (!findportbyindex(port_ind))
+		return 0;
+	
+	node->name[MIB_POS_NASPortEntry_INDEX] = port_ind;
+	return node;
 }
 
-/* Free the SNMP request */
-void
-snmp_req_free(void *ptr)
+Mib_tree_node *
+snmp_stat_port_getnext(node, name, name_length)
+	Mib_tree_node *node;
+	oid *name;
+	int name_length;
 {
-        SNMP_REQ *req = ptr;
-        snmp_pdu_free(req->pdu);
-        grad_free(req->community);
-        grad_free(req);
-}
+	int ind;
+	PORT_STAT *port;
+	char buf1[MAXOIDLEN], buf2[MAXOIDLEN];
+	
+	debug(2, ("node %s, name %s",
+		 sprint_oid(buf1, sizeof(buf1), node->name, node->len),
+		 sprint_oid(buf2, sizeof(buf2), name, name_length)));
 
-void
-snmp_req_drop(int type, void *data, void *orig_data,
-	      int fd, const char *status_str)
-{
-        SNMP_REQ *req = data ? data : orig_data;
-        char ipbuf[GRAD_IPV4_STRING_LENGTH];
+	if (oidcmp(name, node->name, node->len-1)) {
+		ind = 1;
+	} else {
+		ind = name[MIB_POS_NASPortEntry_INDEX] + 1;
+	} 
 
-        grad_log(L_NOTICE,
-                 _("Dropping SNMP request from client %s: %s"),
-                 grad_ip_iptostr(ntohl(req->addr.sin_addr.s_addr), ipbuf),
-                 status_str);
-}
+	port = findportbyindex(ind);
+	
+	if (!port) {
+		debug(2,("no more nodes"));
+ 		return 0;
+	}
+	
+	debug(2,
+		("PORT %d: %d", ind, port->port_no));
 
-static u_char send_buffer[RAD_BUFFER_SIZE];
-
-int
-snmp_req_respond(REQUEST *request)
-{ 
-	SNMP_REQ *req = request->data;
-	struct snmp_session session;
-        struct snmp_pdu *pdu;
-        int len;
-
-        pdu = snmp_agent_response(req->pdu, req->access);
-        if (pdu) {
-                session.version = SNMP_VERSION_1;
-                session.community.str = req->community;
-                session.community.len = strlen(req->community);
-                len = sizeof(send_buffer);
-                if (snmp_encode_request(&session, pdu, send_buffer, &len)==0) {
-                        sendto(request->fd,
-                               send_buffer, len,
-                               0, (struct sockaddr *) &request->addr,
-                               sizeof(request->addr));
-                }
-                snmp_pdu_free(pdu);
-        }
-        return 0;
+	node->name[MIB_POS_NASPortEntry_INDEX] = ind;
+	return node;
 }
 
 #endif
+
 
 
 

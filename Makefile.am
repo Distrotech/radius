@@ -1,53 +1,33 @@
-# This file is part of GNU Radius.
-# Copyright (C) 2000,2001,2002,2003,2004,2007 Free Software Foundation, Inc.
-#
-# Written by Sergey Poznyakoff
-#
-# GNU Radius is free software; you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation; either version 3 of the License, or
-# (at your option) any later version.
-#
-# GNU Radius is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with GNU Radius; if not, write to the Free Software Foundation,
-# Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-
-AUTOMAKE_OPTIONS = gnits 1.8 dist-bzip2
-ACLOCAL_AMFLAGS = -I m4
-
-SUBDIRS= scripts include lib gnu sql snmplib radscm radiusd radwho \
-         radzap radlast radscripts elisp raddb db client radtest \
-         examples tests doc po\
-         mibs contrib 
-
-update-dictionary:
-	here=`cd $(top_srcdir); pwd`;\
-	cd $$here/raddb;\
-	$(MAKE) update-dictionary;\
-	cd $$here
-
-# We never remove the contents of configuration directory and the
-# info directory index
-distuninstallcheck_listfiles = \
- find $(prefix) -type f -not -path '$(sysconfdir)/raddb/*'
-
-if MAINTAINER_MODE
-MAINTAINERCLEANFILES=core *~ err out
-
-webdoc:;   $(MAKE) -C doc/texinfo webdoc
-
-alpha: 
-	$(MAKE) dist distdir=$(PACKAGE)-$(VERSION)-`date +'%Y%m%d'`
-
-alphacheck: 
-	$(MAKE) distcheck distdir=$(PACKAGE)-$(VERSION)-`date +'%Y%m%d'`
-
+if SNMP
+if DBM
+SUBDIRS=include radlib snmplib radiusd radtest radwho radzap radlast raduse radctl radscripts checkrad builddbm doc po
+else
+SUBDIRS=include radlib snmplib radiusd radtest radwho radzap radlast raduse radctl radscripts checkrad doc po
+endif
+else
+if DBM
+SUBDIRS=include radlib radiusd radtest radzap radwho radlast raduse radctl radscripts checkrad builddbm doc po
+else
+SUBDIRS=include radlib radiusd radtest radzap radwho radlast raduse radctl radscripts checkrad doc po
+endif
 endif
 
- 
+if MAINTAINER_MODE
+CFLAGS=-ggdb
+MAINTAINERCLEANFILES=core *~ err out
 
+debugmod:; MAKE=${MAKE} $(top_srcdir)/scripts/debug.sh $(top_srcdir)/scripts/debugmod.m4 radlib $(SUBDIRS)
+endif
+
+EXTRA_DIST=include raddb doc mibs scripts
+
+dist-hook:
+	(cd $(distdir); \
+	 rm -f radlib/users_gram.c radlib/users_lex.c \
+	       radiusd/config.c radtest/y.tab.c radtest/lex.yy.c )
+
+install-data-local:
+	@if [ ! -d @ETC_DIR@/raddb ]; then \
+		./install-sh -d -m 644 @ETC_DIR@ ; \
+		cp -r raddb @ETC_DIR@ ; \
+	fi

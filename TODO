@@ -1,52 +1,3 @@
-TODO for GNU Radius
-
-* Redesign configuration files. The goals are:
-** get rid of the mess in raddb, replacing it with a single 
-logically structured configuration file.
-** restructure the packet matching logic (from hints,huntgroups,users)
-to allow for writing more complicated and logically structured rules.
-Possibly this will allow to get rid from the so-called 'server
-attributes', this will make dictionary simpler and clearer.
-** The current configuration file system should be supported as well.
-
-* Consider replacing obsolete usage of AC_CHECK_TYPE in configure.ac
-
-* libgnuradius
-** Finish normalizing the namespace. 
-
-* Guile interface
-** Make server queue a usual Guile object (possibly a SMOB) instead of a
-hidden list.
-** Remove calls to grad_path_init and grad_dict_init from radscm_init to a
-separate function
-
-* The server:
-** Support rfc2433.txt  rfc2548.txt  rfc2759.txt
-** Support for LDAP
-** Add \ line continuation to read_raddb_files.
-** Scheme-Program and Scheme-Acct-Program must be able to accept arbitrary
-s-exps as well as function names
-** Move GNU attributes into a separate namespace. This will require
-registering a vendor id...
-** Clean up the semantics of log_init/log_done.
-** Enable use of port number in rewrite:check_unix()?
-** Add include feature to config files that don't have it.
-** Revise the possibility of listing memory and queue usage via
-snmp.
-** Add missing SNMP MIBS and check the compliance of the snmpserv.c
-to RFC 2619,2621
-** SNMP should reflect each NAS that has actually sent requests to radiusd
-instead of the listing the configured NASes. The current behavior
-becomes wrong with the introduction of CIDR notation in raddb/naslist.
-** Move the radtest functionality to the test shell and remove radtest
-altogether?
-
-* Redesign raduse to use snmp queries instead of peeking in radstat.
-* Write radctl substitute which would use SNMP.
-
-
-
-Local variables:
-mode: outline
-paragraph-separate: "[ 	]*$"
-end:
+Cache NAS and (probably) digest into AUTH_REQ structure.
+Need a more flexible IP allocation strategy
+Write a unified configuration utility in guile.

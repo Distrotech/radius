@@ -1,220 +1,152 @@
-/* This file is part of GNU Radius
- * Copyright (C) 2000,2003,2007 Free Software Foundation, Inc.
- *
- * Written by Sergey Poznyakoff
- *
- * GNU Radius is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNU Radius is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNU Radius; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
- */
+/* Radius MIB tree entry */
+radiusMIB					1,3,6,1,2,1,67
 
 /* Authentication */
-/* Fixed oids */
-= AuthServIdent        			1,3,6,1,2,1,67,1,1,1,1,1
-= AuthServUpTime	           	1,3,6,1,2,1,67,1,1,1,1,2
-= AuthServResetTime			1,3,6,1,2,1,67,1,1,1,1,3
-= AuthServConfigReset			1,3,6,1,2,1,67,1,1,1,1,4
-= AuthServTotalAccessRequests       	1,3,6,1,2,1,67,1,1,1,1,5
-= AuthServTotalInvalidRequests		1,3,6,1,2,1,67,1,1,1,1,6
-= AuthServTotalDupAccessRequests    	1,3,6,1,2,1,67,1,1,1,1,7
-= AuthServTotalAccessAccepts		1,3,6,1,2,1,67,1,1,1,1,8
-= AuthServTotalAccessRejects	        1,3,6,1,2,1,67,1,1,1,1,9
-= AuthServTotalAccessChallenges	        1,3,6,1,2,1,67,1,1,1,1,10
-= AuthServTotalMalformedAccessRequests  1,3,6,1,2,1,67,1,1,1,1,11
-= AuthServTotalBadAuthenticators  	1,3,6,1,2,1,67,1,1,1,1,12
-= AuthServTotalPacketsDropped	        1,3,6,1,2,1,67,1,1,1,1,13
-= AuthServTotalUnknownTypes		1,3,6,1,2,1,67,1,1,1,1,14
-					
-/* Variable oids */			
-~ AuthClientIndex			1,3,6,1,2,1,67,1,1,1,1,15,1,1
-~ AuthClientAddress			1,3,6,1,2,1,67,1,1,1,1,15,1,2
-~ AuthClientID				1,3,6,1,2,1,67,1,1,1,1,15,1,3
-~ AuthServAccessRequests		1,3,6,1,2,1,67,1,1,1,1,15,1,4
-~ AuthServDupAccessRequests		1,3,6,1,2,1,67,1,1,1,1,15,1,5
-~ AuthServAccessAccepts			1,3,6,1,2,1,67,1,1,1,1,15,1,6
-~ AuthServAccessRejects			1,3,6,1,2,1,67,1,1,1,1,15,1,7
-~ AuthServAccessChallenges		1,3,6,1,2,1,67,1,1,1,1,15,1,8
-~ AuthServMalformedAccessRequests	1,3,6,1,2,1,67,1,1,1,1,15,1,9
-~ AuthServBadAuthenticators		1,3,6,1,2,1,67,1,1,1,1,15,1,10
-~ AuthServPacketsDropped		1,3,6,1,2,1,67,1,1,1,1,15,1,11
-~ AuthServUnknownTypes	 		1,3,6,1,2,1,67,1,1,1,1,15,1,12
-					
-/* Accounting */			
-/* Fixed oids */			
-= AccServIdent				1,3,6,1,2,1,67,2,1,1,1,1
-= AccServUpTime			        1,3,6,1,2,1,67,2,1,1,1,2
-= AccServResetTime			1,3,6,1,2,1,67,2,1,1,1,3
-= AccServConfigReset		        1,3,6,1,2,1,67,2,1,1,1,4
-= AccServTotalRequests		        1,3,6,1,2,1,67,2,1,1,1,5
-= AccServTotalInvalidRequests	        1,3,6,1,2,1,67,2,1,1,1,6
-= AccServTotalDupRequests		1,3,6,1,2,1,67,2,1,1,1,7
-= AccServTotalResponses		        1,3,6,1,2,1,67,2,1,1,1,8
-= AccServTotalMalformedRequests	        1,3,6,1,2,1,67,2,1,1,1,9
-= AccServTotalBadAuthenticators	        1,3,6,1,2,1,67,2,1,1,1,10
-= AccServTotalPacketsDropped	        1,3,6,1,2,1,67,2,1,1,1,11
-= AccServTotalNoRecords	        	1,3,6,1,2,1,67,2,1,1,1,12
-= AccServTotalUnknownTypes		1,3,6,1,2,1,67,2,1,1,1,13
-					
-/* Variable oids */			
-~ AccClientIndex			1,3,6,1,2,1,67,2,1,1,1,14,1,1
-~ AccClientAddress			1,3,6,1,2,1,67,2,1,1,1,14,1,2
-~ AccClientID				1,3,6,1,2,1,67,2,1,1,1,14,1,3
-~ AccServPacketsDropped			1,3,6,1,2,1,67,2,1,1,1,14,1,4
-~ AccServRequests			1,3,6,1,2,1,67,2,1,1,1,14,1,5
-~ AccServDupRequests			1,3,6,1,2,1,67,2,1,1,1,14,1,6
-~ AccServResponses			1,3,6,1,2,1,67,2,1,1,1,14,1,7
-~ AccServBadAuthenticators		1,3,6,1,2,1,67,2,1,1,1,14,1,8
-~ AccServMalformedRequests		1,3,6,1,2,1,67,2,1,1,1,14,1,9
-~ AccServNoRecords			1,3,6,1,2,1,67,2,1,1,1,14,1,10
-~ AccServUnknownTypes			1,3,6,1,2,1,67,2,1,1,1,14,1,11
-					
-/* Enterprises subtree */			
+radiusAuthentication				1,3,6,1,2,1,67,1
+radiusAuthServMIB				1,3,6,1,2,1,67,1,1
+radiusAuthServMIBObjects			1,3,6,1,2,1,67,1,1,1
 
-/* enterprises.gnu-radius subtree: */
-/* Fixed oids */			
-= grad_StatIdent			1,3,6,1,4,1,9163,3,1,1
-= grad_StatUpTime			1,3,6,1,4,1,9163,3,1,2
-= grad_StatConfigReset			1,3,6,1,4,1,9163,3,1,3
-= grad_StatTotalLines			1,3,6,1,4,1,9163,3,1,4
-= grad_StatTotalLinesInUse		1,3,6,1,4,1,9163,3,1,5
-= grad_StatTotalLinesIdle          	1,3,6,1,4,1,9163,3,1,6
-					
-/* Variable oids */			
-~ grad_NASIndex1			1,3,6,1,4,1,9163,3,1,7,1,1
-~ grad_NASIndex2			1,3,6,1,4,1,9163,3,1,7,1,1,-1
-~ grad_NASIndex3			1,3,6,1,4,1,9163,3,1,7,1,1,-1,-1
-~ grad_NASIndex4			1,3,6,1,4,1,9163,3,1,7,1,1,-1,-1,-1
-~ grad_NASAddress			1,3,6,1,4,1,9163,3,1,7,1,2
-~ grad_NASID				1,3,6,1,4,1,9163,3,1,7,1,3
-~ grad_NASLines				1,3,6,1,4,1,9163,3,1,7,1,4
-~ grad_NASLinesInUse			1,3,6,1,4,1,9163,3,1,7,1,5
-~ grad_NASLinesIdle			1,3,6,1,4,1,9163,3,1,7,1,6
+--#define MIB_POS_radiusAuthServ 11
 
-~ grad_StatPortIndex1			1,3,6,1,4,1,9163,3,1,8,1,1
-~ grad_StatPortIndex2			1,3,6,1,4,1,9163,3,1,8,1,1,-1
+radiusAuthServ					1,3,6,1,2,1,67,1,1,1,1
+radiusAuthServIdent				1,3,6,1,2,1,67,1,1,1,1,1
+radiusAuthServUpTime				1,3,6,1,2,1,67,1,1,1,1,2
+radiusAuthServResetTime				1,3,6,1,2,1,67,1,1,1,1,3
+radiusAuthServConfigReset			1,3,6,1,2,1,67,1,1,1,1,4
+radiusAuthServTotalAccessRequests		1,3,6,1,2,1,67,1,1,1,1,5
+radiusAuthServTotalInvalidRequests		1,3,6,1,2,1,67,1,1,1,1,6
+radiusAuthServTotalDupAccessRequests		1,3,6,1,2,1,67,1,1,1,1,7
+radiusAuthServTotalAccessAccepts		1,3,6,1,2,1,67,1,1,1,1,8
+radiusAuthServTotalAccessRejects		1,3,6,1,2,1,67,1,1,1,1,9
+radiusAuthServTotalAccessChallenges		1,3,6,1,2,1,67,1,1,1,1,10
+radiusAuthServTotalMalformedAccessRequests	1,3,6,1,2,1,67,1,1,1,1,11
+radiusAuthServTotalBadAuthenticators		1,3,6,1,2,1,67,1,1,1,1,12
+radiusAuthServTotalPacketsDropped		1,3,6,1,2,1,67,1,1,1,1,13
+radiusAuthServTotalUnknownTypes			1,3,6,1,2,1,67,1,1,1,1,14
 
-~ grad_StatPortNASIndex			1,3,6,1,4,1,9163,3,1,8,1,2
-~ grad_StatPortID			1,3,6,1,4,1,9163,3,1,8,1,3
-~ grad_StatPortFramedAddress		1,3,6,1,4,1,9163,3,1,8,1,4 
-~ grad_StatPortTotalLogins		1,3,6,1,4,1,9163,3,1,8,1,5 
-~ grad_StatPortStatus			1,3,6,1,4,1,9163,3,1,8,1,6 
-~ grad_StatPortStatusChangeTimestamp	1,3,6,1,4,1,9163,3,1,8,1,7 
-~ grad_StatPortUpTime			1,3,6,1,4,1,9163,3,1,8,1,8 
-~ grad_StatPortLastLoginName		1,3,6,1,4,1,9163,3,1,8,1,9 
-~ grad_StatPortLastLoginTimestamp	1,3,6,1,4,1,9163,3,1,8,1,10
-~ grad_StatPortLastLogoutTimestamp	1,3,6,1,4,1,9163,3,1,8,1,11
-~ grad_StatPortIdleTotalTime		1,3,6,1,4,1,9163,3,1,8,1,12
-~ grad_StatPortIdleMaxTime		1,3,6,1,4,1,9163,3,1,8,1,13
-~ grad_StatPortIdleMaxTimestamp		1,3,6,1,4,1,9163,3,1,8,1,14
-~ grad_StatPortInUseTotalTime		1,3,6,1,4,1,9163,3,1,8,1,15
-~ grad_StatPortInUseMaxTime		1,3,6,1,4,1,9163,3,1,8,1,16
-~ grad_StatPortInUseMaxTimestamp	1,3,6,1,4,1,9163,3,1,8,1,17
+--#define MIB_POS_radiusAuthClient 13
+--#define MIB_POS_radiusAuthClient_INDEX 14
+-beginX
+radiusAuthClientTable				1,3,6,1,2,1,67,1,1,1,1,15
+radiusAuthClientEntry				1,3,6,1,2,1,67,1,1,1,1,15,1
+radiusAuthClientIndex				1,3,6,1,2,1,67,1,1,1,1,15,1,1
+radiusAuthClientAddress				1,3,6,1,2,1,67,1,1,1,1,15,1,2
+radiusAuthClientID				1,3,6,1,2,1,67,1,1,1,1,15,1,3
+radiusAuthServAccessRequests			1,3,6,1,2,1,67,1,1,1,1,15,1,4
+radiusAuthServDupAccessRequests			1,3,6,1,2,1,67,1,1,1,1,15,1,5
+radiusAuthServAccessAccepts			1,3,6,1,2,1,67,1,1,1,1,15,1,6
+radiusAuthServAccessRejects			1,3,6,1,2,1,67,1,1,1,1,15,1,7
+radiusAuthServAccessChallenges			1,3,6,1,2,1,67,1,1,1,1,15,1,8
+radiusAuthServMalformedAccessRequests		1,3,6,1,2,1,67,1,1,1,1,15,1,9
+radiusAuthServBadAuthenticators			1,3,6,1,2,1,67,1,1,1,1,15,1,10
+radiusAuthServPacketsDropped			1,3,6,1,2,1,67,1,1,1,1,15,1,11
+radiusAuthServUnknownTypes			1,3,6,1,2,1,67,1,1,1,1,15,1,12
+-endX
+radiusAuthServMIBConformance			1,3,6,1,2,1,67,1,2
+radiusAuthServMIBCompliances			1,3,6,1,2,1,67,1,2,1
+radiusAuthServMIBCompliance			1,3,6,1,2,1,67,1,2,1,1
 
-/* Server */
-/* fixed oids */
-= grad_radiusServerUpTime		1,3,6,1,4,1,9163,1,1
-= grad_radiusServerResetTime		1,3,6,1,4,1,9163,1,2
-= grad_radiusServerState		1,3,6,1,4,1,9163,1,3
+radiusAuthServMIBGroups				1,3,6,1,2,1,67,1,2,2
+radiusAuthServMIBGroup				1,3,6,1,2,1,67,1,2,2,1
 
-/* variable oids */
-~ grad_queueIndex			1,3,6,1,4,1,9163,1,4,1,1
-~ grad_queueName			1,3,6,1,4,1,9163,1,4,1,2
-~ grad_queueActive			1,3,6,1,4,1,9163,1,4,1,3
-~ grad_queueHeld			1,3,6,1,4,1,9163,1,4,1,4
-~ grad_queueTotal			1,3,6,1,4,1,9163,1,4,1,5
+/* Accounting */
+radiusAccounting				1,3,6,1,2,1,67,2 
+radiusAccServMIB				1,3,6,1,2,1,67,2,1
+radiusAccServMIBObjects				1,3,6,1,2,1,67,2,1,1
+radiusAccServ					1,3,6,1,2,1,67,2,1,1,1
 
-= grad_memoryNumClasses			1,3,6,1,4,1,9163,1,5,1
-= grad_memoryNumBuckets			1,3,6,1,4,1,9163,1,5,2
-= grad_memoryBytesAllocated		1,3,6,1,4,1,9163,1,5,3
-= grad_memoryBytesUsed			1,3,6,1,4,1,9163,1,5,4
+--#define MIB_POS_radiusAccServ 11
+radiusAccServIdent				1,3,6,1,2,1,67,2,1,1,1,1
+radiusAccServUpTime				1,3,6,1,2,1,67,2,1,1,1,2
+radiusAccServResetTime				1,3,6,1,2,1,67,2,1,1,1,3
+radiusAccServConfigReset			1,3,6,1,2,1,67,2,1,1,1,4
+radiusAccServTotalRequests			1,3,6,1,2,1,67,2,1,1,1,5
+radiusAccServTotalInvalidRequests		1,3,6,1,2,1,67,2,1,1,1,6
+radiusAccServTotalDupRequests			1,3,6,1,2,1,67,2,1,1,1,7
+radiusAccServTotalResponses			1,3,6,1,2,1,67,2,1,1,1,8
+radiusAccServTotalMalformedRequests		1,3,6,1,2,1,67,2,1,1,1,9
+radiusAccServTotalBadAuthenticators		1,3,6,1,2,1,67,2,1,1,1,10
+radiusAccServTotalPacketsDropped		1,3,6,1,2,1,67,2,1,1,1,11
+radiusAccServTotalNoRecords			1,3,6,1,2,1,67,2,1,1,1,12
+radiusAccServTotalUnknownTypes			1,3,6,1,2,1,67,2,1,1,1,13
+radiusAccClientTable				1,3,6,1,2,1,67,2,1,1,1,14
 
-~ grad_classIndex			1,3,6,1,4,1,9163,1,5,5,1,1
-~ grad_classSize			1,3,6,1,4,1,9163,1,5,5,1,2
-~ grad_classElsPerBucket		1,3,6,1,4,1,9163,1,5,5,1,3
-~ grad_classNumBuckets			1,3,6,1,4,1,9163,1,5,5,1,4
-~ grad_classElsUsed			1,3,6,1,4,1,9163,1,5,5,1,5
+--#define MIB_POS_radiusAccClient 13
+--#define MIB_POS_radiusAccClient_INDEX 14
+-beginX
+radiusAccClientEntry				1,3,6,1,2,1,67,2,1,1,1,14,1
+radiusAccClientIndex				1,3,6,1,2,1,67,2,1,1,1,14,1,1
+radiusAccClientAddress				1,3,6,1,2,1,67,2,1,1,1,14,1,2
+radiusAccClientID				1,3,6,1,2,1,67,2,1,1,1,14,1,3
+radiusAccServPacketsDropped			1,3,6,1,2,1,67,2,1,1,1,14,1,4
+radiusAccServRequests				1,3,6,1,2,1,67,2,1,1,1,14,1,5
+radiusAccServDupRequests			1,3,6,1,2,1,67,2,1,1,1,14,1,6
+radiusAccServResponses				1,3,6,1,2,1,67,2,1,1,1,14,1,7
+radiusAccServBadAuthenticators			1,3,6,1,2,1,67,2,1,1,1,14,1,8
+radiusAccServMalformedRequests			1,3,6,1,2,1,67,2,1,1,1,14,1,9
+radiusAccServNoRecords				1,3,6,1,2,1,67,2,1,1,1,14,1,10
+radiusAccServUnknownTypes			1,3,6,1,2,1,67,2,1,1,1,14,1,11
+-endX
 
-= grad_memoryMallocBlocks		1,3,6,1,4,1,9163,1,5,6
-= grad_memoryMallocBytes		1,3,6,1,4,1,9163,1,5,7
+radiusAccServMIBConformance			1,3,6,1,2,1,67,2,1,2
+radiusAccServMIBCompliances			1,3,6,1,2,1,67,2,1,2,1
+radiusAccServMIBCompliance			1,3,6,1,2,1,67,2,1,2,1,1
 
-/* enterprises.gnu.radius subtree: */
+radiusAccServMIBGroups				1,3,6,1,2,1,67,2,1,2,2
+radiusAccServMIBGroup				1,3,6,1,2,1,67,2,1,2,2,1
 
-/* Fixed oids */			
-= StatIdent				1,3,6,1,4,1,11591,1,3,1,1
-= StatUpTime				1,3,6,1,4,1,11591,1,3,1,2
-= StatConfigReset			1,3,6,1,4,1,11591,1,3,1,3
-= StatTotalLines			1,3,6,1,4,1,11591,1,3,1,4
-= StatTotalLinesInUse		        1,3,6,1,4,1,11591,1,3,1,5
-= StatTotalLinesIdle          		1,3,6,1,4,1,11591,1,3,1,6
-					
-/* Variable oids */			
-~ NASIndex1				1,3,6,1,4,1,11591,1,3,1,7,1,1
-~ NASIndex2				1,3,6,1,4,1,11591,1,3,1,7,1,1,-1
-~ NASIndex3				1,3,6,1,4,1,11591,1,3,1,7,1,1,-1,-1
-~ NASIndex4				1,3,6,1,4,1,11591,1,3,1,7,1,1,-1,-1,-1
-~ NASAddress				1,3,6,1,4,1,11591,1,3,1,7,1,2
-~ NASID					1,3,6,1,4,1,11591,1,3,1,7,1,3
-~ NASLines				1,3,6,1,4,1,11591,1,3,1,7,1,4
-~ NASLinesInUse				1,3,6,1,4,1,11591,1,3,1,7,1,5
-~ NASLinesIdle				1,3,6,1,4,1,11591,1,3,1,7,1,6
+/* Statistics */
+radiusStatistics				1,3,6,1,2,1,67,3
+radiusStatMIB					1,3,6,1,2,1,67,3,1
 
-~ StatPortIndex1			1,3,6,1,4,1,11591,1,3,1,8,1,1
-~ StatPortIndex2			1,3,6,1,4,1,11591,1,3,1,8,1,1,-1
+--#define MIB_POS_radiusStatServ 9
+radiusStatIdent					1,3,6,1,2,1,67,3,1,1
+radiusStatUpTime				1,3,6,1,2,1,67,3,1,2
+radiusStatConfigReset				1,3,6,1,2,1,67,3,1,3
+radiusStatTotalLines				1,3,6,1,2,1,67,3,1,4
+radiusStatTotalLinesInUse			1,3,6,1,2,1,67,3,1,5
+radiusStatTotalLinesIdle			1,3,6,1,2,1,67,3,1,6
 
-~ StatPortNASIndex			1,3,6,1,4,1,11591,1,3,1,8,1,2
-~ StatPortID				1,3,6,1,4,1,11591,1,3,1,8,1,3
-~ StatPortFramedAddress			1,3,6,1,4,1,11591,1,3,1,8,1,4 
-~ StatPortTotalLogins			1,3,6,1,4,1,11591,1,3,1,8,1,5 
-~ StatPortStatus			1,3,6,1,4,1,11591,1,3,1,8,1,6 
-~ StatPortStatusChangeTimestamp		1,3,6,1,4,1,11591,1,3,1,8,1,7 
-~ StatPortUpTime			1,3,6,1,4,1,11591,1,3,1,8,1,8 
-~ StatPortLastLoginName			1,3,6,1,4,1,11591,1,3,1,8,1,9 
-~ StatPortLastLoginTimestamp		1,3,6,1,4,1,11591,1,3,1,8,1,10
-~ StatPortLastLogoutTimestamp		1,3,6,1,4,1,11591,1,3,1,8,1,11
-~ StatPortIdleTotalTime			1,3,6,1,4,1,11591,1,3,1,8,1,12
-~ StatPortIdleMaxTime			1,3,6,1,4,1,11591,1,3,1,8,1,13
-~ StatPortIdleMaxTimestamp		1,3,6,1,4,1,11591,1,3,1,8,1,14
-~ StatPortInUseTotalTime		1,3,6,1,4,1,11591,1,3,1,8,1,15
-~ StatPortInUseMaxTime			1,3,6,1,4,1,11591,1,3,1,8,1,16
-~ StatPortInUseMaxTimestamp		1,3,6,1,4,1,11591,1,3,1,8,1,17
+radiusStatNASTable				1,3,6,1,2,1,67,3,1,7
+radiusStatNASEntry				1,3,6,1,2,1,67,3,1,7,1
 
-/* Server */
-/* fixed oids */
-= radiusServerUpTime			1,3,6,1,4,1,11591,1,1,1
-= radiusServerResetTime			1,3,6,1,4,1,11591,1,1,2
-= radiusServerState			1,3,6,1,4,1,11591,1,1,3
+--#define MIB_POS_radiusStatNASEntry 11
+--#define MIB_POS_radiusStatNASEntry_INDEX 12
+-beginX
+NASIndex					1,3,6,1,2,1,67,3,1,7,1,1
+NASAddress					1,3,6,1,2,1,67,3,1,7,1,2
+NASID						1,3,6,1,2,1,67,3,1,7,1,3
+NASLines					1,3,6,1,2,1,67,3,1,7,1,4
+NASLinesInUse					1,3,6,1,2,1,67,3,1,7,1,5
+NASLinesIdle					1,3,6,1,2,1,67,3,1,7,1,6
 
-/* variable oids */
-~ queueIndex				1,3,6,1,4,1,11591,1,1,4,1,1
-~ queueName				1,3,6,1,4,1,11591,1,1,4,1,2
-~ queueWaiting				1,3,6,1,4,1,11591,1,1,4,1,3
-~ queuePending				1,3,6,1,4,1,11591,1,1,4,1,4
-~ queueCompleted			1,3,6,1,4,1,11591,1,1,4,1,5
-~ queueTotal				1,3,6,1,4,1,11591,1,1,4,1,6
+radiusStatNASPortTable				1,3,6,1,2,1,67,3,1,8
+radiusStatNASPortEntry				1,3,6,1,2,1,67,3,1,8,1
 
-= memoryNumClasses			1,3,6,1,4,1,11591,1,1,5,1
-= memoryNumBuckets			1,3,6,1,4,1,11591,1,1,5,2
-= memoryBytesAllocated			1,3,6,1,4,1,11591,1,1,5,3
-= memoryBytesUsed			1,3,6,1,4,1,11591,1,1,5,4
+--#define MIB_POS_NASPortEntry 11
+--#define MIB_POS_NASPortEntry_INDEX 12
 
-~ classIndex				1,3,6,1,4,1,11591,1,1,5,5,1,1
-~ classSize				1,3,6,1,4,1,11591,1,1,5,5,1,2
-~ classElsPerBucket			1,3,6,1,4,1,11591,1,1,5,5,1,3
-~ classNumBuckets			1,3,6,1,4,1,11591,1,1,5,5,1,4
-~ classElsUsed				1,3,6,1,4,1,11591,1,1,5,5,1,5
+radiusStatPortIndex				1,3,6,1,2,1,67,3,1,8,1,1
+radiusStatNASIndex				1,3,6,1,2,1,67,3,1,8,1,2
+radiusStatPortID				1,3,6,1,2,1,67,3,1,8,1,3
+radiusStatPortFramedAddress			1,3,6,1,2,1,67,3,1,8,1,4 
+radiusStatPortTotalLogins			1,3,6,1,2,1,67,3,1,8,1,5 
+radiusStatPortStatus				1,3,6,1,2,1,67,3,1,8,1,6 
+radiusStatPortStatusDate			1,3,6,1,2,1,67,3,1,8,1,7 
+radiusStatPortUpTime				1,3,6,1,2,1,67,3,1,8,1,8 
+radiusStatPortLastLoginName			1,3,6,1,2,1,67,3,1,8,1,9 
+radiusStatPortLastLoginDate			1,3,6,1,2,1,67,3,1,8,1,10
+radiusStatPortLastLogoutDate			1,3,6,1,2,1,67,3,1,8,1,11
+radiusStatPortIdleTotalTime			1,3,6,1,2,1,67,3,1,8,1,12
+radiusStatPortIdleMaxTime			1,3,6,1,2,1,67,3,1,8,1,13
+radiusStatPortIdleMaxDate			1,3,6,1,2,1,67,3,1,8,1,14
+radiusStatPortInUseTotalTime			1,3,6,1,2,1,67,3,1,8,1,15
+radiusStatPortInUseMaxTime			1,3,6,1,2,1,67,3,1,8,1,16
+radiusStatPortInUseMaxDate			1,3,6,1,2,1,67,3,1,8,1,17
 
-= memoryMallocBlocks			1,3,6,1,4,1,11591,1,1,5,6
-= memoryMallocBytes			1,3,6,1,4,1,11591,1,1,5,7
+-endX
+
+
 
 
 

@@ -1,20 +1,22 @@
-# This file is part of GNU Radius.
-# Copyright (C) 2000,2001,2003,2004 Free Software Foundation, Inc.
-#
-# Written by Sergey Poznyakoff
-#
-# This file is free software; as a special exception the author gives
-# unlimited permission to copy and/or distribute it, with or without
-# modifications, as long as this notice is preserved.
-#
-# GNU Radius is distributed in the hope that it will be useful, but
-# WITHOUT ANY WARRANTY, to the extent permitted by law; without even the
-# implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+# $Id$
+if MAINTAINER_MODE
+CFLAGS=-ggdb -DMAINTAINER_MODE=1
+
+FILELIST:; @echo gram.y > .list
+	
+endif
 
 bin_PROGRAMS    = radtest
-radtest_SOURCES = main.c gram.y input.l radtest.h runtime.c completion.c
-radtest_LDADD   = @LIBGNURADIUS@ @LIBRADEXTRA@ ../lib/libradextra.a @READLINE_LIBS@ @LIBINTL@
-noinst_HEADERS  = gram.h
-INCLUDES        = @RADIUS_INCLUDE_PATH@ -I$(srcdir) 
-AM_YFLAGS = -vdt 
+radtest_SOURCES = main.c radtest.c y.tab.c lex.yy.c symtab.c debugmod.c
+radtest_LDADD   = -L ../radlib -lrad -llog 
+INCLUDES        = -I$(top_srcdir) -I$(top_srcdir)/include -I$(srcdir) @INCLUDEPATH@
+EXTRA_DIST      = gram.y input.l radtest.h
 
+y.tab.c y.tab.h: $(srcdir)/gram.y
+	$(YACC) -vd @YACC_OPTS@ $(srcdir)/gram.y
+
+lex.yy.c: $(srcdir)/input.l
+	$(LEX) $(srcdir)/input.l
+
+y.tab.o: y.tab.c y.tab.h
+lex.yy.o: lex.yy.c y.tab.h

@@ -1,21 +1,13 @@
-/* This file is part of GNU Radius
-   Copyright (C) 2001,2003,2007 Free Software Foundation, Inc.
+/*
+ * timestr.c	See if a string like 'Su2300-0700' matches (UUCP style).
+ *
+ * Version:	@(#)timestr.c  0.10  21-Mar-1999 miquels@cistron.nl
+ *
+ */
 
-   Written by Sergey Poznyakoff
-  
-   GNU Radius is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 3 of the License, or
-   (at your option) any later version.
-  
-   GNU Radius is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-  
-   You should have received a copy of the GNU General Public License
-   along with GNU Radius; if not, write to the Free Software Foundation, 
-   Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA. */
+#ifndef lint
+static char rcsid[] = "@(#) $Id$";
+#endif
 
 #ifdef HAVE_CONFIG_H
 # include <config.h>
@@ -23,263 +15,240 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/time.h>
-#include <strings.h>
+#include <sysdep.h>
 #include <ctype.h>
 
-#ifdef TM_IN_SYS_TIME
-# include <sys/time.h>
+static char *days[] =
+	{ "su", "mo", "tu", "we", "th", "fr", "sa", "wk", "any", "al" };
+
+#define DAYMIN		(24*60)
+#define WEEKMIN		(24*60*7)
+#define val(x)		(( (x) < 48 || (x) > 57) ? 0 : ((x) - 48))
+
+#ifdef DEBUG
+#  define xprintf if (1) printf
 #else
-# include <time.h>
+#  define xprintf if (0) printf
 #endif
 
-#include <timestr.h>
 
-#ifndef ALLOC
-# define ALLOC malloc
-#endif
-#ifndef FREE
-# define FREE free
-#endif
 
-#define DAYMIN  (24*60)
-#define val(x)  (( (x) < '0' || (x) > '9') ? 0 : ((x) - '0'))
-
-static TIMESPAN *
-timespan_new(int start, int stop)
+/*
+ *	String code.
+ */
+static int strcode (char **str)
 {
-        TIMESPAN *ts;
+	int		i, l;
 
-        ts = ALLOC(sizeof(*ts));
-        ts->next  = NULL;
-        ts->start = start;
-        ts->stop  = stop;
-        return ts;
-}
+	xprintf("strcode %s called\n", *str);
 
-static void
-timespan_day(TIMESPAN **ts, int day, int start, int stop)
-{
-        TIMESPAN *tp, *prev;
-        
-        if (stop < start) {
-                timespan_day(ts, day, start, DAYMIN);
-                timespan_day(ts, day % 7, 0, stop);
-                return;
-        }
-
-        day *= DAYMIN;
-        start += day;
-        stop  += day;
-        
-        if (!*ts) {
-                *ts = timespan_new(start, stop);
-                return;
-        }
-
-        /*
-         * Let R be the timespan requested and F the timespan found
-         * a. R lies entirely within F.
-         *        just return
-         * b. R complements F
-         *        Append R to F
-         * c. R precedes F
-         *        insert R before F
-         * d. F precedes R
-         *        continue
-         */
-        prev = NULL;
-        for (tp = *ts; tp && tp->stop < start; tp = tp->next)
-                prev = tp;
-
-        if (tp) {
-                if (tp->start <= start && stop <= tp->stop)
-                        return;
-        
-                if (tp->start == stop) {
-                        tp->start = start;
-                        return;
-                }
-
-                if (tp->stop == start) {
-                        tp->stop = stop;
-                        return;
+	for (i = 0; i < 10; i++) {
+		l = strlen(days[i]);
+		if (l > strlen(*str))
+			continue;
+		if (strncmp(*str, days[i], l) == 0) {
+			*str += l;
+			break;
 		}
-        }
+	}
+	xprintf("strcode result %d\n", i);
 
-        tp = timespan_new(start, stop);
-        if (prev) {
-                tp->next = prev->next;
-                prev->next = tp;
-        } else {
-                tp->next = *ts;
-                *ts = tp;
-        }
+	return (i >= 10) ? -1 : i;
+
 }
 
-static int
-timespan_parse(TIMESPAN **ts, char *s, char **endp)
+/*
+ *	Fill bitmap with hours/mins.
+ */
+static int hour_fill(char *bitmap, char *tm)
 {
-        register int i, j;
-        register char *p;
-        int start, stop;
-        char t[3];
-        static char *days[] =
-        { "su", "mo", "tu", "we", "th", "fr", "sa", "wk", "any", "al" };
-        #define ND sizeof(days)/sizeof(days[0])
+	char		*p;
+	int		start, end;
+	int		i, bit, byte;
 
-        for (i = 0; i < sizeof(t); i++)
-                t[i] = tolower(s[i]);
+	xprintf("hour_fill called for %s\n", tm);
 
-        for (i = 0; i < ND; i++) {
-                p = days[i];
-                for (j = 0; p[j] && p[j] == t[j]; j++)
-                        ;
-                if (p[j] == 0) {
-                        s += j;
-                        break;
-                }
-        }
-        if (i == ND) {
-                *endp = s;
-                return -1;
-        }
+	/*
+	 *	Get timerange in start and end.
+	 */
+	end = -1;
+	if ((p = strchr(tm, '-')) != NULL) {
+		p++;
+		if (p - tm != 5 || strlen(p) < 4 || !isdigit(*p))
+			return 0;
+		end = 600 * val(p[0]) + 60 * val(p[1]) + atoi(p + 2);
+	}
+	if (*tm == 0) {
+		start = 0;
+		end = DAYMIN - 1;
+	} else {
+		if (strlen(tm) < 4 || !isdigit(*tm))
+			return 0;
+		start = 600 * val(tm[0]) + 60 * val(tm[1]) + atoi(tm + 2);
+		if (end < 0)
+			end = start;
+		if (end < start)
+			end += 2*600+4*60;
+		if (start >= DAYMIN)
+			return 0;
+	}
+	xprintf("hour_fill: range from %d to %d\n", start, end);
 
-        /*
-         * i is the day of week.
-         */
-        if (*s && *s != ',' && *s != '|') {
-                /* Syntax check */
-                p = s;
-                for (j = 0; j < 4; j++, p++)
-                        if (!isdigit(*p)) {
-                                *endp = p;
-                                return -1;
-                        }
-                if (*p != '-') {
-                        *endp = p;
-                        return -1;
-                }
-                for (p++, j = 0; j < 4; j++, p++)
-                        if (!isdigit(*p)) {
-                                *endp = p;
-                                return -1;
-                        }
-                *endp = p;
-                /*
-                 * determine start and stop limits
-                 */
-                start = 600 * val(s[0]) + 60 * val(s[1]) + atoi(s + 2);
-                s += 5;
-                stop  = 600 * val(s[0]) + 60 * val(s[1]) + atoi(s + 2);
-        } else {
-                *endp = s;
-                if (i > 7) { /* al and any */
-                        *ts = NULL;
-                        return 0;
-                }
-                start = 0;
-                stop = DAYMIN;
-        }
-
-        /*
-         * Create timespans
-         */
-        if (i <= 6) 
-                timespan_day(ts, i, start, stop);
-        else if (i == 7) 
-                for (i = 1; i <= 5; i++)
-                        timespan_day(ts, i, start, stop);
-        else 
-                for (i = 0; i <= 6; i++)
-                        timespan_day(ts, i, start, stop);
-
-        return 0;
+	/*
+	 *	Fill bitmap.
+	 */
+	for (i = start; i <= end; i++) {
+		byte = (i / 8);
+		bit  = i % 8;
+		xprintf("setting byte %d, bit %d\n", byte, bit);
+		bitmap[byte] |= (1 << bit);
+	}
+	return 1;
 }
 
-void
-ts_free(TIMESPAN *sp)
+/*
+ *	Call the fill bitmap function for every day listed.
+ */
+static int day_fill(char *bitmap, char *tm)
 {
-        TIMESPAN *next;
+	char		*hr;
+	int		n;
+	int		start, end;
 
-        while (sp) {
-                next = sp->next;
-                FREE(sp);
-                sp = next;
-        }
+	for (hr = tm; *hr; hr++)
+		if (isdigit(*hr))
+			break;
+	if (hr == tm) tm = "Al";
+
+	xprintf("dayfill: hr %s    tm %s\n", hr, tm);
+
+	while ((start = strcode(&tm)) >= 0) {
+		/*
+		 *	Find start and end weekdays and
+		 *	build a valid range 0 - 6.
+		 */
+		if (*tm == '-') {
+			tm++;
+			if ((end = strcode(&tm)) < 0)
+				break;
+		} else
+			end = start;
+		if (start == 7) {
+			start = 1;
+			end = 5;
+		}
+		if (start > 7) {
+			start = 0;
+			end = 6;
+		}
+		n = start;
+		xprintf("day_fill: range from %d to %d\n", start, end);
+		while (1) {
+			hour_fill(bitmap + 180 * n, hr);
+			if (n == end) break;
+			n++;
+			n %= 7;
+		}
+	}
+
+	return 1;
 }
 
-
-int
-ts_parse(TIMESPAN **sp, char *str, char **endp)
+/*
+ *	Fill the week bitmap with allowed times.
+ */
+static int week_fill(char *bitmap, char *tm)
 {
-        *sp = NULL;
-        while (1) {
-                if (timespan_parse(sp, str, endp)) {
-                        ts_free(*sp);
-                        return -1;
-                }
-                str = *endp;
-                if (*str == 0)
-                        break;
-                if (*str != ',' && *str != '|') {
-                        ts_free(*sp);
-                        return -1;
-                }
-                str++;
-        }
-        return 0;
+	char		*s;
+	char		tmp[128];
+
+	strncpy(tmp, tm, 128);
+	tmp[127] = 0;
+	for (s = tmp; *s; s++)
+		if (isupper(*s)) *s = tolower(*s);
+
+	if (strcmp(tmp, "never") == 0)
+		return 0;
+
+	s = strtok(tmp, ",|");
+	while (s) {
+		day_fill(bitmap, s);
+		s = strtok(NULL, ",|");
+	}
+
+	return 0;
 }
 
-int
-ts_match(TIMESPAN *timespan, time_t *time_now, unsigned *rest)
+/*
+ *	Match a timestring and return seconds left.
+ *	-1 for no match, 0 for unlimited.
+ */
+int timestr_match(char *tmstr, time_t t)
 {
-        TIMESPAN *tp;
-        struct tm *tm, tms;
-        unsigned now;
-        
-        if (!timespan) {
-                return 2;
-        }
+	struct tm	*tm;
+	char		bitmap[WEEKMIN / 8];
+	int		now, tot, i;
+	int		byte, bit;
+#if DEBUG2
+	int		y;
+	char		*s;
+	char		null[8];
+#endif
 
-        tm = localtime_r(time_now, &tms);
-        now = tm->tm_wday * DAYMIN + tm->tm_hour * 60 + tm->tm_min;
+	tm = localtime(&t);
+	now = tm->tm_wday * DAYMIN + tm->tm_hour * 60 + tm->tm_min;
+	tot = 0;
+	memset(bitmap, 0, sizeof(bitmap));
+	week_fill(bitmap, tmstr);
 
-        for (tp = timespan; tp; tp = tp->next) {
-                if (tp->start <= now && now < tp->stop) {
-                        if (rest)
-                                *rest = (tp->stop - now)*60;
-                        return 0;
-                }
-        }
+#if DEBUG2
+	memset(null, 0, 8);
+	for (i = 0; i < 7; i++) {
+		printf("%d: ", i);
+		s = bitmap + 180 * i;
+		for (y = 0; y < 23; y++) {
+			s = bitmap + 180 * i + (75 * y) / 10;
+			printf("%c", memcmp(s, null, 8) == 0 ? '.' : '#');
+		}
+		printf("\n");
+	}
+#endif
 
-        if (!rest)
-                return 1;
-        
-        for (tp = timespan; tp && tp->stop <= now; tp = tp->next)
-                ;
-        if (!tp)
-                tp = timespan;
-        if (tp->start < now)
-                *rest = (7*DAYMIN + tp->start - now)*60;
-        else
-                *rest = (tp->start - now)*60;
-        return 1;
+	/*
+	 *	See how many minutes we have.
+	 */
+	i = now;
+	while (1) {
+		byte = i / 8;
+		bit = i % 8;
+		xprintf("READ: checking byte %d bit %d\n", byte, bit);
+		if (!(bitmap[byte] & (1 << bit)))
+			break;
+		tot += 60;
+		i++;
+		i %= WEEKMIN;
+		if (i == now)
+			break;
+	}
+
+	if (!tot) return -1;
+	return (i == now) ? 0 : tot;
 }
 
-int
-ts_check(char *str, time_t *time, unsigned *rest, char **endp)
+#ifdef STANDALONE
+
+int main(int argc, char **argv)
 {
-        TIMESPAN *ts;
-        int rc;
-        
-        if (ts_parse(&ts, str, &str)) {
-                if (endp)
-                        *endp = str;
-                return -1;
-        }
-        rc = ts_match(ts, time, rest);
-        ts_free(ts);
-        return rc;
+	int		l;
+
+	if (argc != 2) {
+		fprintf(stderr, "Usage: test timestring\n");
+		exit(1);
+	}
+	l = timestr_match(argv[1], time(NULL));
+	printf ("%s: %d seconds left\n", argv[1], l);
+	return 0;
 }
+
+#endif
 

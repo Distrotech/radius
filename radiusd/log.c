@@ -1,1154 +1,548 @@
-/* This file is part of GNU Radius.
-   Copyright (C) 2000,2001,2002,2003,2004,2005,
-   2007 Free Software Foundation, Inc.
+/* This file is part of GNU RADIUS.
+ * Copyright (C) 2000, Sergey Poznyakoff
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+ *
+ */
+/*  log.c	Logging module. */
 
-   Written by Sergey Poznyakoff
-  
-   GNU Radius is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 3 of the License, or
-   (at your option) any later version.
-  
-   GNU Radius is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-  
-   You should have received a copy of the GNU General Public License
-   along with GNU Radius; if not, write to the Free Software Foundation,
-   Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA. */
+#ifndef lint
+static char rcsid[] = "@(#) $Id$";
+#endif
 
 #ifdef HAVE_CONFIG_H
 # include <config.h>
 #endif
 
-#include <sys/types.h>
-#include <sys/wait.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <errno.h>
+#include <ctype.h>
+#include <varargs.h>
 #include <syslog.h>
-
+#include <netinet/in.h>
+#include <sysdep.h>
 #include <radiusd.h>
-#include <rewrite.h>
 
-static int logging_category = L_CAT(L_MAIN);
-static grad_list_t /* of Channel*/ *chanlist;   /* List of defined channels */
-static char *log_prefix_hook;             /* Name of the global prefix hook */
-static char *log_suffix_hook;             /* Name of the global suffix hook */
-
-#define SP(p) ((p)?(p):"")
-
-struct log_data {
-	int cat;
-	int pri;
-	const grad_request_t *req;
-	const char *prefix;
-	const char *text;
-	const char *errtext;
+struct category {
+	char *descr;
+	struct channel *channel;
 };
 
-
+extern char	*radlog_dir;
 
-struct logbuf {
-	char *ptr;
-	size_t size;
-	size_t pos;
+char default_log[MAX_PATH_LENGTH];
+int log_mode = RLOG_DEFAULT;
+
+struct channel *chan_first, *chan_last;
+struct channel default_channel;
+
+struct category category[] = {
+	NULL,          NULL,
+        N_("Debug"),   NULL, 
+	N_("Info"),    NULL, 
+	N_("Notice"),  NULL, 
+	N_("Warning"), NULL, 
+	N_("Error"),   NULL, 
+	N_("Crit"),    &default_channel,
+	N_("Auth"),    NULL,
+	N_("Proxy"),   NULL,
 };
 
-#define LOGBUF_INIT(b) { (b), sizeof(b), 0 }
-#define _log_s_cat2__(a,b) a ## b 
-#define LOGBUF_DECL(name,size) \
-  static char _log_s_cat2__(name,_buffer)[ size ];\
-  struct logbuf name = LOGBUF_INIT(_log_s_cat2__(name,_buffer))
+int log_to_file(char *file, int opt, char *descr, char *msg);
 
 void
-logbuf_append(struct logbuf *buf, const char *str)
+log_init()
 {
-	size_t length = strlen(str);
-	size_t rest = buf->size - buf->pos;
+	Channel *cp;
 
-	if (rest <= 1) 
-		buf->ptr[buf->pos-1] = '>';
-	else if (rest == 2)
-		buf->ptr[buf->pos++] = '>';
-	else if (length >= rest) {
-		if (--rest > 1) {
-			if (rest >= 2)
-				rest--;
-			memcpy(buf->ptr + buf->pos, str, rest);
-			buf->pos += rest;
-		} 
-		buf->ptr[buf->pos++] = '>';
-	} else {
-		memcpy(buf->ptr + buf->pos, str, length);
-		buf->pos += length;
+	log_cleanup(1);
+	if (chan_first || chan_last) {
+		radlog(L_CRIT, _("log_cleanup failed"));
+		abort();
+	}
+			
+	if (strlen(radlog_dir)+1+sizeof(RADIUS_LOG) >= sizeof(default_log)) {
+		radlog(L_CRIT, _("radlog_dir too long, using default instead"));
+		radlog_dir = RADLOG_DIR;
+	}
+	sprintf(default_log, "%s/%s", radlog_dir, RADIUS_LOG);
+	
+	default_channel.mode = LM_FILE;
+	default_channel.options = LO_CONS|LO_PID|LO_LEVEL;
+	default_channel.id.file = default_log;
+	
+	install_channel("null", LM_OFF, 0, NULL, 0);
+	cp = install_channel("default",	LM_FILE, 0, RADIUS_LOG, LO_LEVEL);
+	register_category(-1, cp);
+}
+
+void
+log_cleanup(all)
+	int all;
+{
+	Channel *cp, *next, *prev;
+
+	prev = NULL;
+	cp = chan_first;
+	while (cp) {
+		next = cp->next;
+		if (all || cp->ucnt == 0) {
+			efree(cp->name);
+			if (cp->mode == LM_FILE)
+				efree(cp->id.file);
+
+			if (prev)
+				prev->next = next;
+			else
+				chan_first = next;
+			if (cp == chan_last) 
+				chan_last = prev;
+
+			efree(cp);
+		} else
+			prev = cp;
+		cp = next;
 	}
 }
 
-void
-logbuf_append_line(struct logbuf *buf, size_t line)
+Channel *
+channel_lookup(name)
+	char *name;
 {
-	char linestr[64];
-	snprintf(linestr, sizeof(linestr), "%lu", (unsigned long)line);
-	logbuf_append(buf, linestr);
+	Channel *cp;
+
+	for (cp = chan_first; cp; cp = cp->next)
+		if (strcmp(cp->name, name) == 0)
+			return cp;
+	return NULL;
 }
 
 void
-logbuf_vformat(struct logbuf *buf, const char *fmt, va_list ap)
+register_category(level, channel)
+	int level;
+	Channel *channel;
 {
-	size_t rest = buf->size - buf->pos;
-	size_t length;
-	int n;
+	if (channel == NULL)
+		channel = channel_lookup("default");
+	else if (channel->mode == LM_OFF)
+		channel = NULL;
 	
-	if (rest <= 1)
-		return;
+	if (level <= 0) {
+		for (level = 1; level < NITEMS(category); level++) {
+			if (level == L_CRIT)
+				continue;
+			category[level].channel = channel;
+			if (channel)
+				channel->ucnt++;
+		}
+	} else {
+		category[level].channel = channel;
+		if (channel)
+			channel->ucnt++;
+	}
+}
 
-	n = vsnprintf(buf->ptr + buf->pos, rest, fmt, ap);
-	length = strlen (buf->ptr + buf->pos);
-	buf->pos += length;
-	if (n == -1 || length < n)
-		buf->ptr[buf->pos-1] = '>';
+Channel *
+register_channel(chan)
+	Channel *chan;
+{
+	int len;
+	FILE *fp;
+	Channel *channel;
+	char *filename;
+	
+	if (chan->mode == LM_FILE) {
+		len = strlen(chan->id.file) + strlen(radlog_dir) + 2;
+			
+		filename = emalloc(len);
+		sprintf(filename, "%s/%s", radlog_dir, chan->id.file);
+		
+		/* check the accessibility of the file */
+		fp = fopen(filename, "a");
+		if (!fp) {
+			radlog(L_CRIT|L_PERROR, _("can't access `%s'"), filename);
+			return NULL;
+		}
+		fclose(fp);
+
+	} else if (chan->mode == LM_SYSLOG) {
+	} 
+
+	channel = emalloc(sizeof(*channel));
+	channel->name = estrdup(chan->name);
+	channel->ucnt = 0;
+	channel->mode = chan->mode;
+	if (chan->mode == LM_FILE)
+		channel->id.file = filename;
+	else if (chan->mode == LM_SYSLOG)
+		channel->id.prio = chan->id.prio;
+	channel->options = chan->options;
+	if (!chan_first)
+		chan_first = channel;
+	else
+		chan_last->next = channel;
+	chan_last = channel;
+	return channel;
+}	
+
+Channel *
+install_channel(name, mode, prio, file, options)
+	char *name;
+	int mode;
+	int prio;
+	char *file;
+	int options;
+{
+	Channel chan;
+
+	chan.name = name;
+	chan.mode = mode;
+	if (mode = LM_FILE)
+		chan.id.file = file;
+	else
+		chan.id.prio = prio;
+	chan.options = options;
+	return register_channel(&chan);
+}
+
+int vlog(int lvl, char *fmt, va_list ap);
+
+int
+vlog(lvl, fmt, ap)
+	int lvl;
+	char *fmt;
+	va_list ap;
+{
+	char *p, *q;
+	char buffer[512];
+	char msgbuf[1024];
+	int prio;
+	char *errstr;
+	Channel *channel;
+	int syserr;
+		
+	syserr = lvl & L_PERROR;
+	lvl &= L_MASK;
+	
+	channel = category[lvl].channel;
+	if (!channel) 
+		return 0;
+
+	errstr = strerror(errno);
+
+#ifdef HAVE_VSNPRINTF
+	vsnprintf(buffer, sizeof(buffer), fmt, ap);
+#else
+# warning "Using vsprintf which does no checks for buffer overflow"	
+	vsprintf(buffer, fmt, ap);
+#endif	
+	p = buffer;
+	q = msgbuf;
+	while (*p) {
+		if (!isprint(*p)) {
+			if (q + 4 >= msgbuf + sizeof(msgbuf))
+				break;
+			sprintf(q, "\\%03o", *p);
+			q += 4;
+			p++;
+		} else
+			*q++ = *p++;
+	}
+	*q = 0;
+
+	/* Append system error message if necessary */
+	if (syserr) {
+		if (q - msgbuf + strlen(errstr) + 2 + 1 < sizeof(msgbuf)) {
+			*q++ = ':';
+			*q++ = ' ';
+			strcpy(q, errstr);
+		}
+	}	
+
+	if (channel->options & LO_CONS) {
+		log_to_file("/dev/console",
+			    channel->options,
+			    category[lvl].descr,
+			    msgbuf);
+	}
+	
+	switch (channel->mode) {
+
+	case LM_FILE:
+		log_to_file(channel->id.file,
+			    channel->options,
+			    category[lvl].descr,
+			    msgbuf);
+		break;
+
+	case LM_SYSLOG:
+		prio = channel->id.prio;
+		if (channel->options & LO_PID)
+			prio |= LOG_PID;
+		if (channel->options & LO_LEVEL) 
+			syslog(prio, "%s: %s", _(category[lvl].descr), msgbuf);
+		else
+			syslog(prio, "%s", msgbuf);
+	}
+	
+	return 0;
+}
+
+int
+log_to_file(file, opt, descr, msg)
+	char *file;
+	int opt;
+	char *descr;
+	char *msg;
+{
+	FILE *fp;
+	char buffer[256];
+	time_t	timeval;
+	struct tm *tm;
+	
+	if (strcmp(file, "stdout") != 0) {
+		if (!(fp = fopen(file, "a"))) {
+			fp = stdout;
+		}
+	} else {
+		fp = stdout;
+	}
+		
+	timeval = time(0);
+	tm = localtime(&timeval);
+	strftime(buffer, sizeof(buffer), "%b %d %H:%M:%S", tm);
+	fprintf(fp, "%s: ", buffer);
+
+	if (opt & LO_LEVEL) 
+		fprintf(fp, "%s: ", _(descr));
+		
+	if (opt & LO_PID) 
+		fprintf(fp, "[%lu]: ", getpid());
+	
+	fprintf(fp, "%s\n", msg);
+	if (fp != stdout) 
+		fclose(fp);
+	return 0;
+}
+
+/*PRINTFLIKE2*/
+int
+radlog(lvl, msg, va_alist)
+	int lvl;
+	char *msg;
+	va_dcl
+{
+	va_list ap;
+	int r;
+
+	va_start(ap);
+	r = vlog(lvl, msg, ap);
+	va_end(ap);
+
+	return r;
+}
+
+void
+debug_pair(prefix, pair)
+	char *prefix;
+	VALUE_PAIR *pair;
+{
+	Channel *channel;
+	
+	channel = category[L_DBG].channel;
+	if (!channel)
+		return;
+	fprintf(stdout, "%10.10s: ", prefix);
+	fprint_attr_val(stdout, pair);
+	fprintf(stdout, "\n");
+}
+
+
+#if RADIUS_DEBUG
+#include <obstack1.h>
+
+static int debug_stack_inited;
+static struct obstack debug_stack;
+
+static void debug_init_string();
+static void debug_add_string(char *str, int  len);
+static void debug_add_char(int c);
+static void debug_ws();
+static char *debug_finish_string();
+
+void
+debug_init_string()
+{
+	if (debug_stack_inited) 
+		obstack_free(&debug_stack, NULL);
+	else
+		debug_stack_inited++;
+	obstack_init(&debug_stack);
+}
+
+void
+debug_add_string(str, len)
+	char *str;
+	int  len;
+{
+	obstack_grow(&debug_stack, str, len);
+}
+
+void
+debug_add_char(c)
+	int c;
+{
+	obstack_1grow(&debug_stack, c);
+}
+
+void
+debug_ws()
+{
+	debug_add_char(' ');
 }
 
 char *
-logbuf_ptr(struct logbuf *buf)
+debug_finish_string()
 {
-	buf->ptr[buf->pos] = 0;
-	return buf->ptr;
+	debug_add_char(0);
+	return obstack_finish(&debug_stack);
 }
 
-size_t
-logbuf_printable_length(struct logbuf *buf)
+char *
+debug_print_pair(pair)
+	VALUE_PAIR *pair;
 {
-	return buf->pos;
-}
+	DICT_VALUE	*dval;
+	char		buffer[32];
+	u_char		*ptr;
+	UINT4		vendor;
+	int		i, left;
 
-
-static int
-log_get_category()
-{
-        return logging_category;
-}
+	if (!pair->name)
+		return "(no username)";
 
-static void
-log_set_category(int cat)
-{
-        logging_category = L_CAT(cat);
-}
+	insist(pair->operator >= 0 && pair->operator < PW_NUM_OPERATORS);
 
-void
-log_open(int cat)
-{
-        log_set_category(cat);
-}
+	debug_init_string();
 
-void
-log_close()
-{
-        log_set_category(L_MAIN);
-}
+	debug_add_string(pair->name, strlen(pair->name));
+	debug_add_string(opstr[pair->operator], strlen(opstr[pair->operator]));
 
-static char *catname[] = { /* category names */
-        N_("none"),
-        N_("Main"),
-        N_("Auth"),
-        N_("Acct"),
-        N_("Proxy"),
-        N_("SNMP"),
-};
+	switch (pair->type) {
 
-static char *priname[] = { /* priority names */
-        N_("emerg"),
-        N_("alert"),
-        N_("crit"),
-        N_("error"),
-        N_("warning"),
-        N_("notice"),
-        N_("info"),
-        N_("debug")
-};
-
-static char *
-run_log_hook(const grad_request_t *req, const char *hook_name)
-{
-	grad_value_t val;
-	char nasbuf[GRAD_MAX_LONGNAME];
-
-	memset(&val, 0, sizeof(val));
-
-	/* FIXME: Should make sure that the hook does not modify the
-	   request, either by passing rewrite_invoke a copy of the
-	   latter (expensive), or by providing some internal rewrite
-	   mechanism */
-	if (rewrite_invoke(String,
-			   &val,
-			   hook_name,
-			   req,
-			   "isi",
-			   req->code,
-			   grad_nas_request_to_name(req,
-						    nasbuf, sizeof nasbuf),
-			   req->id))
-		return NULL;
-	return val.datum.sval.data;
-}
-
-static void
-log_format_hook(struct logbuf *bufp, char **hook_name_ptr,
-		const grad_request_t *req)
-{
-	char *hook_res = NULL;
-
-	if (*hook_name_ptr) {
-		hook_res = run_log_hook(req, *hook_name_ptr);
-		if (!hook_res) 
-			*hook_name_ptr = NULL;
-	}
-
-	if (hook_res) {
-		logbuf_append(bufp, hook_res);
-		grad_free(hook_res);
-	}
-}
-
-static FILE *
-channel_open_file(Channel *chan)
-{
-        FILE *fp = NULL;
-
-        if (strcmp(chan->id.file, "stdout"))
-                fp = fopen(chan->id.file, "a");
-        return fp ? fp : stderr;
-}
-
-/*ARGSUSED*/
-static void
-channel_close_file(Channel *chan, FILE *fp)
-{
-        if (fp != stderr)
-                fclose(fp);
-}
-
-int
-log_to_channel(void *item, void *pdata)
-{
-	Channel *chan = item;
-	struct log_data *data = pdata;
-
-	LOGBUF_DECL(pri_prefix, 64);
-	LOGBUF_DECL(req_prefix, 256);
-	LOGBUF_DECL(req_suffix, 256);
-	
-        time_t  timeval;
-        char buffer[256];
-        struct tm *tm, tms;
-        int spri;
-        FILE *fp;
-
-	if (!(chan->pmask[data->cat] & L_MASK(data->pri)))
-		return 0;
-	
-        if (chan->options & LO_CAT) {
-		logbuf_append(&pri_prefix, _(catname[data->cat]));
-		logbuf_append(&pri_prefix, ".");
-	}
-        if (chan->options & LO_PRI)
-		logbuf_append(&pri_prefix, _(priname[data->pri]));
-
-  	if (data->req) {
-		log_format_hook(&req_prefix,
-				chan->prefix_hook ?
- 				   &chan->prefix_hook : &log_prefix_hook,
-				data->req);
- 		log_format_hook(&req_suffix,
-				chan->suffix_hook ?
-				   &chan->suffix_hook : &log_suffix_hook,
-				data->req);
-	}
-	
-        switch (chan->mode) {
-        case LM_FILE:
-                if (chan->options & LO_MSEC) {
-                        struct timeval tv;
-                        int len;
-                        
-                        gettimeofday(&tv, NULL);
-                        tm = localtime_r(&tv.tv_sec, &tms);
-                        strftime(buffer, sizeof(buffer), "%b %d %H:%M:%S", tm);
-                        len = strlen(buffer);
-                        snprintf(buffer+len, sizeof(buffer)-len,
-                                 ".%06d", (int) tv.tv_usec);
-                } else {
-                        timeval = time(NULL);
-                        tm = localtime_r(&timeval, &tms);
-                        strftime(buffer, sizeof(buffer), "%b %d %H:%M:%S", tm);
-                }
-                fp = channel_open_file(chan);
-                if (!fp) /* FIXME: log to default channel */
-                        break;
-                fprintf(fp, "%s ", buffer);
-                if (chan->options & LO_PID) 
-                        fprintf(fp, "[%lu]: ", (u_long) getpid());
-                if (logbuf_printable_length(&pri_prefix))
-                        fprintf(fp, "%s: ", logbuf_ptr(&pri_prefix));
-                if (data->prefix)
-                        fprintf(fp, "%s", data->prefix);
-		if (logbuf_printable_length(&req_prefix))
-			fprintf(fp, "%s", logbuf_ptr(&req_prefix));
-                if (data->text)
-                        fprintf(fp, "%s", data->text);
-                if (data->errtext)
-                        fprintf(fp, ": %s", data->errtext);
-		if (logbuf_printable_length(&req_suffix))
-			fprintf(fp, "%s", logbuf_ptr(&req_suffix));
-                fprintf(fp, "\n");
-                channel_close_file(chan, fp);
-                break;
-                
-        case LM_SYSLOG:
-                spri = chan->id.prio;
-                if (chan->options & LO_PID)
-                        spri |= LOG_PID;
-                if (logbuf_printable_length(&pri_prefix)) {
-			if (data->errtext)
-				syslog(spri, "%s: %s%s%s: %s%s",
-				       logbuf_ptr(&pri_prefix),
-				       SP(data->prefix),
-				       logbuf_ptr(&req_prefix),
-				       SP(data->text),
-				       data->errtext,
-				       logbuf_ptr(&req_suffix));
-			else
-				syslog(spri, "%s: %s%s%s%s",
-				       logbuf_ptr(&pri_prefix),
-				       SP(data->prefix),
-				       logbuf_ptr(&req_prefix),
-				       SP(data->text),
-				       logbuf_ptr(&req_suffix));
+	case PW_TYPE_STRING:
+		debug_add_char('"');
+		if (pair->attribute != DA_VENDOR_SPECIFIC) {
+			debug_add_string(pair->strvalue, pair->strlength);
 		} else {
-			if (data->errtext)
-				syslog(spri, "%s%s%s: %s%s",
-				       SP(data->prefix),
-				       logbuf_ptr(&req_prefix),
-				       SP(data->text),
-				       data->errtext,
-				       logbuf_ptr(&req_suffix));
-			else
-				syslog(spri, "%s%s%s%s",
-				       SP(data->prefix),
-				       logbuf_ptr(&req_prefix),
-				       SP(data->text),
-				       logbuf_ptr(&req_suffix));
-		}
-                break;
-        }
-	return 0;
-}
+			/*
+			 *	Special format, print out as much
+			 *	info as we can.
+			 */
+			ptr = (u_char *)pair->strvalue;
+			if (pair->strlength < 6) {
+				sprintf(buffer, "(invalid length: %d)",
+					pair->strlength);
+				debug_add_string(buffer, strlen(buffer));
+				break;
+			}
+			memcpy(&vendor, ptr, 4);
+			ptr += 4;
+			sprintf(buffer, "V%d", (int)ntohl(vendor));
+			debug_add_string(buffer, strlen(buffer));
 
-/* Note: if modifying this function, make sure it does not allocate any
-   memory! */
-void
-radiusd_logger(int level,
-	       const grad_request_t *req,
-	       const grad_locus_t *loc,
-	       const char *func_name,
-	       int en,
-	       const char *fmt, va_list ap)
-{
-        Channel *chan;
-        int cat, pri;
-	struct log_data log_data;
-	
-	LOGBUF_DECL(buf1, 256);
-	LOGBUF_DECL(buf2, 1024);
-	
-        char *errstr = NULL;
+			left = pair->strlength - 4;
+			while (left >= 2) {
+				sprintf(buffer, ":T%d:L%d:", ptr[0], ptr[1]);
+				debug_add_string(buffer, strlen(buffer));
 
-        cat = L_CAT(level);
-        if (cat == 0)
-                cat = log_get_category();
-        pri = L_PRI(level);
-        
-        if (loc) {
-		logbuf_append(&buf1, loc->file);
-		logbuf_append(&buf1, ":");
-		logbuf_append_line(&buf1, loc->line);
-		if (func_name) {
-			logbuf_append(&buf1, ":");			
-			logbuf_append(&buf1, func_name);
+				left -= 2;
+				ptr += 2;
+				
+				i = ptr[1] - 2;
+				while (i > 0 && left > 0) {
+					debug_add_char(*ptr);
+					ptr++;
+					i--;
+					left--;
+				}
+			}
 		}
-		logbuf_append(&buf1, ": ");			
+		debug_add_char('"');
+		break;
+
+	case PW_TYPE_INTEGER:
+		dval = dict_valget(pair->lvalue, pair->name);
+		if (dval != (DICT_VALUE *)NULL) {
+			debug_add_string(dval->name, strlen(dval->name));
+		} else {
+			sprintf(buffer, "%ld", (long)pair->lvalue);
+			debug_add_string(buffer, strlen(buffer));
+		}
+		break;
+
+	case PW_TYPE_IPADDR:
+		ipaddr2str(buffer, pair->lvalue);
+		debug_add_string(buffer, strlen(buffer));
+		break;
+
+	case PW_TYPE_DATE:
+		strftime(buffer, sizeof(buffer), "%b %e %Y",
+			 localtime((time_t *)&pair->lvalue));
+		debug_add_string(buffer, strlen(buffer));
+		break;
+
+	default:
+		sprintf(buffer, "(unknown type %d)", pair->type);
+		debug_add_string(buffer, strlen(buffer));
+		break;
 	}
-	
-        if (en)
-                errstr = strerror(en);
 
-        logbuf_vformat(&buf2, fmt, ap);
-
-        log_data.cat = cat;
-	log_data.pri = pri;
-	log_data.req = req;
-	log_data.prefix = logbuf_ptr(&buf1);
-	log_data.text = logbuf_ptr(&buf2);
-	log_data.errtext = errstr;
-
- 	grad_list_iterate(chanlist, log_to_channel, &log_data);
+	ptr = debug_finish_string();
+	return ptr;
 }
 
-/* Interface */
+#endif
 
 #ifdef USE_SQL
 void
-sqllog(int status, char *query)
+sqllog(status, msg, va_alist)
+	int status;
+	char *msg;
+	va_dcl
 {
+        va_list ap;
         FILE *fp;
-        char *path;
-        char *filename;
+	char *path;
+	char *filename;
 
-        filename = status ? "sql-lost" : "sql.log";
-        path = grad_mkfilename(grad_acct_dir, filename);
+	filename = status ? "sql-lost" : "sql.log";
+        path = mkfilename(radacct_dir, filename);
         if ((fp = fopen(path, "a")) == NULL) {
-                grad_log(L_ERR|L_PERROR,  
-                         _("could not append to file %s"), path);
-                grad_free(path);
+                radlog(L_ERR|L_PERROR, _("could not append to file %s"), path);
+		efree(path);
                 return;
         }
-        grad_free(path);
-        fprintf(fp, "%s;\n", query);
+	efree(path);
+        va_start(ap);
+        vfprintf(fp, msg, ap);
+        fprintf(fp, ";\n");
+        va_end(ap);
         fclose(fp);
 }
 #endif
-
-/* Registering functions */
-
-void
-channel_free(Channel *chan)
-{
-        grad_free(chan->name);
-        if (chan->mode == LM_FILE)
-                grad_free(chan->id.file);
-	grad_free(chan->prefix_hook);
-	grad_free(chan->suffix_hook);
-        grad_free(chan);
-}
-
-Channel *
-log_mark()
-{
-        return grad_list_item(chanlist, 0);
-}
-
-void
-log_release(Channel *chan)
-{
-        Channel *cp;
-        int emerg, alert, crit;
-	grad_iterator_t *itr = grad_iterator_create(chanlist);
-
-	for (cp = grad_iterator_first(itr); cp; cp = grad_iterator_next(itr))
-		if (cp == chan)
-			break;
-        for (; cp; cp = grad_iterator_next(itr)) {
-                if (!(cp->options & LO_PERSIST)) {
-			grad_list_remove(chanlist, cp, NULL);
-                        channel_free(cp);
-                }
-        }
-
-        /* Make sure we have at least a channel for categories below
-           L_CRIT */
-        emerg = L_EMERG;
-        alert = L_ALERT;
-        crit  = L_CRIT;
-	for (cp = grad_iterator_first(itr); cp; cp = grad_iterator_next(itr)) {
-                int i;
-                for (i = 1; i < L_NCAT; i++) {
-                        if (emerg && (cp->pmask[i] & L_MASK(emerg)))
-                                emerg = 0;
-                        if (alert && (cp->pmask[i] & L_MASK(alert)))
-                                alert = 0;
-                        if (crit && (cp->pmask[i] & L_MASK(crit)))
-                                crit = 0;
-                }
-        }
-	grad_iterator_destroy(&itr);
-        if (emerg || alert || crit)
-                log_set_default("##emerg##", -1, emerg|alert|crit);
-}
-
-int
-log_change_owner(RADIUS_USER *usr)
-{
-        Channel *cp;
-	int errcnt = 0;
-	grad_iterator_t *itr = grad_iterator_create(chanlist);
-	for (cp = grad_iterator_first(itr); cp; cp = grad_iterator_next(itr)) {
-		if (cp->mode == LM_FILE
-		    && chown(cp->id.file, usr->uid, usr->gid)) {
-			grad_log(L_ERR,
-			         _("%s: cannot change owner to %d:%d"),
-			         cp->id.file, usr->uid, usr->gid);
-			errcnt++;
-		}
-	}
-	grad_iterator_destroy(&itr);
-	return errcnt;
-}
-
-static int
-_chancmp(const void *item, const void *data)
-{
-	const Channel *chan = item;
-	const char *name = data;
-        return strcmp(chan->name, name);
-}
-
-Channel *
-channel_lookup(char *name)
-{
-        return grad_list_locate(chanlist, name, _chancmp);
-}
-
-void
-register_channel(Channel *chan)
-{
-        FILE *fp;
-        Channel *channel;
-        char *filename;
-
-        if (chan->mode == LM_FILE) {
-                if (strcmp(chan->id.file, "stdout")) {
-                        filename = grad_mkfilename(grad_log_dir ?
-						   grad_log_dir : RADLOG_DIR,
-						   chan->id.file);
-                        
-                        /* check the accessibility of the file */
-                        fp = fopen(filename, "a");
-                        if (!fp) {
-                                grad_log(L_CRIT|L_PERROR,
-                                         _("can't access log file `%s'"),
-                                         filename);
-                                grad_free(filename);
-                                filename = grad_estrdup("stdout");
-                        } else
-                                fclose(fp);
-                } else
-                        filename = grad_estrdup("stdout");
-        } else if (chan->mode == LM_SYSLOG) {
-        } 
-
-        channel = grad_emalloc(sizeof(*channel));
-        channel->name = grad_estrdup(chan->name);
-        channel->mode = chan->mode;
-        if (chan->mode == LM_FILE)
-                channel->id.file = filename;
-        else if (chan->mode == LM_SYSLOG)
-                channel->id.prio = chan->id.prio;
-        channel->options = chan->options;
-	channel->prefix_hook = chan->prefix_hook;
-	channel->suffix_hook = chan->suffix_hook;
-	
-	if (!chanlist)
-		chanlist = grad_list_create();
-	grad_list_prepend(chanlist, channel);
-}
-
-void
-register_category0(int cat, int pri, Channel *chan)
-{
-	if (cat == -1) {
-		int i;
-		for (i = 0; i < L_NCAT; i++)
-			chan->pmask[i] |= pri;
-	} else
-		chan->pmask[L_CAT(cat)] |= pri;
-}
-
-struct category_closure {
-	int cat;
-	int pri;
-};
-
-static int 
-_regcat(void *item, void *data)
-{
-	Channel *chan = item;
-	struct category_closure *cp = data;
-	register_category0(cp->cat, cp->pri, chan);
-	return 0;
-}
-
-void
-register_category(int cat, int pri, grad_list_t *clist)
-{
-	struct category_closure clos;
-
-        if (pri == -1)
-                pri = L_UPTO(L_DEBUG);
-
-	clos.cat = cat;
-	clos.pri = pri;
-	grad_list_iterate(clist, _regcat, &clos);
-}
-
-/* Auxiliary calls */
-void
-log_set_to_console(int cat, int pri)
-{
-        Channel chan;
-        
-        chan.mode = LM_FILE;
-        chan.name = "stdout";
-        chan.id.file = "stdout";
-        chan.options = LO_CAT|LO_PRI|LO_PERSIST;
-        register_channel(&chan);
-
-        register_category0(cat, pri, channel_lookup("stdout"));
-}
-
-void
-log_set_default(char *name, int cat, int pri)
-{
-        Channel chan;
-        
-        chan.mode = LM_FILE;
-        chan.name = name;
-        chan.id.file = "radius.log";
-        chan.options = LO_CAT|LO_PRI;
-	chan.prefix_hook = chan.suffix_hook = NULL;
-	
-        if (!channel_lookup(name))
-                register_channel(&chan);
-        register_category0(cat, pri, channel_lookup(name));
-}
-
-
-void
-format_exit_status(char *buffer, int buflen, int status)
-{
-	if (WIFEXITED(status)) {
-		snprintf(buffer, buflen,
-/* TRANSLATORS: the subject will always be printed before this msgid.
-   for example: "child 222 exited with status 0"
-*/
-			 _("exited with status %d"),
-			 WEXITSTATUS(status));
-	} else if (WIFSIGNALED(status)) {
-		snprintf(buffer, buflen,
-/* TRANSLATORS: the subject will always be printed before this msgid. */
-			 _("terminated on signal %d"),
-			 WTERMSIG(status));
-	} else
-/* TRANSLATORS: the subject will always be printed before this msgid. */
-		snprintf(buffer, buflen, _("terminated"));
-}
-
-
-/* ************************************************************************* */
-/* Configuration issues */
-
-static Channel *mark, channel;
-static struct category_def {
-	int init;
-	int cat;
-	int pri;
-        grad_list_t /* of Channel */ *clist;
-        int level;
-} cat_def;
-
-static grad_keyword_t syslog_facility[] = {
-	{ "user", 	LOG_USER },
-	{ "daemon", 	LOG_DAEMON },
-	{ "auth", 	LOG_AUTH },
-	{ "local0", 	LOG_LOCAL0 },
-	{ "local1", 	LOG_LOCAL1 },
-	{ "local2", 	LOG_LOCAL2 },
-	{ "local3", 	LOG_LOCAL3 },
-	{ "local4", 	LOG_LOCAL4 },
-	{ "local5", 	LOG_LOCAL5 },
-	{ "local6", 	LOG_LOCAL6 },
-	{ "local7", 	LOG_LOCAL7 },
-	{ 0 }
-};
-
-static grad_keyword_t syslog_priority[] = {
-	{ "emerg", 	LOG_EMERG },
-	{ "alert", 	LOG_ALERT },
-	{ "crit", 	LOG_CRIT },
-	{ "err", 	LOG_ERR },
-	{ "warning", 	LOG_WARNING },
-	{ "notice", 	LOG_NOTICE },
-	{ "info", 	LOG_INFO },
-	{ "debug", 	LOG_DEBUG },
-	{ 0 }
-};
-
-static grad_keyword_t log_categories[] = {
-	{ "main",       L_MAIN },
-	{ "auth",       L_AUTH },
-	{ "acct",       L_ACCT },
-	{ "snmp",       L_SNMP },
-	{ "proxy",      L_PROXY },
-	{ 0 }
-};
-
-static grad_keyword_t log_priorities[] = {
-	{ "emerg",      L_EMERG },
-	{ "alert",      L_ALERT },
-	{ "crit",       L_CRIT },
-	{ "err",        L_ERR },
-	{ "warning",    L_WARN },
-	{ "notice",     L_NOTICE },
-	{ "info",       L_INFO },
-	{ "debug",      L_DEBUG },
-	{ 0 }
-};
-
-int
-logging_stmt_handler(int argc, cfg_value_t *argv, void *block_data,
-		     void *handler_data)
-{
-	mark = log_mark();
-	grad_free(log_prefix_hook);
-	log_prefix_hook = NULL;
-	grad_free(log_suffix_hook);
-	log_suffix_hook = NULL;
-	return 0;
-}
-
-
-int
-logging_stmt_end(void *block_data, void *handler_data)
-{
-	log_release(mark);
-	return 0;
-}
-
-int
-logging_stmt_begin(int finish, void *block_data, void *handler_data)
-{
-	/*nothing to do?*/
-	return 0;
-}
-
-static int
-channel_stmt_handler(int argc, cfg_value_t *argv, void *block_data,
-		     void *handler_data)
-{
-	if (argc != 2) {
-		cfg_argc_error(argc < 2);
-		return 0;
-	}
- 	if (argv[1].type != CFG_STRING) {
-		cfg_type_error(CFG_STRING);
-		return 0;
-	}
-	
-	memset(&channel, 0, sizeof(channel));
-	channel.mode = LM_UNKNOWN;
-	channel.name = argv[1].v.string;
-	return 0;
-}
-
-static int
-channel_stmt_end(void *block_data, void *handler_data)
-{
-	if (channel.mode == LM_UNKNOWN) {
-		grad_log(L_ERR,
-		         _("%s:%d: no channel mode for `%s'"), 
-		         cfg_filename, cfg_line_num, channel.name);
-	} else 
-		register_channel(&channel);
-	return 0;
-}
-
-static int
-get_priority(cfg_value_t *argv)
-{
-	if (argv[0].type != CFG_CHAR || argv[1].type != CFG_STRING)
-		return 1;
-	cat_def.pri = grad_xlat_keyword(log_priorities,
-					argv[1].v.string,
-					-1);
-	if (cat_def.pri == -1)
-		return 1;
-
-	switch (argv[0].v.ch) {
-	case '!':
-		cat_def.pri = L_UPTO(L_DEBUG) & ~L_MASK(cat_def.pri);
-		break;
-
-	case '=':
-		cat_def.pri = L_MASK(cat_def.pri);
-		break;
-
-	default:
-		return 1;
-	}
-	return 0;
-}	
-
-static int
-category_stmt_handler(int argc, cfg_value_t *argv,
-		      void *block_data, void *handler_data)
-{
-	cat_def.init = 0;
-	cat_def.cat = cat_def.pri = -1;
-	cat_def.level = 0;
-	
-	switch (argc) {
-	case 2: /* only category or priority */
-		switch (argv[1].type) {
-		case CFG_CHAR:
-			if (argv[1].v.ch == '*') 
-				cat_def.cat = cat_def.pri = -1;
-			else
-				return 1;
-			break;
-			
-		case CFG_STRING:
-			cat_def.cat = grad_xlat_keyword(log_categories,
-							argv[1].v.string, -1);
-			if (cat_def.cat == -1) {
-				cat_def.pri = grad_xlat_keyword(log_priorities,
-							      argv[1].v.string,
-								-1);
-				if (cat_def.pri == -1)
-					return 1;
-				cat_def.pri = L_UPTO(cat_def.pri);
-			}
-		}
-		break;
-
-	case 3: /* [!=]priority */
-		if (get_priority(argv+1))
-			return 1;
-		break;
-
-	case 4: /* category '.' priority */
-		if (!(argv[2].type == CFG_CHAR && argv[2].v.ch == '.'))
-			return 1;
-
-		switch (argv[1].type) {
-		case CFG_CHAR:
-			if (argv[1].v.ch == '*')
-				cat_def.cat = -1;
-			else
-				return 1;
-			break;
-			
-		case CFG_STRING:
-			cat_def.cat = grad_xlat_keyword(log_categories,
-							argv[1].v.string, -1);
-			if (cat_def.cat == -1) 
-				return 1;
-			break;
-
-		default:
-			return 1;
-		}
-
-		switch (argv[3].type) {
-		case CFG_CHAR:
-			if (argv[3].v.ch == '*')
-				cat_def.pri = -1;
-			else
-				return 1;
-			break;
-			
-		case CFG_STRING:
-			cat_def.pri = grad_xlat_keyword(log_priorities,
-							argv[3].v.string, -1);
-			if (cat_def.pri == -1) 
-				return 1;
-			cat_def.pri = L_UPTO(cat_def.pri);
-			break;
-
-		default:
-			return 1;
-		}
-		break;
-
-	case 5: /* category '.' [!=] priority */
-		if (!(argv[2].type == CFG_CHAR && argv[2].v.ch == '.'))
-			return 1;
-
-		switch (argv[1].type) {
-		case CFG_CHAR:
-			if (argv[1].v.ch == '*')
-				cat_def.cat = -1;
-			else
-				return 1;
-			break;
-			
-		case CFG_STRING:
-			cat_def.cat = grad_xlat_keyword(log_categories,
-							argv[1].v.string, -1);
-			if (cat_def.cat == -1) 
-				return 1;
-			break;
-
-		default:
-			return 1;
-		}
-
-		if (get_priority(argv+3))
-			return 1;
-		break;
-
-	default:
-		cfg_argc_error(0);
-		return 0;
-	}
-	cat_def.init = 1;
-	cat_def.clist = NULL;
-	return 0;
-}
-
-static int
-category_stmt_end(void *block_data, void *handler_data)
-{
-	if (cat_def.init) {
-		switch (cat_def.cat) {
-		case L_AUTH:
-			log_mode = cat_def.level;
-			break;
-		default:
-			if (cat_def.level)
-				grad_log(L_WARN,
-				         "%s:%d: %s",
-				         cfg_filename, cfg_line_num,
-				_("no levels applicable for this category"));
-		}
-		register_category(cat_def.cat, cat_def.pri, cat_def.clist);
-		grad_list_destroy(&cat_def.clist, NULL, NULL);
-	}
-	return 0;
-}
-
-static int
-category_set_channel(int argc, cfg_value_t *argv,
-		     void *block_data, void *handler_data)
-{
-	Channel *channel;
-		
-	if (argc != 2) {
-		cfg_argc_error(argc < 2);
-		return 0;
-	}
- 	if (argv[1].type != CFG_STRING) {
-		cfg_type_error(CFG_STRING);
-		return 0;
-	}
-	channel = channel_lookup(argv[1].v.string);
-
-	if (!channel) {
-		grad_log(L_ERR,
-		         _("%s:%d: channel `%s' not defined"),
-		         cfg_filename, cfg_line_num, argv[1].v.string);
-	} else {
-		if (!cat_def.clist)
-			cat_def.clist = grad_list_create();
-		grad_list_append(cat_def.clist, channel);
-	}
-	
-	return 0;
-}
-
-static int
-category_set_flag(int argc, cfg_value_t *argv, void *block_data,
-		  void *handler_data)
-{
-	int flag = (int) handler_data;
-	if (argc != 2) {
-		cfg_argc_error(argc < 2);
-		return 0;
-	}
- 	if (argv[1].type != CFG_BOOLEAN) {
-		cfg_type_error(CFG_BOOLEAN);
-		return 0;
-	}
-	if (argv[1].v.bool)
-		cat_def.level |= flag;
-	else
-		cat_def.level &= ~flag;
-	return 0;
-}
-
-static int
-category_set_level(int argc, cfg_value_t *argv,
-		   void *block_data, void *handler_data)
-{
-	int i;
-
-	grad_clear_debug();
-	for (i = 1; i < argc; ) {
-		char *modname;
-		int level;
-		
-		if (argv[i].type != CFG_STRING) {
-			grad_log(L_ERR,
-			         _("%s:%d: list item %d has wrong datatype"),
-			         cfg_filename, cfg_line_num,
-			         i);
-			return 1;
-		}
-		modname = argv[i++].v.string;
-		level = -1;
-		if (i < argc
-		    && argv[i].type == CFG_CHAR && argv[i].v.ch == '=') {
-			i++;
-			if (i == argc || argv[i].type != CFG_INTEGER)
-				return 1;
-			level = argv[i++].v.number;
-		}
-		if (grad_set_module_debug_level(modname, level)) {
-			grad_log(L_WARN,
-			         _("%s:%d: no such module name: %s"),
-			         cfg_filename, cfg_line_num, modname);
-		}
-	}
-	return 0;
-}
-
-static int
-channel_file_handler(int argc, cfg_value_t *argv, void *block_data,
-		     void *handler_data)
-{
-	if (argc != 2) {
-		cfg_argc_error(argc < 2);
-		return 0;
-	}
- 	if (argv[1].type != CFG_STRING) {
-		cfg_type_error(CFG_STRING);
-		return 0;
-	}
-	channel.mode = LM_FILE;
-	channel.id.file = argv[1].v.string;
-	return 0;
-}
-
-static int
-channel_syslog_handler(int argc, cfg_value_t *argv, void *block_data,
-		       void *handler_data)
-{
-	int facility;
-	int prio;
-	
-	if (argc != 4) {
-		cfg_argc_error(argc < 4);
-		return 0;
-	}
-
-	switch (argv[1].type) {
-	case CFG_INTEGER:
-		facility = argv[1].v.number;
-		break;
-
-	case CFG_STRING:
-		facility = grad_xlat_keyword(syslog_facility,
-					     argv[1].v.string, -1);
-		break;
-
-	default:
-		return 1;
-	}
-
-	if (facility == -1)
-		return 1;
-
-	if (argv[2].type != CFG_CHAR || argv[2].v.ch != '.')
-		return 1;
-	
-	switch (argv[3].type) {
-	case CFG_INTEGER:
-		prio = argv[3].v.number;
-		break;
-
-	case CFG_STRING:
-		prio = grad_xlat_keyword(syslog_priority,
-					 argv[3].v.string, -1);
-		break;
-
-	default:
-		return 1;
-	}
-
-	if (prio == -1)
-		return 1;
-	
-	channel.mode = LM_SYSLOG;
-	channel.id.prio = facility | prio ;
-	return 0;
-}
-
-static int
-channel_set_flag(int argc, cfg_value_t *argv,
-		 void *block_data, void *handler_data)
-{
-	int flag = (int) handler_data;
-	if (argc != 2) {
-		cfg_argc_error(argc < 2);
-		return 0;
-	}
- 	if (argv[1].type != CFG_BOOLEAN) {
-		cfg_type_error(CFG_BOOLEAN);
-		return 0;
-	}
-
-	if (argv[1].v.bool)
-		channel.options |= flag;
-	else
-		channel.options &= ~flag;
-	return 0;
-}
-
-static struct cfg_stmt channel_stmt[] = {
-	{ "file", CS_STMT, NULL, channel_file_handler, NULL, NULL, NULL },
-	{ "syslog", CS_STMT, NULL, channel_syslog_handler, NULL, NULL, NULL },
-	{ "print-pid", CS_STMT, NULL, channel_set_flag, (void*)LO_PID,
-	  NULL, NULL },
-	{ "print-cons", CS_STMT, NULL, channel_set_flag, (void*)LO_CONS,
-	  NULL, NULL },
-	{ "print-level", CS_STMT, NULL, channel_set_flag, (void*)LO_PRI,
-	  NULL, NULL },
-	{ "print-category", CS_STMT, NULL, channel_set_flag, (void*)LO_CAT,
-	  NULL, NULL },
-	{ "print-priority", CS_STMT, NULL, channel_set_flag, (void*)LO_PRI,
-	  NULL, NULL },
-	{ "print-milliseconds", CS_STMT, NULL, channel_set_flag,
-	  (void*)LO_MSEC, NULL, NULL },
-	{ "prefix-hook", CS_STMT, NULL, cfg_get_string, &channel.prefix_hook,
-	  NULL, NULL },
-	{ "suffix-hook", CS_STMT, NULL, cfg_get_string, &channel.suffix_hook,
-	  NULL, NULL },
-	{ NULL }
-};
-
-static struct cfg_stmt category_stmt[] = {
-	{ "channel", CS_STMT, NULL, category_set_channel, NULL, NULL, NULL },
-	{ "print-auth", CS_STMT, NULL,
-	  category_set_flag, (void*)RLOG_AUTH, NULL, NULL },
-	{ "print-failed-pass", CS_STMT, NULL,
-	  category_set_flag, (void*)RLOG_FAILED_PASS, NULL, NULL },
-	{ "print-pass", CS_STMT, NULL,
-	  category_set_flag, (void*)RLOG_AUTH_PASS, NULL, NULL },
-	{ "level", CS_STMT, NULL,
-	  category_set_level, NULL, NULL, NULL },
-	{ NULL }
-};
-
-struct cfg_stmt logging_stmt[] = {
-	{ "channel", CS_BLOCK, NULL,
-	  channel_stmt_handler, NULL, channel_stmt, channel_stmt_end },
-	{ "category", CS_BLOCK, NULL,
-	  category_stmt_handler, NULL, category_stmt, category_stmt_end }, 
-	{ "prefix-hook", CS_STMT, NULL, cfg_get_string, &log_prefix_hook,
-	  NULL, NULL },
-	{ "suffix-hook", CS_STMT, NULL, cfg_get_string, &log_suffix_hook,
-	  NULL, NULL },
-	{ NULL },
-};
 

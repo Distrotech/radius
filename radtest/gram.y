@@ -1,1031 +1,593 @@
+/* This file is part of GNU RADIUS.
+ * Copyright (C) 2000, Sergey Poznyakoff
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+ *
+ */
 %{
-/* This file is part of GNU Radius.
-   Copyright (C) 2000,2001,2002,2003,2004,2006,
-   2007 Free Software Foundation, Inc.
+#define RADIUS_MODULE 2
 
-   Written by Sergey Poznyakoff
-  
-   GNU Radius is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 3 of the License, or
-   (at your option) any later version.
-  
-   GNU Radius is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-  
-   You should have received a copy of the GNU General Public License
-   along with GNU Radius; if not, write to the Free Software Foundation,
-   Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA. */
+#ifndef lint	
+	static char rcsid[] = 
+	"@(#) $Id$";
+#endif	
+        #if defined(HAVE_CONFIG_H)        
+	# include <config.h>
+        #endif
+        #include <sys/types.h>
+        #include <sys/socket.h>
+        #include <sys/time.h>
+        #include <sys/file.h>
+        #include <sys/stat.h>
+        #include <netinet/in.h>
+		 
+        #include <stdio.h>
+        #include <stdlib.h>
+        #include <netdb.h>
+        #include <fcntl.h>
+        #include <ctype.h>
+        #include <unistd.h>
+        #include <signal.h>
+        #include <errno.h>
+        #include <sys/wait.h>
+        #include <varargs.h>
+        #include <sysdep.h>
+        #include <radiusd.h>
+	#include <radclient.h>
+	#include <radtest.h>
 
-#if defined(HAVE_CONFIG_H)        
-# include <config.h>
-#endif
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <sys/time.h>
-#include <sys/file.h>
-#include <sys/stat.h>
-#include <netinet/in.h>
-         
-#include <stdio.h>
-#include <stdlib.h>
-#include <netdb.h>
-#include <fcntl.h>
-#include <ctype.h>
-#include <unistd.h>
-#include <signal.h>
-#include <errno.h>
-#include <sys/wait.h>
+	int source_line_num;
+	char *source_filename = "";
 
-#include <common.h>
-#include <radtest.h>
+	void print_ident(char *str, Variable *var);
+	VALUE_PAIR * install_pair(char *name, int op, char *valstr);
+	int subscript(Variable *var, char *attr_name, Variable *ret_var);
 
-#define YYERROR_VERBOSE 1
-	
-extern int yylex();
-
-/* Local variables */ 
-static int current_nesting_level; /* Nesting level of WHILE/DO statements */
-static int error_count;           /* In interactive mode: number of errors
-				     in the statement being compiled. Gets
-				     reset to 0 after each statement.
-				     In batch mode: total number of errors
-				     encountered so far */
- 
-static struct {                   /* Definition of the function currently
-				     being compiled */
-	char *function;           /* Function name */
-	grad_locus_t locus;       /* Location of the beginning of
-				     the definition */
-} defn;
-
-/* Context stack support. This is used for improving diagnostic
-   messages and after-error synchronization */
-   
-struct context_stack {
-	struct context_stack *next;
-	enum context ctx;
-};
-
-static struct context_stack *context_stack;
- 
-static enum context 
-push_ctx(enum context ctx)
-{
-	struct context_stack *p = grad_emalloc(sizeof(*p));
-	p->ctx = ctx;
-	p->next = context_stack;
-	context_stack = p;
-	return ctx;
-}
-
-enum context
-pop_ctx()
-{
-	enum context ctx;
-	struct context_stack *p = context_stack;
-	
-	if (!context_stack)
-		return ctx_none;
-	ctx = p->ctx;
-	context_stack = p->next;
-	grad_free(p);
-	return ctx;
-}
-
-enum context
-peek_ctx()
-{
-	return context_stack ? context_stack->ctx : ctx_none;
-}
-
-/* Forward declarations */
-static void run_statement(radtest_node_t *node);
-static void errsync();
-int yyerror(char *s);
- 
+	void print_exprlist(Variable *list);
+	void free_exprlist(Variable *list);
 %}
 
-%token EOL AUTH ACCT SEND EXPECT T_BEGIN T_END
-%token IF ELSE WHILE DO BREAK CONTINUE INPUT SHIFT GETOPT CASE IN
-%token T_RETURN
-%token <set> SET
-%token PRINT 
-%token EXIT
-%token T_BOGUS
-%token ARGCOUNT
-%token <deref> IDENT
-%token <parm> PARM
+%token EOL AUTH ACCT CNTL SEND EXPECT
+%token EQ LT GT NE LE GE
+%token PRINT ALL VARS
+%token <ident> IDENT
 %token <string> NAME
 %token <number> NUMBER
 %token <string> QUOTE
-%token <bstring> BSTRING
 %token <ipaddr> IPADDRESS
 
-%left PRITEM
-%left OR
-%left AND
-%nonassoc EQ NE 
-%nonassoc LT LE GT GE
-%left '+' '-'
-%left '*' '/' '%'
-%left UMINUS NOT
-%nonassoc '[' 
-
-%type <op> op
+%type <number> op code dictname
+%type <variable> value expr
+%type <vector> vector 
+%type <pair_list> pair_list
 %type <pair> pair
-%type <list> pair_list maybe_pair_list prlist maybe_prlist list caselist
-%type <i> closure req_code nesting_level port_type
-%type <node> stmt lstmt expr maybe_expr value bool cond expr_or_pair_list
-             pritem 
-%type <var> send_flag imm_value
-%type <symtab> send_flags send_flag_list
-%type <string> name string
-%type <case_branch> casecond
-%type <fun> function_def
+%type <exprlist> exprlist
+%type <string> string 
+%type <number> port_type
 
 %union {
-	int i;
-	long number;
-	char *string;
-	radtest_node_t *node;
-	radtest_node_deref_var_t deref;
-	radtest_node_deref_parm_t parm;
-	grad_uint32_t ipaddr;
-	enum grad_operator op;
-	radtest_pair_t *pair;
-	grad_list_t *list;
-	radtest_variable_t *var;
-	grad_symtab_t *symtab;
+	char string[MAX_STRING];
+	int number;
+	UINT4 ipaddr;
+	Variable *ident;
+	VALUE_PAIR *pair;
+	VALUE_PAIR *vector;
 	struct {
-		int argc;
-		char **argv;
-	} set;
-	radtest_case_branch_t *case_branch;
-	radtest_function_t *fun;
-	radtest_bstring_t bstring;
+		VALUE_PAIR *head, *tail;
+	} pair_list;
+	struct {
+		Variable *head, *tail;
+	} exprlist;
+	Variable variable;
 }
 
 %%
 
-program       : /* empty */
-              | input
-              | input stmt
-              ; 
-
-input         : lstmt
-                {
-			run_statement($1);
-		}
-              | input lstmt
-                {
-			run_statement($2);
-		}
+input         : list
               ;
 
-list          : lstmt
-                {
-			$$ = grad_list_create();
-			if ($1)
-				grad_list_append($$, $1);
-		}
-              | list lstmt
-                {
-			if ($2) 
-				grad_list_append($1, $2);
-			$$ = $1;
-		}
+list          : stmt 
+              | list stmt
               ;
 
-lstmt         : /* empty */ EOL
+stmt          : /* empty */ EOL
+              | PRINT prlist
                 {
-			$$ = NULL;
+			printf("\n");
 		}
-              | stmt EOL
+              | NAME EQ expr EOL
                 {
-			switch (peek_ctx()) {
-			case ctx_iferr:
-			case ctx_doerr:
-				pop_ctx();
-				break;
-			default:
-				break;
+			Variable *var;
+			
+			if ((var = (Variable*) sym_lookup(vartab, $1)) == NULL)
+				var = (Variable*) sym_install(vartab, $1);
+			if (var->type == Builtin)
+				var->datum.builtin.set(&$3);
+			else {
+				var->type = $3.type;
+				var->datum = $3.datum;
 			}
 		}
+              | SEND port_type code expr EOL
+                {
+			radtest_send($2, $3, &$4);
+		}
+              | EXPECT code exprlist EOL
+                {
+			if (verbose) {
+				printf("expect %d\n", $2);
+				printf("got    %d\n", reply_code);
+			}
+			if (reply_code != $2) {
+				if ($3.head)
+					print_exprlist($3.head);
+				parse_error("expect failed: got %d\n",
+					    reply_code);
+				YYACCEPT;
+			}
+			free_exprlist($3.head);
+		} 
               | error EOL
                 {
-			errsync();
-                        yyclearin;
-                        yyerrok;
-                }
-	      ;
-
-maybe_eol     :
-              | EOL
-              ;
-
-stmt          : T_BEGIN list T_END
-                {
-			$$ = radtest_node_alloc(radtest_node_stmt);
-			$$->v.list = $2;			
-		}
-              | if cond maybe_eol stmt 
-                {
-			pop_ctx();
-			$$ = radtest_node_alloc(radtest_node_cond);
-			$$->v.cond.cond = $2;
-			$$->v.cond.iftrue = $4;
-			$$->v.cond.iffalse = NULL;
-		}
-              | if cond maybe_eol stmt else stmt 
-                {
-			pop_ctx();
-			$$ = radtest_node_alloc(radtest_node_cond);
-			$$->v.cond.cond = $2;
-			$$->v.cond.iftrue = $4;
-			$$->v.cond.iffalse = $6;
-		}
-              | case expr in caselist T_END
-                {
-			pop_ctx();
-			$$ = radtest_node_alloc(radtest_node_case);
-			$$->locus = $2->locus;
-			$$->v.branch.expr = $2;
-			$$->v.branch.branchlist = $4;
-		}
-              | while { current_nesting_level++; } cond EOL stmt
-                {
-			pop_ctx();
-			current_nesting_level--;
-			$$ = radtest_node_alloc(radtest_node_loop);
-			$$->v.loop.cond = $3;
-			$$->v.loop.body = $5;
-			$$->v.loop.first_pass = 0;
-		}
-              | do EOL { current_nesting_level++; } stmt EOL WHILE { current_nesting_level--; } cond  
-                {
-			pop_ctx();
-			$$ = radtest_node_alloc(radtest_node_loop);
-			$$->v.loop.cond = $8;
-			$$->v.loop.body = $4;
-			$$->v.loop.first_pass = 1;
-		} 
-              | PRINT prlist 
-                {
-			$$ = radtest_node_alloc(radtest_node_print);
-			$$->v.list = $2;
-		}
-              | NAME EQ expr 
-                {
-			$$ = radtest_node_alloc(radtest_node_asgn);
-			$$->v.asgn.name = $1;
-			$$->v.asgn.expr = $3;
-		}
-              | SEND send_flags port_type req_code expr_or_pair_list 
-                {
-			$$ = radtest_node_alloc(radtest_node_send);
-			$$->v.send.cntl = $2;
-			$$->v.send.port_type = $3;
-			$$->v.send.code = $4;
-			$$->v.send.expr = $5;
-		}			
-              | EXPECT req_code expr_or_pair_list 
-                {
-			$$ = radtest_node_alloc(radtest_node_expect);
-			$$->v.expect.code = $2;
-			$$->v.expect.expr = $3;
-		}
-              | EXIT maybe_expr 
-                {
-			$$ = radtest_node_alloc(radtest_node_exit);
-			$$->v.expr = $2;
-		}
-	      | BREAK nesting_level 
-                {
-			if ($2 > current_nesting_level) {
-				parse_error(_("not enough 'while's to break from"));
-			}
-			$$ = radtest_node_alloc(radtest_node_break);
-			$$->v.level = $2;
-		}
-	      | CONTINUE nesting_level 
-                {
-			if ($2 > current_nesting_level) {
-				parse_error(_("not enough 'while's to continue"));
-			}
-			$$ = radtest_node_alloc(radtest_node_continue);
-			$$->v.level = $2;
-		}
-              | INPUT
-                {
-			$$ = radtest_node_alloc(radtest_node_input);
-			$$->v.input.expr = NULL;
-			$$->v.input.var = (radtest_variable_t*)
-				grad_sym_lookup_or_install(vartab,
-							   "INPUT",
-							   1);
-		}
-              | INPUT expr NAME
-                {
-			$$ = radtest_node_alloc(radtest_node_input);
-			$$->v.input.expr = $2;
-			$$->v.input.var = (radtest_variable_t*)
-				grad_sym_lookup_or_install(vartab,
-							   $3,
-							   1);
-		}
-              | SET
-                {
-			$$ = radtest_node_alloc(radtest_node_set);
-			$$->v.set.argc = $1.argc;
-			$$->v.set.argv = $1.argv;
-		}
-              | SHIFT maybe_expr
-                {
-			$$ = radtest_node_alloc(radtest_node_shift);
-			$$->v.expr = $2;
-		}
-              | function_def list T_END
-                {
-			$1->body = $2;
-			radtest_fix_mem();
-			$$ = NULL;
-			defn.function = NULL;
-		}
-              | T_RETURN maybe_expr
-                {
-			if (!defn.function) {
-				parse_error(_("return outside of a function definition"));
-			}
-			$$ = radtest_node_alloc(radtest_node_return);
-			$$->v.expr = $2;
-		}
-              | NAME '(' maybe_prlist ')'
-                {
-			radtest_function_t *fun;
-			
-			fun = (radtest_function_t*)
-				grad_sym_lookup(functab, $1);
-			if (!fun) {
-				parse_error(_("undefined function `%s'"), $1);
-			}
-			$$ = radtest_node_alloc(radtest_node_call);
-			$$->v.call.fun = fun;
-			$$->v.call.args = $3;
-		}
-              ;
-
-function_def  : NAME EOL T_BEGIN EOL
-                {
-			radtest_function_t *fun;
-			
-			if (defn.function) {
-				parse_error(_("nested function definitions "
-					      "are not allowed"));
-				parse_error_loc(&defn.locus,
-						_("the current function "
-						  "definition begins here"));
-				YYERROR; /* FIXME */
-			}
-			defn.function = $1;
-			defn.locus = source_locus;
-			fun = (radtest_function_t*)
-				grad_sym_lookup_or_install(functab, $1, 1);
-			if (fun->body) {
-				parse_error(_("redefinition of function `%s'"), $1);
-				parse_error_loc(&fun->locus,
-					     _("`%s' previously defined here"),
-						$1);
-
-				YYERROR; /* FIXME */
-			}
-			fun->locus = source_locus;
-			$$ = fun;
-		}
-              ;
-
-if            : IF
-                {
-			push_ctx(ctx_if);
-		}
-              ;
-
-case          : CASE
-                {
-			push_ctx(ctx_case);
-		}
-              ;
-
-do            : DO
-                {
-			push_ctx(ctx_do);
-		}
-              ;
-
-while         : WHILE
-                {
-			push_ctx(ctx_while);
-		}
-              ;  
-
-else          : ELSE maybe_eol
-                {
-			pop_ctx();
-		}
-              ;
-
-in            : IN maybe_eol
-              ;
-
-caselist      : casecond
-                {
-			$$ = grad_list_create();
-			grad_list_append($$, $1);
-		}
-              | caselist casecond
-                {
-			grad_list_append($1, $2);
-			$$ = $1;
-		}
-              ;
-
-casecond      : expr ')' stmt nls
-                {
-			radtest_case_branch_t *p = radtest_branch_alloc();
-			p->cond = $1;
-			p->node = $3;
-			$$ = p;
-		}
-              ;
-
-nls           : EOL
-              | nls EOL
-              ;
-
-name          : /* empty */
-                {
-			$$ = NULL;
-		}
-              | NAME
-	      ;
-
-string        : NAME
-              | QUOTE
-              | BSTRING
-                {
-			parse_error(_("warning: truncating binary string"));
-			$$ = $1.ptr;
-		}
-              ;
-
-nesting_level : /* empty */
-                {
-			$$ = 1;
-		}
-              | NUMBER
-                {
-			$$ = $1;
+			yyclearin;
+			yyerrok;
 		}
               ;
 
 port_type     : AUTH
                 {
-			$$ = GRAD_PORT_AUTH;
+			$$ = PORT_AUTH;
 		}
               | ACCT
                 {
-			$$ = GRAD_PORT_ACCT;
+			$$ = PORT_ACCT;
+		}
+              | CNTL
+                {
+			$$ = PORT_CNTL;
 		}
               ;
 
-req_code      : NUMBER
+code          : NUMBER
+              | IDENT
                 {
-			$$ = $1;
-		}
-              | NAME
-                {
-			$$ = grad_request_name_to_code($1);
-			if ($$ == 0) 
-				parse_error(_("expected integer value or request code name"));
-		}
-              ;
-
-send_flags    : /* empty */
-                {
-			$$ = NULL;
-		}
-              | send_flag_list
-              ;
-
-send_flag_list: send_flag
-                {
-			radtest_variable_t *var;
-			
-			$$ = grad_symtab_create(sizeof(*var), var_free);
-			var = (radtest_variable_t*) grad_sym_install($$,
-								     $1->name);
-			radtest_var_copy (var, $1);
-		}
-              | send_flag_list send_flag
-                {
-			radtest_variable_t *var;
-			var = (radtest_variable_t*) grad_sym_install($1,
-								     $2->name);
-			radtest_var_copy (var, $2); /* FIXME: check this */
-		}
-              ;
-
-send_flag     : NAME EQ NUMBER
-                {
-			$$ = radtest_var_alloc(rtv_integer);
-			$$->name = $1;
-			$$->datum.number = $3;
-		}
-              ;
-
-expr_or_pair_list: /* empty */
-                {
-			$$ = NULL;
-		}
-              | pair_list
-                {
-			radtest_variable_t *var = radtest_var_alloc(rtv_pairlist);
-			var->datum.list = $1;
-			$$ = radtest_node_alloc(radtest_node_value);
-			$$->v.var = var;
-		}
-	      | expr
-	      ;
-     
-cond          : bool
-              | NOT cond
-                {
-			$$ = radtest_node_alloc(radtest_node_unary);
-			$$->v.unary.op = radtest_op_not;
-			$$->v.unary.operand = $2;
-		}
-              | '(' cond ')'
-                {
-			$$ = $2;
-		}
-              | cond AND cond
-                {
-			$$ = radtest_node_alloc(radtest_node_bin);
-			$$->v.bin.op = radtest_op_and;
-			$$->v.bin.left = $1;
-			$$->v.bin.right = $3;
-		}
-              | cond OR cond
-                {
-			$$ = radtest_node_alloc(radtest_node_bin);
-			$$->v.bin.op = radtest_op_or;
-			$$->v.bin.left = $1;
-			$$->v.bin.right = $3;
-		}
-              | cond EQ cond
-                {
-			$$ = radtest_node_alloc(radtest_node_bin);
-			$$->v.bin.op = radtest_op_eq;
-			$$->v.bin.left = $1;
-			$$->v.bin.right = $3;
-		}
-              | cond LT cond
-                {
-			$$ = radtest_node_alloc(radtest_node_bin);
-			$$->v.bin.op = radtest_op_lt;
-			$$->v.bin.left = $1;
-			$$->v.bin.right = $3;
-		}
-              | cond GT	cond
-                {
-			$$ = radtest_node_alloc(radtest_node_bin);
-			$$->v.bin.op = radtest_op_gt;
-			$$->v.bin.left = $1;
-			$$->v.bin.right = $3;
-		}
-              | cond NE	cond
-                {
-			$$ = radtest_node_alloc(radtest_node_bin);
-			$$->v.bin.op = radtest_op_ne;
-			$$->v.bin.left = $1;
-			$$->v.bin.right = $3;
-		}
-              | cond LE	cond
-                {
-			$$ = radtest_node_alloc(radtest_node_bin);
-			$$->v.bin.op = radtest_op_le;
-			$$->v.bin.left = $1;
-			$$->v.bin.right = $3;
-		}
-              | cond GE	cond
-                {
-			$$ = radtest_node_alloc(radtest_node_bin);
-			$$->v.bin.op = radtest_op_ge;
-			$$->v.bin.left = $1;
-			$$->v.bin.right = $3;
-		}
-              ;
-
-bool          : expr
+			if ($1->type != Integer) {
+				yyerror("expected integer value");
+				YYERROR;
+			} else {
+				$$ = $1->datum.number;
+			}
+	        }
+              | dictname
               ;
 
 expr          : value
-              | GETOPT string name name
+              | expr '+' value
                 {
-			char *name = $3 ? $3 : "OPTVAR";
-			$$ = radtest_node_alloc(radtest_node_getopt);
-			$$->v.gopt.last = 0;
-			$$->v.gopt.optstr = $2;
-			$$->v.gopt.var = (radtest_variable_t*)
-				grad_sym_lookup_or_install(vartab, name, 1);
-
-			name = $4 ? $4 : "OPTARG";
-			$$->v.gopt.arg = (radtest_variable_t*)
-				grad_sym_lookup_or_install(vartab, name, 1);
-
-			name = $4 ? $4 : "OPTIND";
-			$$->v.gopt.ind = (radtest_variable_t*)
-				grad_sym_lookup_or_install(vartab, name, 1);
-			
-		}
-              | '(' expr ')'
-                {
-			$$ = $2;
-		}
-              | expr '[' NAME closure ']' 
-                {
-			grad_dict_attr_t *dict = grad_attr_name_to_dict($3);
-			if (!dict) {
-				parse_error(_("unknown attribute `%s'"), $3);
-				$$ = NULL;
+			if ($1.type != Vector) {
+				parse_error("bad datatype of larg in +");
+			} else if ($3.type != Vector) {
+				parse_error("bad datatype of rarg in +");
 			} else {
-				$$ = radtest_node_alloc(radtest_node_attr);
-				$$->v.attr.node = $1;
-				$$->v.attr.dict = dict;
-				$$->v.attr.all = $4;
-				if ($4 && dict->type != GRAD_TYPE_STRING) 
-					parse_error(
-		     _("warning: '*' is meaningless for this attribute type"));
-			}
-		}
-              | expr '+' expr
-                {
-			$$ = radtest_node_alloc(radtest_node_bin);
-			$$->v.bin.op = radtest_op_add;
-			$$->v.bin.left = $1;
-			$$->v.bin.right = $3;
-		}
-              | expr '-' expr
-                {
-			$$ = radtest_node_alloc(radtest_node_bin);
-			$$->v.bin.op = radtest_op_sub;
-			$$->v.bin.left = $1;
-			$$->v.bin.right = $3;
-		}
-              | expr '*' expr
-                {
-			$$ = radtest_node_alloc(radtest_node_bin);
-			$$->v.bin.op = radtest_op_mul;
-			$$->v.bin.left = $1;
-			$$->v.bin.right = $3;
-		}
-              | expr '/' expr
-                {
-			$$ = radtest_node_alloc(radtest_node_bin);
-			$$->v.bin.op = radtest_op_div;
-			$$->v.bin.left = $1;
-			$$->v.bin.right = $3;
-		}
-              | expr '%' expr
-                {
-			$$ = radtest_node_alloc(radtest_node_bin);
-			$$->v.bin.op = radtest_op_mod;
-			$$->v.bin.left = $1;
-			$$->v.bin.right = $3;
-		}
-              | '-' expr %prec UMINUS
-                {
-			$$ = radtest_node_alloc(radtest_node_unary);
-			$$->v.unary.op = radtest_op_neg;
-			$$->v.unary.operand = $2;
-		}
-              | '+' expr %prec UMINUS
-                {
-			$$ = $2;
-		}
-              ;
-
-maybe_expr    : /* empty */
-                {
-			$$ = NULL;
-		}
-              | expr
-              ;
-
-value         : imm_value
-                {
-			$$ = radtest_node_alloc(radtest_node_value);
-			$$->v.var = $1;
-		}
-              | IDENT
-                {
-			$$ = radtest_node_alloc(radtest_node_deref);
-			$$->v.deref = $1;
-		}
-              | PARM
-                {
-			$$ = radtest_node_alloc(radtest_node_parm);
-			$$->v.parm = $1;
-		}
-              | ARGCOUNT
-                {
-			$$ = radtest_node_alloc(radtest_node_argcount);
-		}
-              | NAME '(' maybe_prlist ')'
-                {
-			radtest_function_t *fun;
-			
-			fun = (radtest_function_t*)
-				grad_sym_lookup(functab, $1);
-			if (!fun) {
-				parse_error(_("undefined function `%s'"), $1);
-				$$ = NULL;
-			} else {
-				$$ = radtest_node_alloc(radtest_node_call);
-				$$->v.call.fun = fun;
-				$$->v.call.args = $3;
+				pairlistadd(&$1.datum.vector, $3.datum.vector);
+				$$ = $1;
 			}
 		}
               ;
 
-closure       : /* empty */
+vector        : '{' pair_list '}'
                 {
-			$$ = 0;
+			$$ = $2.head;
 		}
-              | '*'
+              | '{' pair_list ',' '}' /* C-like syntactic sugar */
                 {
-			$$ = 1;
+			$$ = $2.head;
 		}
               ;
-
-imm_value     : NUMBER
-                {
-			$$ = radtest_var_alloc(rtv_integer);
-			$$->datum.number = $1;
-		}
-              | IPADDRESS
-                {
-			$$ = radtest_var_alloc(rtv_ipaddress);
-			$$->datum.ipaddr = $1;
-		}
-              | QUOTE
-                {
-			$$ = radtest_var_alloc(rtv_string);
-			$$->datum.string = $1;
-		}
-              | BSTRING
-                {
-			$$ = radtest_var_alloc(rtv_bstring);
-			$$->datum.bstring = $1;
-		}
-              | NAME 
-                {
-			$$ = radtest_var_alloc(rtv_string);
-			$$->datum.string = $1;
-		}
-              | '(' maybe_pair_list ')'
-                {
-			$$ = radtest_var_alloc(rtv_pairlist);
-			$$->datum.list = $2;
-		}
-              ;
-
-maybe_prlist  : /* empty */
-	        {
-			$$ = NULL;
-		}
-              | prlist 
-              ;
-
-maybe_pair_list: /* empty */
-                {
-			$$ = NULL;
-		}
-	      | pair_list
-	      ;
 
 pair_list     : pair
                 {
-			$$ = grad_list_create();
-			grad_list_append($$, $1);
+			$$.head = $$.tail = $1;
 		}
               | pair_list pair
                 {
-			grad_list_append($1, $2);
-			$$ = $1;
+ 			if ($2) {
+ 				if ($$.tail) {
+ 					$$.tail->next = $2;
+ 					$$.tail = $2;	
+ 				} else {
+ 					$$.head = $$.tail = $2;
+ 				}
+ 			} 
 		}
               | pair_list ',' pair
                 {
-			grad_list_append($1, $3);
-			$$ = $1;
+ 			if ($3) {
+				if ($$.tail) {
+ 					$$.tail->next = $3;
+ 					$$.tail = $3;
+ 				} else {
+ 					$$.head = $$.tail = $3;
+ 				}
+ 			}
 		}
-              | pair_list error
+              | pair_list error 
+                {
+			pairfree($1.head);
+			$$.head = $$.tail = NULL;
+		}
               ;
 
-pair          : NAME op expr
+pair          : NAME op string
                 {
-			grad_dict_attr_t *attr = grad_attr_name_to_dict($1);
-			if (!attr) 
-				parse_error(_("unknown attribute `%s'"), $1);
+			$$ = install_pair($1, $2, $3);   
+	        }
+              ;
 
-			$$ = radtest_pair_alloc();
-			$$->attr = attr;
-			$$->op = $2;
-			$$->node = $3;
+string        : QUOTE
+              | NAME
+              | NUMBER
+                {
+			sprintf($$, "%d", $1);
+	        }
+              | IDENT
+                {
+			print_ident($$, $1);
+		}
+              | IPADDRESS
+                {
+			ipaddr2str($$, $1);
 		}
               ;
 
 op            : EQ
                 {
-                        $$ = grad_operator_equal;
-                } 
+			$$ = PW_OPERATOR_EQUAL;
+		} 
               | LT
                 {
-                        $$ = grad_operator_less_than;
-                }
+			$$ = PW_OPERATOR_LESS_THAN;
+		}
               | GT
                 { 
-                        $$ = grad_operator_greater_than;
-                }
+			$$ = PW_OPERATOR_GREATER_THAN;
+		}
               | NE
                 {
-                        $$ = grad_operator_not_equal;
-                }
+			$$ = PW_OPERATOR_NOT_EQUAL;
+		}
               | LE
                 {
-                        $$ = grad_operator_less_equal;
-                }
+			$$ = PW_OPERATOR_LESS_EQUAL;
+		}
               | GE
                 {
-                        $$ = grad_operator_greater_equal;
-                }
-              ;
-
-prlist        : pritem
-                {
-			$$ = grad_list_create();
-			grad_list_append($$, $1);
-		}
-              | prlist ',' pritem
-                {
-			grad_list_append($1, $3);
-			$$ = $1;
-		}
-              | prlist pritem
-                {
-			grad_list_append($1, $2);
-			$$ = $1;
+			$$ = PW_OPERATOR_GREATER_EQUAL;
 		}
               ;
 
-pritem        : expr %prec PRITEM 
-              ;
+value       : NUMBER
+              {
+		      $$.type = Integer;
+		      $$.datum.number = $1;
+	      }
+            | IPADDRESS
+              {
+		      $$.type = Ipaddress;
+		      $$.datum.ipaddr = $1;
+	      }
+            | QUOTE
+              {
+		      $$.type = String;
+		      strcpy($$.datum.string, $1);
+	      }
+            | dictname
+              {
+		      $$.type = Integer;
+		      $$.datum.number = $1;
+	      }
+            | IDENT
+              {
+		      $$ = *$1;
+	      }
+            | IDENT '[' NAME ']'
+              {
+		      subscript($1, $3, &$$);
+	      }
+            | vector
+              {
+		      $$.type = Vector;
+		      $$.datum.vector = $1;
+	      }
+            ;
+
+dictname    : NAME
+              {
+		      DICT_VALUE	*dval;
+		      
+		      if ((dval = dict_valfind($1)) == NULL) {
+			      parse_error("unknown value %s", $1);
+			      YYERROR;
+		      } else {
+			      $$ = dval->value;
+		      }
+	      }
+            ;
+
+prlist      : pritem
+            | prlist pritem
+            ;
+
+pritem      : expr
+              {
+		      print(&$1);
+	      }
+	    ;
+
+exprlist    : /* empty */
+              {
+		      $$.head = $$.tail = NULL;
+	      }
+            | expr
+              {
+		      Variable *var = emalloc(sizeof(*var));
+		      *var = $1;
+		      var->next = NULL;
+		      $$.head = $$.tail = var;
+	      }
+            | exprlist expr
+              {
+		      Variable *var = emalloc(sizeof(*var));
+		      *var = $2;
+		      var->next = NULL;
+		      $$.tail->next = (Symbol*)var;
+		      $$.tail = var;
+	      }
+            | exprlist error EOL
+              {
+		      yyerrok;
+		      yyclearin;
+		      putback(";");
+	      }
+            ;
 
 %%
 
-int
-yyerror(char *s)
+yyerror(s)
+	char *s;
 {
-	if (strcmp(s, "parse error") == 0
-	    || strcmp(s, "syntax error") == 0) {
-		if (yychar == T_END)
-			parse_error(_("Misplaced `end'"));
-		else if (yychar == EOL) {
-			grad_locus_t loc = source_locus;
-			loc.line--;
-			parse_error_loc(&loc, _("Unexpected end of line"));
-		} else if (peek_ctx() == ctx_doerr)
-			;
-		else 
-			parse_error(s);
-	} else if (yychar == EOL) {
-		grad_locus_t loc = source_locus;
-		loc.line--;
-		parse_error_loc(&loc, s);
-	} else
-		parse_error(s);
-}
-
-static char *funcname_displayed = NULL;
-
-static int
-namecmp(char *a, char *b)
-{
-	if (!a || !b)
-		return a != b;
-	return strcmp(a, b);
-}
-
-static void
-print_function_name()
-{
-	if (namecmp(funcname_displayed, defn.function)) {
-		if (defn.function)
-			fprintf(stderr, _("In function `%s':\n"),
-				defn.function);
-		else
-			fprintf(stderr, _("At top level:\n"));
-		funcname_displayed = defn.function;
-	}
-}	
-
-void
-parse_error(const char *fmt, ...)
-{
-        va_list ap;
-
-	print_function_name();
-	va_start(ap, fmt);
-        fprintf(stderr, "%s:%lu: ",
-		source_locus.file,
-		(unsigned long) source_locus.line);
-        vfprintf(stderr, fmt, ap);
-        va_end(ap);
-        fprintf(stderr, "\n");
-	error_count++;
+	fprintf(stderr, "%s:%d: %s\n",
+		source_filename,
+		source_line_num,
+		s);
 }
 
 void
-parse_error_loc(grad_locus_t *locus, const char *fmt, ...)
+parse_error(va_alist)
+	va_dcl
 {
-        va_list ap;
-
-	print_function_name();
-	va_start(ap, fmt);
-        fprintf(stderr, "%s:%lu: ",
-		locus->file, (unsigned long) locus->line);
-        vfprintf(stderr, fmt, ap);
-        va_end(ap);
-        fprintf(stderr, "\n");
-	error_count++;
+	va_list ap;
+	char *fmt;
+	
+	va_start(ap);
+	fmt = va_arg(ap, char*);
+	fprintf(stderr, "%s:%d: ", source_filename, source_line_num);
+	vfprintf(stderr, fmt, ap);
+	va_end(ap);
+	fprintf(stderr, "\n");
 }
 
 void
 set_yydebug()
 {
-        extern int yydebug;
-        if (GRAD_DEBUG_LEVEL(1)) {
-                yydebug = 1;
-        }
+	extern int yydebug;
+	
+	if (debug_on(1)) {
+#ifdef YACC_DEBUG
+		yydebug = 1;
+#else
+		fprintf(stderr, "radtest compiled without parser debugging support\n");
+#endif	
+	}
 }
 
-static void
-run_statement(radtest_node_t *node)
+VALUE_PAIR *
+install_pair(name, op, valstr)
+	char *name;
+	int op;
+	char *valstr;
 {
-	if (!dry_run) {
-		if (!error_count)
-			radtest_eval(node, toplevel_env);
-		/* Clear error_count only if we are in interactive
-		   mode. There is no use continuing executing of a script
-		   after an erroneous statement. */
-		if (interactive)
-			error_count = 0;
+	DICT_ATTR	*attr = NULL;
+	DICT_VALUE	*dval;
+	VALUE_PAIR	*pair, *pair2;
+	char *s;
+	int x;
+	time_t timeval;
+	struct tm *tm;
+	
+	if ((attr = dict_attrfind(name)) == (DICT_ATTR *)NULL) {
+		parse_error("unknown attribute `%s'", name);
+		return NULL;
 	}
-	radtest_free_mem();
+
+	pair = alloc_pair();
+	
+	pair->next = NULL;
+	pair->name = attr->name;
+	pair->attribute = attr->value;
+	pair->type = attr->type;
+	pair->operator = op;
+	
+	switch (pair->type) {
+	case PW_TYPE_STRING:
+		pair->strvalue = make_string(valstr);
+		pair->strlength = strlen(pair->strvalue);
+		break;
+
+	case PW_TYPE_INTEGER:
+		/*
+		 *	For DA_NAS_PORT_ID, allow a
+		 *	port range instead of just a port.
+		 */
+		if (attr->value == DA_NAS_PORT_ID) {
+			for (s = valstr; *s; s++)
+				if (!isdigit(*s))
+					break;
+			if (*s) {
+				pair->type = PW_TYPE_STRING;
+				pair->strvalue = make_string(valstr);
+				pair->strlength = strlen(pair->strvalue);
+				break;
+			}
+		}
+		if (isdigit(*valstr)) {
+			pair->lvalue = atoi(valstr);
+		} else if ((dval = dict_valfind(valstr)) == NULL) {
+			free_pair(pair);
+			parse_error("unknown value %s", valstr);
+			return NULL;
+		} else {
+			pair->lvalue = dval->value;
+		}
+		break;
+
+	case PW_TYPE_IPADDR:
+		if (pair->attribute != DA_FRAMED_IP_ADDRESS) {
+			pair->lvalue = get_ipaddr(valstr);
+		} else {
+			/*
+			 *	We allow a "+" at the end to
+			 *	indicate that we should add the
+			 *	portno. to the IP address.
+			 */
+			x = 0;
+			if (valstr[0]) {
+				for(s = valstr; s[1]; s++)
+					;
+				if (*s == '+') {
+					*s = 0;
+					x = 1;
+				}
+			}
+			pair->lvalue = get_ipaddr(valstr);
+
+			/*
+			 *	Add an extra (hidden) attribute.
+			 */
+			pair2 = alloc_pair();
+			
+			pair2->name = "Add-Port-To-IP-Address";
+			pair2->attribute = DA_ADD_PORT_TO_IP_ADDRESS;
+			pair2->type = PW_TYPE_INTEGER;
+			pair2->lvalue = x;
+			pair2->next = pair;
+			pair = pair2;
+		}
+		break;
+		
+	case PW_TYPE_DATE:
+		timeval = time(0);
+		tm = localtime(&timeval);
+		if (user_gettime(valstr, tm)) {
+			parse_error("%s: can't parse date", name);
+			free_pair(pair);
+			return NULL;
+		}
+#ifdef TIMELOCAL
+		pair->lvalue = (UINT4)timelocal(tm);
+#else /* TIMELOCAL */
+		pair->lvalue = (UINT4)mktime(tm);
+#endif /* TIMELOCAL */
+		break;
+
+	default:
+		parse_error("unknown attribute type %d", pair->type);
+		free_pair(pair);
+		return NULL;
+	}
+
+	return pair;
 }
+
 
 int
-read_and_eval(char *filename)
+subscript(var, attr_name, ret_var)
+	Variable *var;
+	char *attr_name;
+	Variable *ret_var;
 {
-        if (open_input(filename))
-                return 1;
-        return (yyparse() || error_count) ? 1 : 0;
+	DICT_ATTR *dict;
+	VALUE_PAIR *pair;
+
+	ret_var->type = Undefined;
+	if (var->type != Vector) {
+		parse_error("subscript on non-vector");
+		return -1;
+	}
+	if ((dict = dict_attrfind(attr_name)) == NULL) {
+		parse_error("unknown attribute %s", attr_name);
+		return -1;
+	}
+	
+	pair = pairfind(var->datum.vector, dict->value);
+	if (!pair) 
+		return -1;
+
+	switch (dict->type) {
+	case PW_TYPE_STRING:
+		ret_var->type = String;
+		strcpy(ret_var->datum.string, pair->strvalue);
+		break;
+	case PW_TYPE_INTEGER:
+	case PW_TYPE_DATE:
+		ret_var->type = Integer;
+		ret_var->datum.number = pair->lvalue;
+		break;
+	case PW_TYPE_IPADDR:
+		ret_var->type = Ipaddress;
+		ret_var->datum.ipaddr = pair->lvalue;
+		break;
+	default:
+		radlog(L_CRIT,
+		       _("attribute %s has unknown type"),
+		       dict->name);
+		exit(1);
+	}
+	return 0;
 }
 
-static void
-errsync()
+void
+print_exprlist(list)
+	Variable *list;
 {
-	enum context ctx = pop_ctx();
-	switch (ctx) {
-	case ctx_none:
-		break;
-		
-	case ctx_if:
-		push_ctx(ctx_iferr);
-		break;
-		
-	case ctx_do:
-		current_nesting_level--;
-		push_ctx(ctx_doerr);
-		break;
+	while (list) {
+		print(list);
+		list = (Variable*) list->next;
+	}
+	printf("\n");
+}
 
-	case ctx_while:
-		current_nesting_level--;
-		break;
-		
-	case ctx_case:
-		;
+void
+free_exprlist(list)
+	Variable *list;
+{
+	Variable *next;
+
+	while (list) {
+		next = (Variable*)list->next;
+		efree(list);
+		list = next;
 	}
 }

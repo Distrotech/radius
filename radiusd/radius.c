@@ -1,660 +1,657 @@
-/* This file is part of GNU Radius.
-   Copyright (C) 2000,2001,2002,2003,2004,2006,
-   2007 Free Software Foundation, Inc.
+/* This file is part of GNU RADIUS.
+ * Copyright (C) 2000, Sergey Poznyakoff
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+ *
+ */
 
-   Written by Sergey Poznyakoff
-  
-   GNU Radius is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 3 of the License, or
-   (at your option) any later version.
-  
-   GNU Radius is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-  
-   You should have received a copy of the GNU General Public License
-   along with GNU Radius; if not, write to the Free Software Foundation,
-   Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA. */
+#define RADIUS_MODULE 11
+#ifndef lint
+static char rcsid[] =
+"@(#) $Id$";
+#endif
 
 #ifdef HAVE_CONFIG_H
 # include <config.h>
 #endif
 
-#include <radiusd.h>
+#include	<sys/types.h>
+#include	<sys/socket.h>
+#include	<sys/time.h>
+#include	<netinet/in.h>
 
-/* Build and send a reply to the incoming request.
-   Input: code        -- Reply code.
-          radreq      -- The request.
-          reply_pairs -- List of A/V pairs to be encoded in the reply
-          msg         -- User message
-          fd          -- Socket descriptor.
-    NOTE: If radreq contains cached reply information, this information
-          is used instead of the supplied arguments. */
+#include	<stdio.h>
+#include	<stdlib.h>
+#include	<netdb.h>
+#include	<pwd.h>
+#include	<time.h>
+#include	<ctype.h>
 
-void
-radius_send_reply(int code, radiusd_request_t *radreq,
-		  grad_avp_t *reply_pairs, char *msg, int fd)
+#include	<radiusd.h>
+
+
+/*
+ *	Make sure our buffer is aligned.
+ */
+static int	i_send_buffer[RAD_BUFFER_SIZE];
+static char	*send_buffer = (char *)i_send_buffer;
+
+/*
+ *	Reply to the request.  Also attach
+ *	reply attribute value pairs and any user message provided.
+ */
+int
+rad_send_reply(code, authreq, oreply, msg, activefd)
+	int code;
+	AUTH_REQ *authreq;
+	VALUE_PAIR *oreply;
+	char *msg;
+	int activefd;
 {
-        if (radreq->reply_code == 0) {
-                grad_avp_t *reply;
-                
-                /* Save the data */
-                radreq->reply_code = code;
-                radreq->reply_msg = grad_estrdup(msg);
+	AUTH_HDR		*auth;
+	u_short			total_length;
+	struct	sockaddr	saremote;
+	struct	sockaddr_in	*sin;
+	u_char			*ptr, *length_ptr;
+	char			*what;
+	int			len;
+	UINT4			lval;
+	u_char			digest[AUTH_DIGEST_LEN];
+	int			secretlen;
+	VALUE_PAIR		*reply;
+	int			vendorcode, vendorpec;
 
-                reply = grad_avl_dup(reply_pairs);
-                grad_avl_move_attr(&reply, &radreq->request->avlist,
-				   DA_PROXY_STATE);
-                
-                switch (code) {
-                case RT_PASSWORD_REJECT:
-                case RT_ACCESS_REJECT:
-                        radreq->reply_pairs = NULL;
-                        grad_avl_move_attr(&radreq->reply_pairs, &reply, 
-					   DA_REPLY_MESSAGE);
-                        grad_avl_move_attr(&radreq->reply_pairs, &reply, 
-					   DA_PROXY_STATE);
-                        grad_avl_free(reply);
-			stat_inc(auth, radreq->request->ipaddr, num_rejects);
-                        break;
+	auth = (AUTH_HDR *)send_buffer;
+	reply = oreply;
 
-		case RT_ACCESS_ACCEPT:
-			stat_inc(auth, radreq->request->ipaddr, num_accepts);
-			/*FALLTHROUGH*/
-			
-                default:
-                        radreq->reply_pairs =
-				grad_client_encrypt_pairlist(reply,
-					     radreq->request->authenticator,
-					     radreq->request->secret);
-                }
-        } 
+	switch (code) {
+		case PW_PASSWORD_REJECT:
+		case PW_AUTHENTICATION_REJECT:
+			what = _("Reject");
+			/*
+			 *	Also delete all reply attributes
+			 *	except proxy-pair and port-message.
+			 */
+			reply = NULL;
+			pairmove2(&reply, &oreply, DA_REPLY_MESSAGE);
+			pairmove2(&reply, &oreply, DA_PROXY_STATE);
+			break;
+		case PW_ACCESS_CHALLENGE:
+			what = _("Challenge");
+			stat_inc(auth, authreq->ipaddr, num_challenges);
+			break;
+		case PW_AUTHENTICATION_ACK:
+			what = _("Ack");
+			break;
+		case PW_ACCOUNTING_RESPONSE:
+			what = _("Accounting Ack");
+			break;
+		default:
+			what = _("Reply");
+			break;
+	}
 
-	grad_server_send_reply(fd, radreq->request,
-			       radreq->reply_code,
-			       radreq->reply_pairs,
-			       radreq->reply_msg);
-}
-	
-#ifdef USE_LIVINGSTON_MENUS
-/* Reply to the request with a CHALLENGE. Also attach any user message
-   provided and a state value.
-   Input: radreq      -- The request.
-          msg         -- User message.
-          state       -- Value of the State attribute.
-          fd          -- Socket descriptor. */
-void
-radius_send_challenge(radiusd_request_t *radreq, char *msg, char *state, int fd)
-{
-	radreq->reply_pairs = NULL;
-	grad_avl_move_attr(&radreq->reply_pairs, &radreq->request->avlist,
-			   DA_PROXY_STATE);
-	if (grad_server_send_challenge(fd, radreq->request,
-				       radreq->reply_pairs, msg, state))
-		stat_inc(auth, radreq->request->ipaddr, num_challenges);
-}
+	/*
+	 *	Build standard header
+	 */
+	auth->code = code;
+	auth->id = authreq->id;
+	memcpy(auth->vector, authreq->vector, AUTH_VECTOR_LEN);
+
+	debug(1, ("Sending %s of id %d to %lx (nas %s)",
+		what, authreq->id, (u_long)authreq->ipaddr,
+		nas_name2(authreq)));
+
+	total_length = AUTH_HDR_LEN;
+
+	/*
+	 *	Load up the configuration values for the user
+	 */
+	ptr = auth->data;
+	while (reply != (VALUE_PAIR *)NULL) {
+		if (debug_on(10))
+			debug_pair("reply", reply);
+
+		/*
+		 *	This could be a vendor-specific attribute.
+		 */
+		length_ptr = NULL;
+		if ((vendorcode = VENDOR(reply->attribute)) > 0 &&
+		    (vendorpec  = dict_vendorpec(vendorcode)) > 0) {
+			if (total_length + 6 >= RAD_BUFFER_SIZE)
+				goto err;
+			*ptr++ = DA_VENDOR_SPECIFIC;
+			length_ptr = ptr;
+			*ptr++ = 6;
+			lval = htonl(vendorpec);
+			memcpy(ptr, &lval, 4);
+			ptr += 4;
+			total_length += 6;
+		} else if (reply->attribute > 0xff) {
+			/*
+			 *	Ignore attributes > 0xff
+			 */
+			reply = reply->next;
+			continue;
+		} else
+			vendorpec = 0;
+
+#ifdef ATTRIB_NMC
+		if (vendorpec == VENDORPEC_USR) {
+			if (total_length + 2 >= RAD_BUFFER_SIZE)
+				goto err;
+			lval = htonl(reply->attribute & 0xFFFF);
+			memcpy(ptr, &lval, 4);
+			total_length += 2;
+			*length_ptr  += 2;
+			ptr          += 4;
+		} else
 #endif
+		*ptr++ = (reply->attribute & 0xFF);
 
-/* Validates the requesting client NAS. */
-static int
-validate_client(grad_request_t *radreq)
-{
-        CLIENT  *cl;
-        
-        if ((cl = client_lookup_ip(radreq->ipaddr)) == NULL) {
-                grad_log_req(L_ERR, radreq,
-			     _("request from unknown client"));
-                return -1;
-        }
+		switch(reply->type) {
 
-        /* Save the secret key */
-        radreq->secret = cl->secret;
+		case PW_TYPE_STRING:
+			/*
+			 *	FIXME: this is just to make sure but
+			 *	should NOT be needed. In fact I have no
+			 *	idea if it is needed :)
+			 */
+			if (reply->strlength == 0 && reply->strvalue[0] != 0)
+				reply->strlength = strlen(reply->strvalue);
 
-        return 0;
-}
+			len = reply->strlength;
+			if (len >= AUTH_STRING_LEN) {
+				len = AUTH_STRING_LEN - 1;
+			}
+			if (total_length + len + 2 >= RAD_BUFFER_SIZE)
+				goto err;
+#ifdef ATTRIB_NMC
+			if (vendorpec != VENDORPEC_USR)
+#endif
+				*ptr++ = len + 2;
+			if (length_ptr) *length_ptr += len + 2;
+			memcpy(ptr, reply->strvalue, len);
+			ptr += len;
+			total_length += len + 2;
+			break;
 
-/* Validates the requesting NAS */
-int
-radius_verify_digest(REQUEST *req)
-{
-	radiusd_request_t *radreq = req->data;
-	size_t len = req->rawsize;
-        int  secretlen;
-        char zero[GRAD_AUTHENTICATOR_LENGTH];
-        u_char  *recvbuf;
-        u_char digest[GRAD_AUTHENTICATOR_LENGTH];
+		case PW_TYPE_INTEGER:
+		case PW_TYPE_IPADDR:
+			if (total_length + sizeof(UINT4) + 2 >= RAD_BUFFER_SIZE)
+				goto err;
+#ifdef ATTRIB_NMC
+			if (vendorpec != VENDORPEC_USR)
+#endif
+				*ptr++ = sizeof(UINT4) + 2;
+			if (length_ptr) *length_ptr += sizeof(UINT4)+ 2;
+			lval = htonl(reply->lvalue);
+			memcpy(ptr, &lval, sizeof(UINT4));
+			ptr += sizeof(UINT4);
+			total_length += sizeof(UINT4) + 2;
+			break;
 
-        secretlen = strlen(radreq->request->secret);
-
-        recvbuf = grad_emalloc(len + secretlen);
-        memcpy(recvbuf, req->rawdata, len);
-        
-        /* Older clients have the authentication vector set to
-           all zeros. Return `1' in that case. */
-        memset(zero, 0, sizeof(zero));
-        if (memcmp(radreq->request->authenticator, zero,
-		   GRAD_AUTHENTICATOR_LENGTH) == 0)
-                return REQ_AUTH_ZERO;
-
-        /* Zero out the auth_vector in the received packet.
-           Then append the shared secret to the received packet,
-           and calculate the MD5 sum. This must be the same
-           as the original MD5 sum (radreq->authenticator). */
-        memset(recvbuf + 4, 0, GRAD_AUTHENTICATOR_LENGTH);
-        memcpy(recvbuf + len, radreq->request->secret, secretlen);
-        grad_md5_calc(digest, recvbuf, len + secretlen);
-        grad_free(recvbuf);
-        
-        return memcmp(digest, radreq->request->authenticator,
-		      GRAD_AUTHENTICATOR_LENGTH) ?
-                          REQ_AUTH_BAD : REQ_AUTH_OK;
-}
-
-
-/* *********************** Radius Protocol Support ************************* */
-
-static void
-add_server_address(grad_request_t *req, const struct sockaddr_in *sa)
-{
-	grad_avl_add_pair(&req->avlist,
-			  grad_avp_create_integer(DA_GNU_SERVER_ADDRESS,
-						  ntohl(sa->sin_addr.s_addr)));
-	grad_avl_add_pair(&req->avlist,
-			  grad_avp_create_integer(DA_GNU_SERVER_PORT,
-						  ntohs(sa->sin_port)));
-}
-
-int
-radius_auth_req_decode(const struct sockaddr_in *srv_sa,
-		       const struct sockaddr_in *clt_sa,
-		       void *input, size_t inputsize, void **output)
-{
-	grad_request_t *greq;
-        radiusd_request_t *radreq;
-
-	log_open(L_AUTH);
-
-        if (suspend_flag) {
-		stat_inc(auth, ntohl(clt_sa->sin_addr.s_addr), num_dropped);
-                return 1;
-	}
-        
-        greq = grad_decode_pdu(ntohl(clt_sa->sin_addr.s_addr),
-			       ntohs(clt_sa->sin_port),
-			       input,
-			       inputsize);
-	if (!greq)
-		return 1;
-
-        if (validate_client(greq)) {
-		stat_inc(auth, greq->ipaddr, num_dropped);
-		grad_request_free(greq);
- 		return 1;
-        }
-	
-	radreq = radiusd_request_alloc(greq);
-
-	add_server_address (radreq->request, srv_sa);
-	
-	/* RFC 2865 p. 2.2:
-	   The random challenge can either be included in the
-	   CHAP-Challenge attribute or, if it is 16 octets long,
-	   it can be placed in the Request Authenticator field of
-	   the Access-Request packet. */
-
-	if (grad_avl_find(radreq->request->avlist, DA_CHAP_PASSWORD)
-	    && !grad_avl_find(radreq->request->avlist, DA_CHAP_CHALLENGE)) {
-		grad_avp_t *p = grad_avp_create_binary(DA_CHAP_CHALLENGE,
-						       GRAD_AUTHENTICATOR_LENGTH,
-						       radreq->request->authenticator);
-		grad_avl_add_pair(&radreq->request->avlist, p);
-	}
-	
-	*output = radreq;
-	return 0;
-}
-
-int
-radius_acct_req_decode(const struct sockaddr_in *srv_sa,
-		       const struct sockaddr_in *clt_sa,
-		       void *input, size_t inputsize, void **output)
-{
-	grad_request_t *greq;
-
-	log_open(L_ACCT);
-	
-        if (suspend_flag) {
-		stat_inc(acct, ntohl(clt_sa->sin_addr.s_addr), num_dropped);
-                return 1;
-	}
-        
-        greq = grad_decode_pdu(ntohl(clt_sa->sin_addr.s_addr),
-			       ntohs(clt_sa->sin_port),
-			       input,
-			       inputsize);
-	if (!greq)
-		return 1;
-        
-        if (validate_client(greq)) {
-		stat_inc(acct, greq->ipaddr, num_dropped);
-		grad_request_free(greq);
- 		return 1;
-        }
-
-	add_server_address (greq, srv_sa);
-	*output = radiusd_request_alloc(greq);
-	
-	return 0;
-}
-
-static void
-decrypt_pair(grad_request_t *req, grad_avp_t *pair)
-{
-	if (pair->prop & GRAD_AP_ENCRYPT) {
-		char password[GRAD_STRING_LENGTH+1];
-		req_decrypt_password(password, req, pair);
-		grad_free(pair->avp_strvalue);
-		pair->avp_strvalue = grad_estrdup(password);
-		pair->avp_strlength = strlen(pair->avp_strvalue);
-	}
-}
-
-grad_avp_t *
-radius_decrypt_request_pairs(radiusd_request_t *req, grad_avp_t *plist)
-{
-	grad_avp_t *pair;
-
-	for (pair = plist; pair; pair = pair->next) 
-		decrypt_pair(req->request, pair);
-	
-	return plist;
-}
-
-void
-radius_destroy_pairs(grad_avp_t **p)
-{
-	grad_avp_t *pair;
-	
-	if (!p || !*p)
-		return;
-	for (pair = *p; pair; pair = pair->next) {
-		if (pair->prop & GRAD_AP_ENCRYPT)
-			memset(pair->avp_strvalue, 0,
-			       pair->avp_strlength);
-	}
-
-	grad_avl_free(*p);
-	*p = NULL;
-}
-
-static grad_avp_t *
-_extract_pairs(grad_request_t *req, int prop)
-{
-	int i;
-	grad_avp_t *newlist = NULL;
-	grad_avp_t *pair;
-	char password[GRAD_STRING_LENGTH+1];
-	int found = 0;
-	
-	for (pair = req->avlist; !found && pair; pair = pair->next)
-		if (pair->prop & (prop|GRAD_AP_ENCRYPT)) {
-			found = 1;
+		default:
 			break;
 		}
 
-	if (!found)
-		return NULL;
-
-	newlist = grad_avl_dup(req->avlist);
-	for (pair = newlist; pair; pair = pair->next) { 
-		if (pair->prop & prop) 
-			decrypt_pair(req, pair);
+		reply = reply->next;
 	}
-	return newlist;
-}
 
-static int
-find_prop(grad_nas_t *nas, char *name, int defval)
-{
-	if (!nas)
-		return defval;
-	return grad_envar_lookup_int(nas->args, name, defval);
-}
+	/*
+	 *	Append the user message
+	 *	Add multiple DA_REPLY_MESSAGEs if it
+	 *	doesn't fit into one.
+	 */
+	if (msg != NULL && (len = strlen(msg)) > 0) {
+		int block_len;
+		
+		while (len > 0) {
+			if (len > AUTH_STRING_LEN) {
+				block_len = AUTH_STRING_LEN;
+			} else {
+				block_len = len;
+			}
 
-int
-radius_req_cmp(void *adata, void *bdata)
-{
-	grad_request_t *a = ((radiusd_request_t*)adata)->request;
-	grad_request_t *b = ((radiusd_request_t*)bdata)->request;
-	int prop = 0;
-	grad_avp_t *alist = NULL, *blist = NULL, *ap, *bp;
-	int rc;
-	grad_nas_t *nas;
-
-	if (proxy_cmp((radiusd_request_t*)adata, (radiusd_request_t*)bdata) == 0) 
-		return RCMP_PROXY;
-	
-	if (a->ipaddr != b->ipaddr || a->code != b->code)
-		return RCMP_NE;
-	
-	if (a->id == b->id
-	    && memcmp(a->authenticator, b->authenticator, sizeof(a->authenticator)) == 0)
-		return RCMP_EQ;
-
-	nas = grad_nas_request_to_nas(a);
-
-	switch (a->code) {
-	case RT_ACCESS_REQUEST:
-	case RT_ACCESS_ACCEPT:
-	case RT_ACCESS_REJECT:
-	case RT_ACCESS_CHALLENGE:
-		prop = find_prop(nas, "compare-auth-flag", 0);
-		if (!prop)
-			prop = find_prop(nas, "compare-attribute-flag",
-					 auth_comp_flag);
-		break;
+			if (total_length + block_len + 2 >= RAD_BUFFER_SIZE) {
+				radlog(L_ERR,
+				       _("user message too long in rad_send_reply"));
+				return -1; /* be on the safe side */
+			}
 			
-	case RT_ACCOUNTING_REQUEST:
-	case RT_ACCOUNTING_RESPONSE:
-	case RT_ACCOUNTING_STATUS:
-	case RT_ACCOUNTING_MESSAGE:
-		prop = find_prop(nas, "compare-acct-flag", 0);
-		if (!prop)
-			prop = find_prop(nas, "compare-attribute-flag",
-					 acct_comp_flag);
-		break;
+			*ptr++ = DA_REPLY_MESSAGE;
+			*ptr++ = block_len + 2;
+			memcpy(ptr, msg, block_len);
+			msg += block_len;
+			ptr += block_len;
+			total_length += block_len + 2;
+			len -= block_len;
+		}
 	}
 
+	auth->length = htons(total_length);
 
-	if (prop == 0) 
-		return RCMP_NE;
+	/*
+	 *	Append secret and calculate the response digest
+	 */
+	secretlen = strlen(authreq->secret);
+	memcpy(send_buffer + total_length, authreq->secret, secretlen);
+	md5_calc(digest, (char *)auth, total_length + secretlen);
+	memcpy(auth->vector, digest, AUTH_VECTOR_LEN);
+	memset(send_buffer + total_length, 0, secretlen);
 
-	prop = GRAD_AP_USER_FLAG(prop);
-	alist = _extract_pairs(a, prop);
-	blist = _extract_pairs(b, prop);
+	sin = (struct sockaddr_in *) &saremote;
+        memset ((char *) sin, '\0', sizeof (saremote));
+	sin->sin_family = AF_INET;
+	sin->sin_addr.s_addr = htonl(authreq->ipaddr);
+	sin->sin_port = htons(authreq->udp_port);
 
-	ap = alist ? alist : a->avlist;
-	bp = blist ? blist : b->avlist;
-	
-	rc = grad_avl_cmp(ap, bp, prop) || grad_avl_cmp(bp, ap, prop);
+	/*
+	 *	Send it to the user
+	 */
+	sendto(activefd, (char *)auth, (int)total_length, (int)0,
+			&saremote, sizeof(struct sockaddr_in));
 
-	radius_destroy_pairs(&alist);
-	radius_destroy_pairs(&blist);
-	
-	if (rc == 0) {
-		/* We need to replace A/V pairs, authenticator and ID
-		   so that the reply is signed correctly.
-		   Notice that the raw data will be replaced by
-		   request_retransmit() */
-		memcpy(a->authenticator, b->authenticator, sizeof(a->authenticator));
-		grad_avl_free(a->avlist);
-		a->avlist = grad_avl_dup(b->avlist);
-		a->id = b->id;
+	/*
+	 *	Just to be tidy move pairs back.
+	 */
+	if (reply != oreply) {
+		pairmove2(&oreply, &reply, DA_PROXY_STATE);
+		pairmove2(&oreply, &reply, DA_REPLY_MESSAGE);
 	}
+
+	return 0;
+err:
+	radlog(L_ERR, _("send buffer overflow"));
+	return -1;
+}
+
+
+/*
+ *	Validates the requesting client NAS.  Calculates the
+ *	digest to be used for decrypting the users password
+ *	based on the clients private key.
+ */
+int
+calc_digest(digest, authreq)
+	u_char *digest;
+	AUTH_REQ *authreq;
+{
+	u_char	buffer[128];
+	int	secretlen;
+	CLIENT	*cl;
+
+	/*
+	 *	See if we know this client.
+	 */
+	if ((cl = client_find(authreq->ipaddr)) == NULL) {
+		radlog(L_ERR, _("request from unknown client: %s"),
+			client_name(authreq->ipaddr));
+		return -1;
+	}
+
+	/*
+	 *	Use the secret to setup the decryption digest
+	 */
+	secretlen = strlen(cl->secret);
+	strcpy(buffer, cl->secret);
+	memcpy(buffer + secretlen, authreq->vector, AUTH_VECTOR_LEN);
+	md5_calc(digest, buffer, secretlen + AUTH_VECTOR_LEN);
+	strcpy(authreq->secret, cl->secret);
+	memset(buffer, 0, sizeof(buffer));
+
+	return(0);
+}
+
+/*
+ *	Validates the requesting client NAS.  Calculates the
+ *	signature based on the clients private key.
+ */
+int
+calc_acctdigest(digest, authreq)
+	u_char *digest;
+	AUTH_REQ *authreq;
+{
+	int	secretlen;
+	CLIENT	*cl;
+	char zero[AUTH_VECTOR_LEN];
+	char	* recvbuf = authreq->data;
+	int	len = authreq->data_len;
+
+	/*
+	 *	See if we know this client.
+	 */
+	if ((cl = client_find(authreq->ipaddr)) == NULL) {
+		radlog(L_ERR, _("request from unknown client: %s"),
+			client_name(authreq->ipaddr));
+		return -1;
+	}
+
+	/*
+	 *	Copy secret into authreq->secret so that we can
+	 *	use it with send_acct_reply()
+	 */
+	secretlen = strlen(cl->secret);
+	strcpy(authreq->secret, cl->secret);
+
+	/*
+	 *	Older clients have the authentication vector set to
+	 *	all zeros. Return `1' in that case.
+	 */
+	memset(zero, 0, sizeof(zero));
+	if (memcmp(authreq->vector, zero, AUTH_VECTOR_LEN) == 0)
+		return 1;
+
+	/*
+	 *	Zero out the auth_vector in the received packet.
+	 *	Then append the shared secret to the received packet,
+	 *	and calculate the MD5 sum. This must be the same
+	 *	as the original MD5 sum (authreq->vector).
+	 */
+	memset(recvbuf + 4, 0, AUTH_VECTOR_LEN);
+	memcpy(recvbuf + len, cl->secret, secretlen);
+	md5_calc(digest, recvbuf, len + secretlen);
+
+	/*
+	 *	Return 0 if OK, 2 if not OK.
+	 */
+	return memcmp(digest, authreq->vector, AUTH_VECTOR_LEN) ? 2 : 0;
+}
+
+
+/*
+ *	Receive UDP client requests, build an authorization request
+ *	structure, and attach attribute-value pairs contained in
+ *	the request to the new structure.
+ */
+AUTH_REQ *
+radrecv(host, udp_port, buffer, length)
+	UINT4 host;
+	u_short udp_port;
+	u_char *buffer;
+	int length;
+{
+	u_char		*ptr;
+	AUTH_HDR	*auth;
+	int		totallen;
+	int		attribute;
+	int		attrlen;
+ 	DICT_ATTR	*attr;
+	UINT4		lval;
+	UINT4		vendorcode;
+	UINT4		vendorpec;
+	VALUE_PAIR	*first_pair;
+	VALUE_PAIR	*prev;
+	VALUE_PAIR	*pair;
+	AUTH_REQ	*authreq;
+
+	/*
+	 *	Pre-allocate the new request data structure
+	 */
+
+	authreq = alloc_request();
 	
-	return rc == 0 ? RCMP_EQ : RCMP_NE;
-}
+	memset(authreq, 0, sizeof(AUTH_REQ));
 
-void
-radius_req_update(void *req_ptr, void *data_ptr)
-{
-	radiusd_request_t *req = req_ptr;
-	RADIUS_UPDATE *upd = data_ptr;
+	auth = (AUTH_HDR *)buffer;
+	totallen = ntohs(auth->length);
+	if (length > totallen) {
+		radlog(L_WARN,
+		       _("Received message length > packet length (%d, %d)"),
+		    length, totallen);
+		length = totallen;
+	}
+		
+	debug(1, ("Request from host %lx code=%d, id=%d, length=%d",
+				(u_long)host, auth->code, auth->id, totallen));
 
-	if (req->request->id != upd->id)
-		return;
-	req->server_id = upd->proxy_id;
-	req->realm = grad_realm_lookup_name(upd->realmname);
-	req->server_no = upd->server_no;
-	GRAD_DEBUG4(1, "Update request %d: proxy_id=%d, realm=%s, server_no=%d",
-		  req->request->id,upd->proxy_id,upd->realmname,upd->server_no);
-}
+	/*
+	 *	Fill header fields
+	 */
+	authreq->ipaddr = host;
+	authreq->udp_port = udp_port;
+	authreq->id = auth->id;
+	authreq->code = auth->code;
+	memcpy(authreq->vector, auth->vector, AUTH_VECTOR_LEN);
+	authreq->data = buffer;
+	authreq->data_len = length;
 
-void
-radius_req_free(void *req)
-{
-        radiusd_request_free((radiusd_request_t *)req);
-}
+	/*
+	 *	Extract attribute-value pairs
+	 */
+	ptr = auth->data;
+	length -= AUTH_HDR_LEN;
+	first_pair = (VALUE_PAIR *)NULL;
+	prev = (VALUE_PAIR *)NULL;
 
-/*ARGSUSED*/
-void
-radius_req_drop(int type, void *data, void *orig_data,
-		int fd, const char *status_str)
-{
-	radiusd_request_t *radreq = data ? data : orig_data;
+	while (length > 0) {
 
-        grad_log_req(L_NOTICE, radreq->request,
-		     "%s: %s", _("Dropping packet"),  status_str);
+		attribute = *ptr++;
+		attrlen = *ptr++;
+		if (attrlen < 2) {
+			length = 0;
+			continue;
+		}
+		attrlen -= 2;
+		length  -= 2;
 
-        switch (type) {
-        case R_AUTH:
-                stat_inc(auth, radreq->request->ipaddr, num_dropped);
-                break;
-        case R_ACCT:
-                stat_inc(acct, radreq->request->ipaddr, num_dropped);
-        }
-}
+		/*
+		 *	FIXME:
+		 *	For now we ignore the length in the vendor-specific
+		 *	part, and assume only one entry.
+		 */
+		if (attribute == DA_VENDOR_SPECIFIC && attrlen > 6) {
+			memcpy(&lval, ptr, 4);
+			vendorpec = ntohl(lval);
+			if ((vendorcode = dict_vendorcode(vendorpec)) != 0) {
+#ifdef ATTRIB_NMC
+				if (vendorpec == VENDORPEC_USR) {
+					ptr += 4;
+					memcpy(&lval, ptr, 4);
 
-void
-radius_req_xmit(REQUEST *request)
-{
-        radiusd_request_t *req = request->data;
+					attribute = (ntohl(lval) & 0xFFFF) |
+							(vendorcode << 16);
+					ptr += 4;
+					attrlen -= 8;
+					length -= 8;
+				} else
+#endif
+				{
+					ptr += 4;
+					attribute = *ptr | (vendorcode << 16);
+					ptr += 2;
+					attrlen -= 6;
+					length -= 6;
+				}
+			}
+		}
 
-        if (request->code == 0) {
-		if (req->reply_code == 0 && req->realm) {
-			proxy_retry(req, request->fd);
+		if ((attr = dict_attrget(attribute)) == (DICT_ATTR *)NULL) {
+			debug(1, ("Received unknown attribute %d", attribute));
+		} else if ( attrlen >= AUTH_STRING_LEN ) {
+			debug(1, ("attribute %d too long, %d >= %d", attribute,
+				attrlen, AUTH_STRING_LEN));
+		} else if ( attrlen > length ) {
+			debug(1,
+			      ("attribute %d longer then buffer left, %d > %d",
+				attribute, attrlen, length));
 		} else {
-			radius_send_reply(0, req,
-					  NULL, NULL, request->fd);
-			grad_log_req(L_NOTICE, req->request,
-				     _("Retransmitting %s reply"),
-				     request_class[request->type].name);
-		} 
-	} else
-		radius_req_drop(request->type, NULL, req, request->fd,
-				_("request failed"));
+			pair = alloc_pair();
+			
+			pair->name = attr->name;
+			pair->attribute = attr->value;
+			pair->type = attr->type;
+			pair->next = (VALUE_PAIR *)NULL;
 
-}
+			switch (attr->type) {
 
-int
-radius_req_failure(int type, struct sockaddr_in *addr)
-{
-	switch (type) {
-	case R_AUTH:
-		stat_inc(auth, ntohl(addr->sin_addr.s_addr), num_bad_req);
-		break;
+			case PW_TYPE_STRING:
+				/* attrlen always < AUTH_STRING_LEN */
+				pair->strlength = attrlen;
+				pair->strvalue = alloc_string(attrlen + 1);
+				memcpy(pair->strvalue, ptr, attrlen);
+				pair->strvalue[attrlen] = 0;
+				if (debug_on(10))
+					debug_pair("send", pair);
+				if (first_pair == (VALUE_PAIR *)NULL) {
+					first_pair = pair;
+				}
+				else {
+					prev->next = pair;
+				}
+				prev = pair;
+				break;
+			
+			case PW_TYPE_INTEGER:
+			case PW_TYPE_IPADDR:
+				memcpy(&lval, ptr, sizeof(UINT4));
+				pair->lvalue = ntohl(lval);
+				if (debug_on(10))
+					debug_pair("send", pair);
+				if (first_pair == (VALUE_PAIR *)NULL) {
+					first_pair = pair;
+				}
+				else {
+					prev->next = pair;
+				}
+				prev = pair;
+				break;
+			
+			default:
+				debug(1, ("    %s (Unknown Type %d)",
+					attr->name,attr->type));
+				free_pair(pair);
+				break;
+			}
 
-	case R_ACCT:
-		stat_inc(acct, ntohl(addr->sin_addr.s_addr), num_bad_req);
-	}
-	return 0;
-}
-
-int
-radius_status_server(radiusd_request_t *radreq, int fd)
-{
-	radius_send_reply(RT_ACCESS_ACCEPT, radreq, NULL,
-			  "GNU Radius server fully operational",
-			  fd);
-	return 0;
-}
-
-int
-radius_respond(REQUEST *req)
-{
-	int rc;
-	radiusd_request_t *radreq = req->data;
-
-	forward_request(req->type, radreq);
-
-	radiusd_sql_clear_cache();
-
-        /* Add any specific attributes for this username. */
-        hints_setup(radreq);
-
-	if (radreq->request->code == RT_ACCESS_REQUEST
-	    && rad_auth_check_username(radreq, req->fd))
-	    return 1;
-	
-        /* Check if we support this request */
-        switch (radreq->request->code) {
-        case RT_ACCESS_REQUEST:
-                stat_inc(auth, radreq->request->ipaddr, num_access_req);
-                if (rad_auth_init(radreq, req->fd) < 0) 
-                        return 1;
-                if (proxy_send(req) != 0) 
-                        return 0;
-		break;
-		
-        case RT_ACCOUNTING_REQUEST:
-		stat_inc(acct, radreq->request->ipaddr, num_req);
-                if (proxy_send(req) != 0) 
-                        return 0;
-		break;
-		
-	case RT_ACCESS_ACCEPT:
-	case RT_ACCESS_REJECT:
-	case RT_ACCOUNTING_RESPONSE:
-	case RT_ACCESS_CHALLENGE:
-		if (!req->orig) {
-			char buf[GRAD_MAX_SHORTNAME];
-			grad_log_req(L_PROXY|L_ERR, radreq->request,
-				     _("Unrecognized proxy reply from server %s, proxy ID %d"),
-				     client_lookup_name(radreq->request->ipaddr,
-						        buf, sizeof buf), 
-				     radreq->request->id);
-			return 1;
 		}
-		
-		if (proxy_receive(radreq, req->orig->data, req->fd) < 0) {
-			return 1;
+		ptr += attrlen;
+		length -= attrlen;
+	}
+	authreq->request = first_pair;
+	return(authreq);
+}
+
+#ifdef USE_LIVINGSTON_MENUS
+/*
+ *	Reply to the request with a CHALLENGE.  Also attach
+ *	any user message provided and a state value.
+ */
+void
+send_challenge(authreq, msg, state, activefd)
+	AUTH_REQ *authreq;
+	char *msg;
+	char *state;
+	int activefd;
+{
+	AUTH_HDR		*auth;
+	struct	sockaddr	saremote;
+	struct	sockaddr_in	*sin;
+	char			digest[AUTH_VECTOR_LEN];
+	int			secretlen;
+	int			total_length;
+	int block_len;
+	u_char			*ptr;
+	int			len;
+
+	auth = (AUTH_HDR *)send_buffer;
+
+	/*
+	 *	Build standard response header
+	 */
+	auth->code = PW_ACCESS_CHALLENGE;
+	auth->id = authreq->id;
+	memcpy(auth->vector, authreq->vector, AUTH_VECTOR_LEN);
+	total_length = AUTH_HDR_LEN;
+	ptr = auth->data;
+
+	/*
+	 *	Append the user message
+	 */
+	if (msg != NULL && (len = strlen(msg)) > 0) {
+		while (len > 0) {
+			if (len > AUTH_STRING_LEN) {
+				block_len = AUTH_STRING_LEN;
+			} else {
+				block_len = len;
+			}
+
+			if (total_length + block_len + 2 >= RAD_BUFFER_SIZE) {
+				radlog(L_ERR,
+				    _("user message too long in send_challenge"));
+				return;
+			}
+			
+			*ptr++ = DA_REPLY_MESSAGE;
+			*ptr++ = block_len + 2;
+			memcpy(ptr, msg, block_len);
+			msg += block_len;
+			ptr += block_len;
+			total_length += block_len + 2;
+			len -= block_len;
 		}
-		break;
 	}
 
-        switch (radreq->request->code) {
-        case RT_ACCESS_REQUEST:
-		rad_authenticate(radreq, req->fd);
-                break;
-		
-        case RT_ACCOUNTING_REQUEST:
-		/* Check the request authenticator. */
-		rc = radius_verify_digest(req);
-		if (rc == REQ_AUTH_BAD) 
-			stat_inc(acct, radreq->request->ipaddr, num_bad_sign);
-		rad_accounting(radreq, req->fd, rc);
-                break;
-
-	case RT_STATUS_SERVER:
-		radius_status_server(radreq, req->fd);
-		break;
-					
-
-        default:
-                stat_inc(acct, radreq->request->ipaddr, num_unknowntypes);
-                grad_log_req(L_NOTICE, radreq->request,
-			     _("unknown request code %d"), 
-                             radreq->request->code); 
-                return -1;
-        }       
-
-	radius_trace_path(radreq);
-	
-        return 0;
-}
-
-void
-radius_req_register_locus(radiusd_request_t *req, grad_locus_t *loc)
-{
-	switch (req->request->code) {
-	case RT_ACCESS_REQUEST:
-	case RT_ACCESS_ACCEPT:
-	case RT_ACCESS_REJECT:
-	case RT_ACCESS_CHALLENGE:
-		if (!auth_trace_rules)
-			return;
-		break;
-		
-	case RT_ACCOUNTING_REQUEST:
-	case RT_ACCOUNTING_RESPONSE:
-	case RT_ACCOUNTING_STATUS:
-	case RT_ACCOUNTING_MESSAGE:
-		if (!acct_trace_rules)
-			return;
-		break;
-
-	default:
-		return;
+	/*
+	 *	Append the state info
+	 */
+	if ((state != (char *)NULL) && (strlen(state) > 0)) {
+		len = strlen(state);
+		*ptr++ = DA_STATE;
+		*ptr++ = len + 2;
+		memcpy(ptr, state, len);
+		ptr += len;
+		total_length += len + 2;
 	}
 
-	if (!req->locus_list)
-		req->locus_list = grad_list_create();
+	/*
+	 *	Set total length in the header
+	 */
+	auth->length = htons(total_length);
+
+	/*
+	 *	Calculate the response digest
+	 */
+	secretlen = strlen(authreq->secret);
+	memcpy(send_buffer + total_length, authreq->secret, secretlen);
+	md5_calc(digest, (char *)auth, total_length + secretlen);
+	memcpy(auth->vector, digest, AUTH_VECTOR_LEN);
+	memset(send_buffer + total_length, 0, secretlen);
+
+	sin = (struct sockaddr_in *) &saremote;
+        memset ((char *) sin, '\0', sizeof (saremote));
+	sin->sin_family = AF_INET;
+	sin->sin_addr.s_addr = htonl(authreq->ipaddr);
+	sin->sin_port = htons(authreq->udp_port);
+
+	debug(1, ("Sending Challenge of id %d to %lx (nas %s)",
+		authreq->id, (u_long)authreq->ipaddr,
+		nas_name2(authreq)));
 	
-	grad_list_prepend(req->locus_list, loc);
+	/*
+	 *	Send it to the user
+	 */
+	sendto(activefd, (char *)auth, (int)total_length, (int)0,
+			&saremote, sizeof(struct sockaddr_in));
 }
 
-struct trace_data {
-	struct obstack stk;
-	char *file;
-};
+#endif
 
-static char *
-skip_common_substring(char *str, char *pat)
-{
-	char *start = str;
 
-	while (*str == *pat++) 
-		if (*str++ == '/')
-			start = str;
-	return start; 
-}
 
-static int
-_trace_path_compose(void *item, void *data)
-{
-	grad_locus_t *loc = item;
-	struct trace_data *td = data;
-	char buf[64];
-	
-	if (!td->file) {
-		td->file = loc->file;
-		obstack_grow(&td->stk, loc->file, strlen(loc->file));
-		obstack_1grow(&td->stk, ':');
-	} else if (strcmp(td->file, loc->file) == 0) {
-		obstack_1grow(&td->stk, ',');
-	} else {
-		char *p;
-		
-		obstack_1grow(&td->stk, ';');
-		obstack_1grow(&td->stk, ' ');
-		
-		p = skip_common_substring(loc->file, td->file);
-		obstack_grow(&td->stk, p, strlen(p));
-		obstack_1grow(&td->stk, ':');
-		td->file = loc->file;
-	}
 
-	snprintf(buf, sizeof buf, "%lu", (unsigned long) loc->line);
-	obstack_grow(&td->stk, buf, strlen(buf));
-	
-	return 0;
-}
 
-void
-radius_trace_path(radiusd_request_t *req)
-{
-	struct trace_data td;
-	char *p;
-	
-	if (!req->locus_list)
-		return; 
-	
-	obstack_init(&td.stk);
-	td.file = NULL;
-	grad_list_iterate(req->locus_list, _trace_path_compose, &td);
-	p = obstack_finish(&td.stk);
-	grad_log_req(L_INFO, req->request, _("rule trace: %s"), p);
-	obstack_free(&td.stk, NULL);
-}
+
+

@@ -1,19 +1,12 @@
-# For detailed description, run:
-#       info Radius users
+# This is the users database.
 
-
-## The following entry is supposed to be used with authentication probe
-## control. Please read `info --node 'Auth Probing' radius' for the detailed
-## description of it
-DEFAULT Group = "*LOCKED_ACCOUNT*",
-		Auth-Type = Reject
-	Reply-Message = "Your account is currently locked.\n\
-Please, contact your system administrator\n"
-
-
-## Default entry. 
-DEFAULT	Auth-Type = SQL,
+DEFAULT	Auth-Type = Mysql,
 		Simultaneous-Use = 1	
 	Service-Type = Framed-User,
 		Framed-Protocol = PPP
+
+## Be very careful with this:
+ROOT	Auth-Type = System,
+		Huntgroup-Name = "ROOT"
+	Service-Type = RADIUS-Administrative-User
 

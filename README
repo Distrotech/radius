@@ -1,338 +1,178 @@
-GNU Radius README
-Copyright (C) 2002,2003,2004,2008 Free Software Foundation, Inc.
-See the end of file for copying conditions.
+              I. Installation
+           ---------------------		
+  To install do:
 
-* Introduction
+1. ./configure [options]
+  For the list of available options consult INSTALL file.
+  The applications-specific options are:
 
-This file contains brief information about configuring, testing
-and running GNU Radius. It is *not* intended as a replacement
-for the documentation, it is provided as a brief reference only.
-The complete documentation for GNU Radius is available in
-doc/texinfo subdirectory. To read it without installing the package
-run `info -f doc/texinfo/radius'. After the package is installed
-the documentation can be accessed running `info radius'.
+  --enable-yydebug	         
+     Enable parser debugging. The parser deugging can be useful to track down
+  errors in configuration files such as /etc/raddb/users and /etc/raddb/config.
+  To enable the debugging on a given file, the first line of it should contain
+  the statement #debug starting on the first colon. Debugging output goes to
+  stderr or to the file /var/log/radius.stderr if such file exists.
 
-The online copy of the documentation in various formats is available
-at http://www.gnu.org/software/radius/manual.
+  --with-etcdir                  
+     Specify the directory containing raddb files instead of the default 
+  /etc/raddb.
 
-* Installation
+  --with-auth-port=NUMBER	 
+     Specify port number to use for authentication. Default is 1645. The
+  default port number for accounting is computed as auth_port + 1.
 
-Before installing, take a glance at doc/MACHINES, it may describe some
-issues, specific to your configuration.
+  --enable-add-libs=STRING 	 
+     Specify any additional libraries/libpaths your system might require.
 
-If you are upgrading from a previous version of GNU Radius, make
-sure to read the section `Upgrading from earlier versions' below.
+  --enable-add-includes=STRING   
+     Specify any additional include files/include paths.
+ 
+  --enable-shadow	         
+     Enable shadow support. Use this only if ./configure was unable to 
+  correctly determine if it should use the shadow support.
 
-To install the package, do:
+  --enable-pam		         
+     Enable pam support.
 
-** ./configure [options]
+  --enable-dbm[={dbm|ndbm}]      
+     Enable dbm support. If no argument is specified, an usual DBM is enabled.
+  The `ndbm' argument instructs to enable support of NDBM.
 
-For the list of available options consult file INSTALL.
-The applications-specific options are:
-			      			      	
-*** --disable-debug
-	Disable debugging functions. This results in slightly more compact
-    	code, but makes configuration issues difficult to debug. Use at
-    	your own risk.
+  --ensble-mysql                 
+     Enable mysql support. If an argument is specified it is supposed to 
+  mean the default port to connect to. The port can be overridden in
+  /etc/raddb/sqlserver.
 
-*** --with-auth-port=NUMBER
-	Specify port number to use for authentication. Default is 1812.
-        The default port number for accounting is computed as auth_port + 1.
+  --enable-snmp                  
+     Enable SNMP support.
 
-*** --enable-pam
-    	Enable PAM support.
+  --enable-notify	         
+     Enable TTL notification. This can be used to set the per-user session
+  timeouts depending on their accounts.
+
+  --enable-livingston-menus	 
+     Enable support for Livingston-compatible menus.
+
+  --enable-deny-shell=SHELL
+     Always reject users with given shell.
+
+  --enable-attrib-nmc	         
+     Enable vendor-specific attributes (ATTRIB_NMC) keyword in dictionaries.
+
+  --enable-osfc2	          
+     Enable OSFC2 support.
+
+     The following is designed for future use. Currently the norwegian locale
+  (bokmal) is being finished.
+
+  --enable-nls		         
+     Enable national language support. 
+
+  --with-languages=LIST          
+     Set a list of languages to include in NLS.
+
+  --with-catobjext=EXT          
+     Override default .po extension.
+
+  --with-instobjext=EXT          
+     Override default .mo extension.
+
+  --with-msgfmt=PROG             
+     Use PROG instead of msgfmt.
+
+  --with-gnu-msgfmt=PROG         
+     Use PROG instead of GNU msgfmt.
+
+2. make
+3. make install
+
+
+              II. Some configuration issues:
+           ------------------------------------		
+
+  Files raddb/users raddb/hints and raddb/huntgroups all follow the same
+syntax:
+
+input       : username check_pairs reply_pairs
+	    ;
+
+check_pairs : pairs
+            ;
+
+reply_pairs : pairs
+            ;
+
+pairs       : NULL
+            | pairlist
+            ;
+
+pairlist    : pair
+            | pairlist ',' pair
+            ;
+
+pair        : attribute op value
+            ;
+
+op          : '=' | '!=' | '<' | '>' | '<=' | '>='
+            ;
+
+value       : NUMBER
+            | IPADDR
+            | DATE
+            | QUOTE
+            ;
+
+username    : STRING
+            ;
+
+attribute   : STRING
+            ;
+
+  Terminal symbols are as follows:
+STRING   is a character string consisting of alphanumeric characters,
+         underscore, dash and a dot. Note that it is not required to
+         start with an alphabetic character.
+NUMBER   is any decimal number.
+IPADDR   is either a hostname or an IP address in dotted quad notation.
+         When a hostname is specified it must be enclosed in a pair of
+         double quotes, e.g. "host.dom.ain". An IP address may be specified
+         either as is, or in a pair of double quotes.
+DATE     date in a form:
+		"Mon DM YEAR"
+	 where
+		Mon  is a three-letter abbreviation of a month name
+		DM   is a two-digit day-of-month number
+		YEAR is a full year number. 
+QUOTE    is any character string enclosed in a pair of double-quotes.
+NULL     is a word NULL, meaning empty pairlist.
+
+  Special usernames DEFAULT and DEFAULT%d, where %d means any decimal number,
+are reserved. When authenticating a request, radius first tries to find
+the exact match on username and check_pairs. If such a match cannot be found
+it tries to find a DEFAULT entry matching the check_pairs. All DEFAULT
+entries are tried in the order of their appearance in the file.
+  When compairing pairlists, order of pairs is not significant. Special
+attributes (the ones with number > 254) appearing in a pairlist are ignored.
+
+              III. Special hacks for some peculiar NASes		
+           ------------------------------------------------
+
+GNU Radius includes packet rewriting support which makes it possible
+to cope with some NASes which do not follow the protocol. The support
+for following NASes is already included:
+
+	1. MAX Ascend which sends packed NAS-Port-Id attributes
+	2. Specialix Jetstream with peculiarities in handling
+           usernames longer than 10 characters.
+	3. Cisco AS5300	used for VoIP.
+
+Support for another NASes can easily be added without recompiling Radius. 
+See accompanying documentation (Ref. "rewrite").
+
+		IV. Bug reporting.		
+           ------------------------------------------------
+
+Bug reports are velcome. Should you find any bugs please report them 
+to bug-gnu-radius@gnu.org. 
+
 	
-*** --enable-dbm[={dbm|ndbm}]
-	Enable dbm support. If no argument is specified, usual DBM is
-	assumed. The `ndbm' argument instructs to enable support of NDBM.
-		
-*** --with-mysql
-	Enable MySQL support. Usually this requires setting
-	appropriate values for LDFLAGS and CPPFLAGS variables.
-    
-*** --with-postgres
-	Enable PostgreSQL support. Usually this requires setting
-	appropriate values for LDFLAGS and CPPFLAGS variables.
-
-*** --with-odbc[={odbc|iodbc}]
-        Configure to work with ODBC. This is an experimental feature, it
-        has not been tested thoroughly.
-    
-*** --without-guile
-	Do not compile Guile support.
-
-*** --without-server-guile
-	Do not compile server Guile support
-
-*** --enable-client
-	Build client programs. Requires presence of Guile >=1.6 and
-	PAM on your system.
-
-*** --disable-server
-        Do not build radius server. This implies --enable-client.
-	
-*** --with-readline
-	Enable GNU readline support for radiusd test shell mode.
-
-*** --without-readline
-	Disable GNU readline support
-
-*** --with-php=PHP-PREFIX
-        Compile mod_radius php module. PHP-PREFIX is the path where
-	php is installed. The module requires php 4.3.x
-		
-*** --enable-snmp[=compat]
-	Enable SNMP support. By default this enables the use of enterprise
-        subtree .iso.org.dod.internet.private.enterprises.gnu.radius
-        (.1.3.6.1.4.1.11591.1). To enable support for the subtree used
-        in previous versions of radius (i.e.
-        .iso.org.dod.internet.private.enterprises.gnu-radius =
-        .1.3.6.1.4.1.9163) use --enable-snmp=compat form of this
-        option.
-        
-*** --enable-livingston-menus
-        Enable support for Livingston-compatible menus.
-
-*** --enable-deny-shell=SHELL
-	Always reject users with the given shell.
-
-*** --with-pamdir=DIR
-	Install PAM modules in the given DIR. Default is
-    	$prefix/lib/security.
-
-*** --with-log-dir=DIRNAME
-	Specifies the full pathname to the default logging directory.
-	By default it is either /var/log or /usr/adm, whichever is
-	applicable to your operationg system and directory layout.
-	
-*** --with-pid-dir=DIRNAME
-	Specifies the full pathname to the directory where radiusd
-	will store its pid-file (radiusd.pid). Default is either
-	"/var/run", or, if this directory does not exist,
-	"$sysconfdir/raddb".
-
-** Run make.
-
-The GNU make is preferred.
-
-** Check it.
-
-You can check the functionality of the package without installing
-it. To do so, run
-
-        make check
-
-(You have to have DejaGNU installed on your system).
-
-** Run `make install'
-
-* Creating SQL database.
-
-If you have configured Radius with SQL support, you may wish
-to create the authentication and accounting database. Notice,
-that if you already have a running database, you may continue
-using it with GNU Radius. You will only have to modify file
-raddb/sqlserver to match your database structure.
-
-To create a fresh Radius database, follow the procedure below:
-
-** Change to the subdirectory db/
-** Edit file config.m4. Most of its contents is commented out, so
-uncomment anything that may be needed. Variables are:
-    
-    server   - SQL server name or IP address
-    port     - port to connect to
-
-	User credentials for creator of the database:
-    
-    CREATOR  - SQL username. This user must have create privileges.
-    CREATOR_PASSWORD - SQL password.
-
-	User credentials for the owner of the database:
-    
-    DB_USER  - SQL username.
-    DB_PWD   - SQL password.
-    (These must coincide with the values in raddb/sqlserver file)
-    
-** Depending on the type of SQL server you are using, run either
-`make mysql' or `make pgsql'.
-
-To get the database structure without creating it, run
-`make mysql.struct' or `make pgsql.struct'.
-    
-* Upgrading from earlier versions of GNU Radius
-
-Please, read file NEWS. It contains important information
-about upgrading from earlier versions, as well as an
-exhaustive list of all the new features.
-               
-* Configuring
-
-Be sure to read the accompanying documentation. The online documentation
-is available at http://www.gnu.org/software/radius/manual.
-If you need help, subscribe to <help-gnu-radius@gnu.org> and send your
-questions there. To subscribe, visit
-
-    http://mail.gnu.org/mailman/listinfo/help-gnu-radius
-
-Before asking a question, it will be a good idea to look through
-the mailing archives on the same page, as they might already
-contain the answer.
-        
-* Testing.		
-
-The commands described below use the configuration file
-raddb/client.conf. See the documentation for the detailed description
-of this file. The default raddb/client.conf installed from the distribution
-should suffice to test the server in default configuration.
-
-** Using radauth
-    
-Use radauth to send various radius requests to the running
-server. The invocation syntax is:
-
-            radauth [OPTIONS] [COMMAND] username [pass]
-
-OPTIONS are:
-    -v          Print verbose descriptions of what is being done
-    -n IP	Set NAS IP address
-    -s SID      Set session ID
-    -P PORT     Set NAS port number
-COMMAND is one of:
-    auth        Send only Access-Request (default)
-    acct        Send Access-Request. If successfull, send
-                accounting start request
-    start       Send accounting start request
-    stop 	Send accounting stop request
-
-So, to test authentication, run:
-
-  radauth LOGIN PASSWD 
-
-You may omit PASSWD if you wish to prevent the password from being
-compromised. In this case, radauth will disable echoing on the screen,
-prompt you for the password, and turn the echoing on again.
-
-To test accounting, use
-
-  radauth -s SID -P PORT start LOGIN
-or
-  radauth -s SID -P PORT stop LOGIN  
-
-Options may be omitted. Radauth will prompt you for the value of
-any missing option, e.g.:
-
-$ radauth start gray
-Enter session ID: a001
-Enter NAS port ID: 1
-
-To fully simulate actions of a NAS when initiating user session, use
-acct command:
-
-  radauth -s SID -P PORT acct LOGIN PASSWD  
-
-Again, you may omit options as well as PASSWD.
-
-** Using radsession
-    
-If you have guile version 1.6.4 or better installed, you can use
-radsession script to send authentication/accounting requests
-to the server. 
-
-*** Authentication test
-
-  radsession -l LOGIN -p PASSWD -P PORT-ID --auth
-
-*** Accounting test
-
-To test accounting do:
-
-  radsession -l LOGIN -p PASSWD -P PORT-ID -s SESSION-ID --start
-or
-  radsession -l LOGIN -P PORT-ID -s SESSION-ID --stop
-
-Where:
-	LOGIN		is the user's login name
-	PASSWD		is his password. Use `.' (dot) to get prompted
-			for the password as passwd(1) does.
-	PORT-ID		is the port number
-	SESSION-ID	is a session ID (a string uniquely identifying
-			the session). It can be an arbitrary string
-			when used with --start option. It should be
-			a session ID of a previously started session
-			when used with --stop option.
-
-** Examples using radauth and radsession
-
-The examples below assume that you have your radius server up and
-running, your user database contains a record for user `hamlet' with
-password `guessme'. The examples show two alternative variants of testing
-commands: using radauth command and using radsession. 
-
-To authenticate `hamlet' and start a radius session, invoke:
-
-     radauth -P 1 -s 0001 acct hamlet guessme
-or
-     radsession -l hamlet -p guessme -P 1 -s 0001 --start
-
-Now, if you run radwho, you will get something like:
-
-     Login             Name What  TTY     When     From        Location
-hamlet           hamlet      PPP  S001  Mon 07:22 localhost    255.255.255.254
-
-whereas radlast will show the following;
-
-hamlet      local    001 127.0.0.2       Thu Mon 07 07:22 - still logged in
-
-radwtmp begins Fri Dec 01 16:36:59 2000
-
-Then, suppose you run:
-
-        radauth -P 1 -s 0001 stop hamlet
-or	
-	radsession -l hamlet -P 1 -s 0001 --stop
-
-This will send a stop record for session 0001. Radlast will then show
-something like:
-
-hamlet      local    001 127.0.0.2       Thu Mon 07 07:22 - 07:25  (00:03) 
-
-radwtmp begins Fri Dec 01 16:36:59 2000
-
-** Using radtest
-
-Radtest is a radius client shell providing simple yet powerful
-scripting language and allowing to send arbitrary radius requests
-and analize server replies. It allows you to write sophisticated
-procedures for interacting with the remote servers. It is not
-designed for newbies, so use it if you wish to test some non-standard
-configurations.
-
-See accompanying documentation (chapter "Radtest") for the detailed
-description of the tool.
-
-* Bug reporting.		
-
-Send bug reports to <bug-gnu-radius@gnu.org>. 
-
-
-* Copyright information:
-
-Copyright (C) 2002,2003,2004,2008 Free Software Foundation, Inc.
-
-   Permission is granted to anyone to make or distribute verbatim copies
-   of this document as received, in any medium, provided that the
-   copyright notice and this permission notice are preserved,
-   thus giving the recipient permission to redistribute in turn.
-
-   Permission is granted to distribute modified versions
-   of this document, or of portions of it,
-   under the above conditions, provided also that they
-   carry prominent notices stating who last changed them.
-
-
-Local Variables:
-mode: outline
-paragraph-separate: "[ 	]*$"
-version-control: never
-End:

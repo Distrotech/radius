@@ -1,126 +1,125 @@
-/* This file is part of GNU Radius
-   Copyright (C) 2000,2001,2002,2003,2004,2005,
-   2007 Free Software Foundation, Inc.
-
-   Written by Sergey Poznyakoff
-
-   GNU Radius is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 3 of the License, or
-   (at your option) any later version.
-   
-   GNU Radius is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-  
-   You should have received a copy of the GNU General Public License
-   along with GNU Radius; if not, write to the Free Software Foundation,
-   Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA. */
-
+/* This file is part of GNU RADIUS.
+ * Copyright (C) 2000, Sergey Poznyakoff
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+ *
+ */
 /* $Id$ */
 
 #ifdef HAVE_CONFIG_H
 # include <config.h>
 #endif
 
-#include <sys/types.h>
-#include <stdio.h>
-#include <radiusd.h>
-#include <radius/radargp.h>
+#include        <sys/types.h>
+#include	<stdio.h>
+#include	<radiusd.h>
 
 static char *sys_def[] = {
+	/* here are all the system definitions compilation uses */
 #if defined(__alpha)
-        "__alpha",
+	"__alpha",
 #endif
 #if defined(__osf__)
-        "__osf__",
+	"__osf__",
 #endif
 #if defined(aix)
-        "aix",
+	"aix",
 #endif
 #if defined(bsdi)
-        "bsdi",
+	"bsdi",
 #endif
 #if defined(__FreeBSD__)
-        "FreeBSD",
+	"FreeBSD"
 #endif
 #if defined(__NetBSD__)
-        "NetBSD",
-#endif
-#if defined(__OpenBSD__)
-        "OpenBSD",
+	"NetBSD"
 #endif
 #if defined(sun)
-        "sun",
+	"sun",
 #endif
 #if defined(sys5)
-        "sys5",
+	"sys5",
 #endif
 #if defined(unixware)
-        "unixware",
+	"unixware",
 #endif
 #if defined(__linux__)
-        "linux",
+	"linux",
 #endif
-        NULL
+#if defined(M_UNIX)
+	"M_UNIX",
+#endif
 };
 
 static char *debug_flag_str[] = {
 #if defined(MAINTAINER_MODE)
-        "MAINTAINER_MODE",
+	"MAINTAINER_MODE",
 #endif
-        NULL
+#if defined(YACC_DEBUG)
+	"YACC_DEBUG",
+#endif
 };
 
 static char *compile_flag_str[] = {
 #if defined(PWD_SHADOW)
-# if PWD_SHADOW == SHADOW	
-        "PWD_SHADOW=SHADOW",
-# else
-	"PWD_SHADOW=OSFC2",
-# endif	
-#endif
-#if defined(USE_SERVER_GUILE)
-        "USE_SERVER_GUILE",
+	"PWD_SHADOW",
 #endif
 #if defined(USE_PAM)
-        "USE_PAM",
+	"USE_PAM",
 #endif
-#if defined(USE_DBM)
-# if USE_DBM == DBM_DBM 
-        "USE_DBM=DBM",
-# elif USE_DBM == DBM_NDBM
-        "USE_DBM=NDBM",
-# endif
-#endif /* USE_DBM */
-#ifdef USE_SQL_MYSQL
-        "USE_SQL_MYSQL",
-#endif      
-#ifdef USE_SQL_POSTGRES
-        "USE_SQL_POSTGRES",
-#endif  
-#ifdef USE_SQL_ODBC
-        "USE_SQL_ODBC",
-#endif  
+#if defined(DBM)
+	"DBM",
+#endif
+#if defined(NDBM)
+	"NDBM",
+#endif
+#if defined(USE_SQL)	
+# if defined(USE_SQL_MYSQL)
+	"USE_SQL_MYSQL",
+# endif	
+#endif /* defined(USE_SQL) */
 #if defined(USE_SNMP)
-# if defined(SNMP_COMPAT_0_96)
-        "USE_SNMP=COMPAT_0_96",
-# else  
-        "USE_SNMP",
-# endif 
+	"USE_SNMP",
+#endif
+#if defined(USE_NOTIFY)
+	"USE_NOTIFY",
 #endif
 #if defined(USE_LIVINGSTON_MENUS)
-        "USE_LIVINGSTON_MENUS",
+	"USE_LIVINGSTON_MENUS",
 #endif
 #if defined(DENY_SHELL)
-        "DENY_SHELL",
+	"DENY_SHELL",
 #endif
-#if defined(USE_LOADABLE_MODULES)
-	"USE_LOADABLE_MODULES",
+#if defined(ATTRIB_NMC)
+	"ATTRIB_NMC",
 #endif
-        NULL
+#if defined(OSFC2)
+	"OSFC2",
+#endif
+#if defined(NT_DOMAIN_HACK)
+	"NT_DOMAIN_HACK",
+#endif
+#if defined(SPECIALIX_JETSTREAM_HACK)
+	"SPECIALIX_JETSTREAM_HACK",
+#endif
+#if defined(ASCEND_PORT_HACK)
+	"ASCEND_PORT_HACK",
+#endif
 };
+
+#define NITEMS(a) sizeof(a)/sizeof((a)[0])
 
 char *server_id;
 
@@ -135,65 +134,81 @@ char *server_id;
 char *
 make_server_ident()
 {
-        if (server_id)
-                return grad_estrdup(server_id);
-        else {
-                const char *msg = _("GNU RADIUS server version ");
-                int len = strlen(msg) + sizeof(VERSION);
-                char *p = grad_emalloc(len);
-                sprintf(p, "%s%s", msg, VERSION);
-                return p;
-        }
+	if (server_id)
+		return estrdup(server_id);
+	else {
+		char *msg = _("GNU RADIUS server version ");
+		int len = strlen(msg) + sizeof(VERSION);
+		char *p = emalloc(len);
+		sprintf(p, "%s%s", msg, VERSION);
+		return p;
+	}
 }
 
 /*
- * Display the version number and built-in defaults.
+ *	Display the revision number for this program
  */
 void
-version(FILE *stream, struct argp_state *state)
-{
-        int i;
-        
-        fprintf(stream, _("%s: GNU Radius version %s"), 
-                program_invocation_short_name, VERSION);
-#ifdef BUILD_TARGET
-        fprintf(stream, " (%s)", BUILD_TARGET);
-#endif
-        fprintf(stream, "\n");
-
-        fprintf(stream, _("Compilation platform: "));
-        for (i = 0; sys_def[i]; i++)
-                fprintf(stream, "%s ", sys_def[i]);
- 
-        fprintf(stream, _("\nDebugging flags: "));
-        for (i = 0; debug_flag_str[i]; i++) {
-                fprintf(stream, "%s ", debug_flag_str[i]);
-        }
-
-        fprintf(stream, _("\nCompilation flags: "));
-        for (i = 0; compile_flag_str[i]; i++) {
-                fprintf(stream, "%s ", compile_flag_str[i]);
-        }
-        fprintf(stream, "\n");
-	fprintf(stream, _("Compilation defaults:\n"));
-        fprintf(stream, _("Ports in use:\n"));
-        fprintf(stream, " AUTH: %d\n", DEF_AUTH_PORT);
-        fprintf(stream, " ACCT: %d\n", DEF_ACCT_PORT);
-        fprintf(stream, _("Paths:\n"));
-        fprintf(stream, _(" configuration directory: %s\n"), RADIUS_DIR);
-        fprintf(stream, _(" logging directory:       %s\n"), RADLOG_DIR);
-        fprintf(stream, _(" accounting directory:    %s\n"), RADACCT_DIR);
-        fprintf(stream, _(" pidfile directory:       %s\n"), RADPID_DIR);
-        fprintf(stream, _("\nReport bugs to <%s>\n"), grad_bug_report_address);
-        exit(0);
-}
-
-void
-show_compilation_defaults()
+version()
 {
 	int i;
 	
-        for (i = 0; compile_flag_str[i]; i++) 
-                printf("%s\n", compile_flag_str[i]);
+	fprintf(stderr, _("%s: GNU Radius version %s"), progname, VERSION);
+#ifdef BUILD_TARGET
+	fprintf(stderr, " (%s)", BUILD_TARGET);
+#endif
+	fprintf(stderr, "\n");
+
+	fprintf(stderr, _("Compilation platform: "));
+	for (i = 0; i < NITEMS(sys_def); i++)
+		fprintf(stderr, "%s ", sys_def[i]);
+
+	fprintf(stderr, _("\nDebugging flags: "));
+	for (i = 0; i < NITEMS(debug_flag_str); i++) {
+		fprintf(stderr, "%s ", debug_flag_str[i]);
+	}
+
+	fprintf(stderr, _("\nCompilation flags: "));
+	for (i = 0; i < NITEMS(compile_flag_str); i++) {
+		fprintf(stderr, "%s ", compile_flag_str[i]);
+	}
+	fprintf(stderr, "\n");
+#if defined(USE_MYSQL)
+	fprintf(stderr, "using mysql port %d\n", RAD_MYSQL_PORT);
+#endif
+#if defined(DENY_SHELL)
+	fprintf(stderr, _("deny shell is %s\n"), DENY_SHELL);
+#endif
+	fprintf(stderr, _("logfiles stored in %s\n"), RADLOG_DIR);
+
+#ifdef RADIUS_PID
+	fprintf(stderr, _("pidfile %s\n"), RADIUS_PID);
+#else
+	fprintf(stderr, _("no pidfile\n"));
+#endif
+
+	exit(0);
 }
 
+char license_text[] =
+"   This program is free software; you can redistribute it and/or modify\n"
+"   it under the terms of the GNU General Public License as published by\n"
+"   the Free Software Foundation; either version 2, or (at your option)\n"
+"   any later version.\n"
+"\n"
+"   This program is distributed in the hope that it will be useful,\n"
+"   but WITHOUT ANY WARRANTY; without even the implied warranty of\n"
+"   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the\n"
+"   GNU General Public License for more details.\n"
+"\n"
+"   You should have received a copy of the GNU General Public License\n"
+"   along with this program; if not, write to the Free Software\n"
+"   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.\n";
+
+void
+license()
+{
+	printf("%s: Copyright 1999,2000 Sergey Poznyakoff\n", progname);
+	printf("\nThis program is part of GNU Radius\n");
+	printf("%s", license_text);
+}

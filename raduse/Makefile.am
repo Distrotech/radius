@@ -1,16 +1,11 @@
-# This file is part of GNU Radius.
-# Copyright (C) 2000,2001,2003 Sergey Poznyakoff
-#
-# This file is free software; as a special exception the author gives
-# unlimited permission to copy and/or distribute it, with or without
-# modifications, as long as this notice is preserved.
-#
-# GNU Radius is distributed in the hope that it will be useful, but
-# WITHOUT ANY WARRANTY, to the extent permitted by law; without even the
-# implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+# $Id$
+if MAINTAINER_MODE
+CFLAGS=-ggdb -DMAINTAINER_MODE=1
+MAINTAINERCLEANFILES=core *~ err out
+endif
+EXTRA_DIST=screen.h
 
 bin_PROGRAMS    = raduse
-raduse_SOURCES = raduse.c session.c stat.c raduse.h
-raduse_LDADD   = ../snmplib/libradsnmp.a ../lib/liblog.la ../lib/librad.la ../lib/libdebug.la @LIBINTL@
-INCLUDES       = @RADIUS_INCLUDE_PATH@
-
+raduse_SOURCES = raduse.c screen.c display.c 
+raduse_LDADD   = -lcurses -ltermcap -L ../radlib -lrad -llog -ldebug
+INCLUDES        = -I$(top_srcdir) -I$(top_srcdir)/include -I$(srcdir) @INCLUDEPATH@

@@ -1,65 +1,52 @@
-# This file is part of GNU Radius.
-# Copyright (C) 2000,2001,2003,2004,2007 Free Software Foundation, Inc.
-#
-# Written by Sergey Poznyakoff
-#
-# This file is free software; as a special exception the author gives
-# unlimited permission to copy and/or distribute it, with or without
-# modifications, as long as this notice is preserved.
-#
-# GNU Radius is distributed in the hope that it will be useful, but
-# WITHOUT ANY WARRANTY, to the extent permitted by law; without even the
-# implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+# $Id$
 
-sbin_PROGRAMS = @RADIUS_DAEMON@
-EXTRA_PROGRAMS  = radiusd
-radiusd_SOURCES = \
- acct.c\
- auth.c\
- builddbm.c\
- checkrad.c\
- config.c\
- dynload.c\
- exec.c\
- files.c\
- forward.c\
- input.c\
- log.c\
- menu.c\
- mlc.c\
- pam.c\
- proxy.c\
- radck.c\
- radius.c\
- radiusd.c\
- radutil.c\
- request.c\
- rewrite.c\
- rpp.c\
- scheme.c\
- snmpserv.c\
- sql.c\
- stat.c\
- timestr.c\
- tsh.c\
- version.c
+CFLAGS=$(MCFLAGS) -DCHECKRAD=\"${sbindir}/checkrad\"
 
-radiusd_LDADD = @LEXLIB@ @SQLLIB@ ../snmplib/libradsnmp.a @RADIUSD_LDADD_LIST@ @LIBGNURADIUS@ @LIBRADEXTRA@ @READLINE_LIBS@ @LIBINTL@
+sbin_PROGRAMS   = radiusd
+radiusd_SOURCES = radiusd.c acct.c auth.c exec.c files.c menu.c sql.c\
+                  notify.c config.c oldconfig.c pam.c proxy.c radius.c\
+                  symtab.c timestr.c version.c log.c ippool.c stat.c\
+                  snmpserv.c shmem.c radutil.c mysql.c radctl.c\
+                  rewrite.c debugmod.c
+radiusd_LDADD   = @LEXLIB@ -L ../radlib -lrad -llog @RADIUSD_LDADD@
 BUILT_SOURCES   = config.c rewrite.c
-MAINTAINERCLEANFILES=config.c rewrite.c y.output
-INCLUDES = @RADIUS_INCLUDE_PATH@ @GUILE_INCLUDES@
-AM_CPPFLAGS=@PATHFLAGS@ -DRADIUS_DATADIR=\"$(pkgdatadir)/$(VERSION)\" -DRADIUS_LIBDIR=\"$(pkglibdir)/$(VERSION)\"
-EXTRA_DIST      = config.y rewrite.y .gdbinit
-YLWRAP = $(SHELL) $(top_srcdir)/scripts/gylwrap
+DISTCLEANFILES  = config.c y.output
+INCLUDES        = -I$(top_srcdir) -I$(top_srcdir)/include -I$(top_srcdir)/include/snmp @INCLUDEPATH@
+EXTRA_DIST      = config.y rewrite.y
 
 config.c: $(srcdir)/config.y
-	$(YLWRAP) "$(YACC)" $(srcdir)/config.y \
-                  y.tab.c config.c y.output config.y.output \
-                  -- -yy cc -vdt 
+	$(YACC) -v @YACC_OPTS@ $(srcdir)/config.y
+	sed -e 's/y\.tab\.\([ch]\)/config\.\1/g;s/yy/conf_yy/g' y.tab.c > config.c
 
-config.o: config.c ../include/radiusd.h 
+config.o: config.c ../include/radiusd.h ../include/ippool.h
 
 rewrite.c: $(srcdir)/rewrite.y
-	$(YLWRAP) "$(YACC)" $(srcdir)/rewrite.y \
-		  y.tab.c rewrite.c y.output rewrite.y.output -- -yy rw_yy -vt
+	$(YACC) -v @YACC_OPTS@ $(srcdir)/rewrite.y
+	sed -e 's/y\.tab\.\([ch]\)/rewrite\.\1/g;s/yy/rw_yy/g' y.tab.c > rewrite.c
+
+SUFFIXES=.S .c .ln .o .s
+
+# Maintainer-specific code
+if MAINTAINER_MODE
+
+MCFLAGS=-ggdb -DMAINTAINER_MODE=1
+MAINTAINERCLEANFILES=core *~ err out 
+CLEANFILES=*.ln
+LINTFLAGS=-gezr -DHAVE_CONFIG_H=1 -DMAINTAINER_MODE=1 -DCHECKRAD=\"${sbindir}/checkrad\" $(INCLUDES)
+radiusd_LNS=$(radiusd_SOURCES:.c=.ln)
+
+.c.ln:
+	$(LINT.c) -i $<
+
+lint:  $(radiusd_LNS)
+	$(LINT.c) -u $(radiusd_LNS)
+
+SRCS=radiusd.c acct.c auth.c exec.c files.c menu.c sql.c\
+         notify.c config.y oldconfig.c pam.c proxy.c radius.c\
+         symtab.c timestr.c version.c log.c ippool.c stat.c\
+         snmpserv.c shmem.c radutil.c mysql.c radctl.c rewrite.y
+
+FILELIST:; @echo $(SRCS) > .list
+
+endif
 

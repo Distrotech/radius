@@ -1,22 +1,33 @@
-/* This file is part of GNU Radius
-   Copyright (C) 2000,2001,2002,2003,2004,
-   2006,2007 Free Software Foundation, Inc.
-
-   Written by Sergey Poznyakoff
- 
-   GNU Radius is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 3 of the License, or
-   (at your option) any later version.
- 
-   GNU Radius is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
- 
-   You should have received a copy of the GNU General Public License
-   along with GNU Radius; if not, write to the Free Software Foundation,
-   Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA. */
+/* This file is part of GNU RADIUS.
+ * Copyright (C) 2000, Sergey Poznyakoff
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+ *
+ */
+/*
+ * auth.c	User authentication.
+ *
+ *
+ * Version:	@(#)auth.c  1.83  21-Mar-1999  miquels@cistron.nl
+ *              @(#) $Id$ 
+ */
+#define RADIUS_MODULE 4
+#ifndef lint
+static char rcsid[] =
+"@(#) $Id$";
+#endif
 
 #ifdef HAVE_CONFIG_H
 # include <config.h>
@@ -27,7 +38,6 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <ctype.h>
 #include <pwd.h>
 #include <time.h>
 #include <unistd.h>
@@ -35,1268 +45,1027 @@
 #include <errno.h>
 #include <sys/wait.h>
 
+#if defined(PWD_SHADOW)
+#include <shadow.h>
+#endif /* PWD_SHADOW */
+
 #if defined(HAVE_CRYPT_H)
 # include <crypt.h>
 #endif
 
-#if defined(PWD_SHADOW)
-# if PWD_SHADOW == SHADOW
-#  include <shadow.h>
-#  define STRUCT_SHADOW_PASSWD struct spwd
-#  define SHADOW_PASSWD_ENCRYPTED(s) ((s)->sp_pwdp)
-#  define GETSPNAM getspnam
-#  if defined(HAVE_STRUCT_SPWD_SP_EXPIRE)
-#   define SHADOW_PASSWD_EXPIRE(s) ((s)->sp_expire)
-#  endif
-# else /*OSFC2*/
-#  include <sys/security.h>
-#  include <prot.h>
-#  define STRUCT_SHADOW_PASSWD struct pr_passwd
-#  define SHADOW_PASSWD_ENCRYPTED(s) ((s)->ufld.fd_encrypt)
-#  define GETSPNAM getprpwnam
-#  ifdef HAVE_STRUCT_PR_PASSWD_UFLG_FG_LOCK
-#   define SHADOW_PASSWD_LOCK(s) ((s)->->uflg.fg_lock)
-#  endif
-# endif				    
-#else
-# define STRUCT_SHADOW_PASSWD struct passwd
-# define GETSPNAM(n) NULL
-# define SHADOW_PASSWD_ENCRYPTED(s) NULL
+#ifdef OSFC2
+# include <sys/security.h>
+# include <prot.h>
 #endif
 
 #include <radiusd.h>
-#include <timestr.h>
-#include <rewrite.h>
-
-char *username_valid_chars;
-
-/* Check if the username is valid. Valid usernames consist of 
-   alphanumeric characters and symbols from username_valid_chars[]
-   array */
-int
-check_user_name(char *p)
-{
-        for (; *p && (isalnum(*p) || strchr(username_valid_chars, *p)); p++)
-                ;
-        return *p;
-}
-
-LOCK_DECLARE(lock)
-
-#ifdef EMBEDDED_EXPIRATION_INFO	
-static char base64[] =         /* 0 ... 63 => ascii - 64 */
-        "./0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
-
-static int
-from_base64(u_char *data, int len, unsigned int *value)
-{
-	int i;
-
-	*value = 0;
-	for (i = len-1; i >= 0; i--) {
-		char *p = strchr(base64, data[i]);
-		if (!p)
-			return 1;
-		*value <<= 6;
-		*value += p - base64;
-	}
-	return 0;
-}
-	
-static int
-decode_aging_info(char *p, u_int *maxweeks, u_int *minweeks, u_int *lastchange)
-{
-	if (from_base64(p, 1, maxweeks))
-		return 1;
-	p++;
-	if (from_base64(p, 1, minweeks))
-		return 1;
-	p++;
-	if (from_base64(p, 2, lastchange))
-		return 1;
-	if (p[2])
-		return 1;
-	return 0;
-}
-#endif	
-	
-static enum auth_status
-unix_expiration(char *name, time_t *exp)
-{
-	enum auth_status status = auth_ok;
-#ifdef SHADOW_PASSWD_EXPIRE
-	STRUCT_SHADOW_PASSWD *spwd = GETSPNAM(name);
-
-	if (spwd && SHADOW_PASSWD_EXPIRE(spwd) > 0) {
-		time_t t = time(NULL);
-		if (t > SHADOW_PASSWD_EXPIRE(spwd) * SECONDS_PER_DAY)
-			status = auth_account_expired;
-		else {
-			*exp = SHADOW_PASSWD_EXPIRE(spwd) * SECONDS_PER_DAY - t;
-			status = auth_valid;
-		}
-	}
-#elif defined(HAVE_STRUCT_PASSWD_PW_EXPIRE)
-	struct passwd *pwd;
-	struct timeval tv;
-	time_t t = 0;
-	
-	if (pwd = getpwnam(name)) {
-		gettimeofday(&tv, NULL);
-		if (pwd->pw_expire) {
-			if (tv.tv_sec >= pwd->pw_expire)
-				status = auth_account_expired;
-			else {
-				t = pwd->pw_change - tv.tv_sec;
-				status = auth_valid;
-			}
-		}
-# if defined(HAVE_STRUCT_PASSWD_PW_CHANGE)
-		if (pwd->pw_change) {
-			if (tv.tv_sec >= pwd->pw_change)
-				status = auth_password_expired;
-			else if (status == auth_ok
-				 || pwd->pw_change - tv.tv_sec < t) {
-				t = pwd->pw_change - tv.tv_sec;
-				status = auth_valid;
-			}
-		}
-		*exp = t;
-# endif
-	}
+#if defined(USE_SQL)
+# include <radsql.h>
 #endif
-#ifdef EMBEDDED_EXPIRATION_INFO
-	if (status == auth_ok) {
-		struct passwd *pwd;
-		char *p;
-#define SECS_IN_WEEK 604800
-	
-		if (pwd = getpwnam(name)) {
-			p = strchr(pwd->pw_passwd, ',');
-			if (p) {
-				u_int maxweeks, minweeks, lastchange;
-			
-				if (decode_aging_info(p+1,
-						      &maxweeks,
-						      &minweeks,
-						      &lastchange) == 0) {
-					time_t now = time(NULL);
-					time_t nweeks = now / SECS_IN_WEEK
-						        - lastchange;
-					
-					if (maxweeks == minweeks)
-						return auth_password_expired;
-				
-					if (nweeks >= minweeks
-					    && nweeks >= maxweeks)
-						return auth_password_expired;
 
-					*exp = (maxweeks - nweeks)
-						* SECS_IN_WEEK
-						+ now % SECS_IN_WEEK;
-					status = auth_valid;
-				} else { /* Invalid password data? */
-					grad_log(L_NOTICE,
-						 _("Invalid password aging information for user '%s'"), name);
-					status = auth_fail;
+#if !defined(__linux__) && !defined(__GLIBC__)
+  extern char *crypt();
+#endif
+
+static int pw_expired(UINT4 exptime);
+static int check_disable(char *username, char **user_msg);
+static int check_expiration(VALUE_PAIR *check_item,
+			    char *umsg, char **user_msg);
+static int unix_pass(char *name, char *passwd);
+
+/*
+ *	Tests to see if the users password has expired.
+ *
+ *	Return: Number of days before expiration if a warning is required
+ *		otherwise 0 for success and -1 for failure.
+ */
+static int
+pw_expired(exptime)
+	UINT4 exptime;
+{
+	struct timeval	tp;
+	struct timezone	tzp;
+	UINT4		exp_remain;
+	int		exp_remain_int;
+
+	gettimeofday(&tp, &tzp);
+	if (tp.tv_sec > exptime)
+		return -1;
+
+	if (warning_seconds != 0) {
+		if (tp.tv_sec > exptime - warning_seconds) {
+			exp_remain = exptime - tp.tv_sec;
+			exp_remain /= (UINT4)SECONDS_PER_DAY;
+			exp_remain_int = exp_remain;
+			return exp_remain_int;
+		}
+	}
+	return 0;
+}
+
+int
+check_disable(username, user_msg)
+	char *username;
+	char **user_msg;
+{
+	if (get_deny(username)) {
+		*user_msg = _("Sorry, your account is currently closed\r\n");
+		return -1;
+	}
+	return 0;
+}
+
+/*
+ *	Check if account has expired, and if user may login now.
+ */
+int
+check_expiration(check_item, umsg, user_msg)
+	VALUE_PAIR *check_item;
+	char *umsg;
+	char **user_msg;
+{
+	int result;
+	int retval;
+
+	result = 0;
+	while (result == 0 && check_item != (VALUE_PAIR *)NULL) {
+
+		/*
+		 *	Check expiration date if we are doing password aging.
+		 */
+		if (check_item->attribute == DA_EXPIRATION) {
+			/*
+			 *	Has this user's password expired
+			 */
+			retval = pw_expired(check_item->lvalue);
+			if (retval < 0) {
+				result = -1;
+				*user_msg = _("Password Has Expired\r\n");
+				break;
+			} else {
+				if (retval > 0) {
+					sprintf(umsg,
+					  _("Password Will Expire in %d Days\r\n"),
+					  retval);
+					*user_msg = umsg;
 				}
 			}
 		}
+		check_item = check_item->next;
 	}
-#endif
-	return status;
+	return result;
 }
-	
-static int
-unix_pass(char *name, char *passwd)
-{
-        int rc;
-        char *encpw;
-        int pwlen;
-        char *encrypted_pass = NULL;
-	STRUCT_SHADOW_PASSWD *spwd;
-
-	LOCK_SET(lock);
-	if (spwd = GETSPNAM(name))
-                encrypted_pass = SHADOW_PASSWD_ENCRYPTED(spwd);
-	else { /* Try to get encrypted password from password file */
-		struct passwd *pwd;
-
-		if (pwd = getpwnam(name)) 
-			encrypted_pass = pwd->pw_passwd;
-	}
-
-#ifdef SHADOW_PASSWD_LOCK
-	if (encrypted_pass) {
-		/* Check if the account is locked. */
-		if (SHADOW_PASSWD_LOCK(spwd) != 1) {
-			grad_log(L_NOTICE,
-			         "unix_pass: [%s]: %s",
-			         name, _("account locked"));
-			encrypted_pass = NULL;
-		}
-	}
-#endif 
-
-	if (encrypted_pass) {
-		if (encrypted_pass[0] == 0)
-			encrypted_pass = NULL;
-		else
-			encrypted_pass = grad_estrdup(encrypted_pass);
-	}
-	
-	LOCK_RELEASE(lock);
-
-        if (!encrypted_pass)
-                return -1;
-
-        /*
-         * Check encrypted password.
-         */
-        pwlen = strlen(encrypted_pass);
-        encpw = grad_emalloc(pwlen+1);
-#ifdef EMBEDDED_EXPIRATION_INFO
- {
-	/* Some systems append expiration data to the encrypted password */
-	char *p = strchr(encrypted_pass, ',');
-	if (p) 
-		pwlen = p - encrypted_pass;
- }
-#endif
-        rc = grad_md5crypt(passwd, encrypted_pass, encpw, pwlen+1) == NULL
-                || strlen (encpw) != pwlen
-		|| memcmp(encpw, encrypted_pass, pwlen);
-        grad_free(encpw);
-	grad_free(encrypted_pass);
-        if (rc)
-                return -1;
-
-        return 0;
-}
-
+/*
+ *	Check the users password against the standard UNIX
+ *	password table.
+ */
 int
-rad_auth_check_username(radiusd_request_t *radreq, int activefd)
+unix_pass(name, passwd)
+	char *name;
+	char *passwd;
 {
-        grad_avp_t *namepair = grad_avl_find(radreq->request->avlist,
-					     DA_USER_NAME);
+	struct passwd	*pwd;
+	char		*encpw;
+	char		*encrypted_pass;
+#if defined(PWD_SHADOW)
+#if defined(M_UNIX)
+	struct passwd	*spwd;
+#else
+	struct spwd	*spwd;
+#endif
+#endif /* PWD_SHADOW */
+#ifdef OSFC2
+	struct pr_passwd *pr_pw;
 
-	log_open(L_AUTH);
+	if ((pr_pw = getprpwnam(name)) == NULL)
+		return -1;
+	encrypted_pass = pr_pw->ufld.fd_encrypt;
+#else /* OSFC2 */
+	/*
+	 *	Get encrypted password from password file
+	 */
+	if ((pwd = getpwnam(name)) == NULL) {
+		return -1;
+	}
+	encrypted_pass = pwd->pw_passwd;
+#endif /* OSFC2 */
 
-        if (grad_avp_null_string_p(namepair)) 
-                grad_log_req(L_ERR, radreq->request, _("No username"));
-	else if (check_user_name(namepair->avp_strvalue)) 
-                grad_log_req(L_ERR, radreq->request, _("Malformed username"));
-	else
+#if defined(PWD_SHADOW)
+	/*
+	 *      See if there is a shadow password.
+	 */
+	if ((spwd = getspnam(name)) != NULL)
+#if defined(M_UNIX)
+		encrypted_pass = spwd->pw_passwd;
+#else
+		encrypted_pass = spwd->sp_pwdp;
+#endif	/* M_UNIX */
+#endif	/* PWD_SHADOW */
+#
+#ifdef DENY_SHELL
+	/*
+	 *	Undocumented temporary compatibility for iphil.NET
+	 *	Users with a certain shell are always denied access.
+	 */
+	if (strcmp(pwd->pw_shell, DENY_SHELL) == 0) {
+		radlog(L_AUTH, _("unix_pass: [%s]: invalid shell"), name);
+		return -1;
+	}
+#endif
+
+#if defined(PWD_SHADOW) && !defined(M_UNIX)
+	/*
+	 *      Check if password has expired.
+	 */
+	if (spwd && spwd->sp_expire > 0 &&
+	    (time(NULL) / 86400) > spwd->sp_expire) {
+		radlog(L_AUTH, _("unix_pass: [%s]: password has expired"), name);
+		return -1;
+	}
+#endif
+
+#ifdef OSFC2
+	/*
+	 *	Check if account is locked.
+	 */
+	if (pr_pw->uflg.fg_lock!=1) {
+		radlog(L_AUTH, _("unix_pass: [%s]: account locked"), name);
+		return -1;
+	}
+#endif /* OSFC2 */
+
+	/*
+	 *	We might have a passwordless account.
+	 */
+	if (encrypted_pass[0] == 0)
 		return 0;
 
-	/* Process a malformed request */
-	if (auth_reject_malformed_names) 
-		radius_send_reply(RT_ACCESS_REJECT, radreq,
-				  NULL,
-				  message_text[MSG_ACCESS_DENIED],
-				  activefd);
-	else
-		stat_inc(auth, radreq->request->ipaddr, num_bad_req);
-	return -1;
+	/*
+	 *	Check encrypted password.
+	 */
+	encpw = crypt(passwd, encrypted_pass);
+	if (strcmp(encpw, encrypted_pass))
+		return -1;
+
+	return 0;
 }
 
-/* Initial step of authentication. */
-int
-rad_auth_init(radiusd_request_t *radreq, int activefd)
-{
-	grad_locus_t loc;
-	
-	log_open(L_AUTH);
-                
-        if (auth_detail)
-                write_detail(radreq, REQ_AUTH_ZERO, R_AUTH);
 
-        /*
-         * See if the user has access to this huntgroup.
-         */
-        if (!huntgroup_access(radreq, &loc)) {
-                grad_log_req(L_NOTICE, radreq->request,
-			     _("Access denied by huntgroup %s:%d"),
-			     loc.file, loc.line);
-                radius_send_reply(RT_ACCESS_REJECT, radreq,
-                                  radreq->request->avlist, NULL, activefd);
-                return -1;
-        }
-
-        return 0;
-}
-
-/* ****************************************************************************
- * Authentication state machine.
+/*
+ *	Check password.
+ *
+ *	Returns:	0  OK
+ *			-1 Password fail
+ *			-2 Rejected
+ *			1  End check & return.
  */
-
-enum auth_state {
-        as_init,
-        as_validate,
-        as_disable, 
-        as_realmuse,
-        as_simuse, 
-        as_time, 
-        as_scheme,
-        as_ipaddr, 
-        as_exec_wait, 
-        as_cleanup_cbkid, 
-        as_menu_challenge,
-        as_ack, 
-        as_exec_nowait, 
-        as_stop, 
-        as_reject,
-	as_reject_cleanup,
-        AS_COUNT
-};
-
-enum list_id {
-        L_null,
-        L_req,
-        L_reply,
-        L_check
-};
-
-typedef struct auth_mach {
-        radiusd_request_t *req;
-        grad_avp_t *user_check;
-        grad_avp_t *user_reply;
-        int        activefd;
-        
-        grad_avp_t *namepair;
-        grad_avp_t *check_pair;
-        char       userpass[GRAD_STRING_LENGTH+1];
-
-        char       *user_msg;
-        struct obstack msg_stack;
-        
-        enum auth_state state;
-} AUTH_MACH;
-
-static void sfn_init(AUTH_MACH*);
-static void sfn_validate(AUTH_MACH*);
-static void sfn_scheme(AUTH_MACH*);
-static void sfn_disable(AUTH_MACH*);
-static void sfn_realmuse(AUTH_MACH*);
-static void sfn_simuse(AUTH_MACH*);
-static void sfn_time(AUTH_MACH*);
-static void sfn_ipaddr(AUTH_MACH*);
-static void sfn_exec_wait(AUTH_MACH*);
-static void sfn_cleanup_cbkid(AUTH_MACH*);
-static void sfn_menu_challenge(AUTH_MACH*);
-static void sfn_ack(AUTH_MACH*);
-static void sfn_exec_nowait(AUTH_MACH*);
-static void sfn_reject(AUTH_MACH*);
-static void sfn_reject_cleanup(AUTH_MACH *m);
-static int check_expiration(AUTH_MACH *m);
-
-
-struct auth_state_s {
-        enum auth_state this;
-        enum auth_state next;
-        int             attr;
-        enum list_id    list;
-        void            (*sfn)(AUTH_MACH*);
-};
-
-struct auth_state_s states[] = {
-        { as_init,         as_validate,
-                         0,               L_null,     sfn_init },
-
-	{ as_validate,     as_disable,
-                         0,               L_null,     sfn_validate },
-        
-        { as_disable,      as_realmuse,
-                         0,               L_null,     sfn_disable },
-        
-        { as_realmuse,     as_simuse,
-                         0,               L_null,     sfn_realmuse }, 
-        
-        { as_simuse,       as_time,
-                         DA_SIMULTANEOUS_USE, L_check, sfn_simuse },
-        
-        { as_time,         as_scheme,
-                         DA_LOGIN_TIME,   L_check, sfn_time },
-        
-        { as_scheme,       as_ipaddr,
-                         DA_SCHEME_PROCEDURE, L_reply, sfn_scheme },
-        
-        { as_ipaddr,       as_exec_wait,
-                         0,               L_null, sfn_ipaddr },
-        
-        { as_exec_wait,    as_cleanup_cbkid,
-                         DA_EXEC_PROGRAM_WAIT, L_reply, sfn_exec_wait },
-        
-        { as_cleanup_cbkid,as_menu_challenge,
-                         DA_CALLBACK_ID,  L_reply, sfn_cleanup_cbkid },
-        
-        { as_menu_challenge,         as_ack,
-                         DA_MENU,         L_reply, sfn_menu_challenge },
-        
-        { as_ack,          as_exec_nowait,
-                         0,               L_null, sfn_ack },
-        
-        { as_exec_nowait,  as_stop,
-                         DA_EXEC_PROGRAM, L_reply, sfn_exec_nowait },
-        
-        { as_stop,         as_stop,
-                         0,               L_null, NULL },
-        
-        { as_reject,       as_stop,
-                         0,               L_null, sfn_reject },
-	
-        { as_reject_cleanup, as_reject,
-                         0,               L_null, sfn_reject_cleanup },
-};
-
-static int is_log_mode(AUTH_MACH *m, int mask);
-static void auth_format_msg(AUTH_MACH *m, int msg_id);
-static char *auth_finish_msg(AUTH_MACH *m);
-
-static void
-auth_log(AUTH_MACH *m, const char *diag, const char *pass,
-	 const char *reason, const char *addstr)
-{
-        if (reason)
-                grad_log_req(L_NOTICE, m->req->request,
-			     "%s [%s%s%s]: %s%s",
-			     diag,
-			     m->namepair->avp_strvalue,
-			     pass ? "/" : "",
-			     pass ? pass : "",
-			     reason,
-			     addstr ? addstr : "");
-        else
-                grad_log_req(L_NOTICE, m->req->request,
-			     "%s [%s%s%s]",
-			     diag,
-			     m->namepair->avp_strvalue,
-			     pass ? "/" : "",
-			     pass ? pass : "");
-}
-
 int
-is_log_mode(AUTH_MACH *m, int mask)
+rad_check_password(authreq, activefd, check_item, namepair,
+		   pw_digest, user_msg, userpass)
+	AUTH_REQ   *authreq;
+	int        activefd;
+	VALUE_PAIR *check_item;
+	VALUE_PAIR *namepair;
+	char       *pw_digest;
+	char       **user_msg;
+	char       *userpass;
 {
-        int mode = log_mode;
-        int xmask = 0;
-#ifdef DA_LOG_MODE_MASK
-        grad_avp_t *p;
+	char		string[AUTH_STRING_LEN];
+	char		*ptr;
+	char		name[AUTH_STRING_LEN];
+	VALUE_PAIR	*auth_type_pair;
+	VALUE_PAIR	*password_pair;
+	VALUE_PAIR	*auth_item;
+	VALUE_PAIR	*tmp;
+	int		auth_type = -1;
+	int		i;
+	int		result;
 
-        for (p = grad_avl_find(m->user_check, DA_LOG_MODE_MASK);
-             p;
-             p = p->next ? grad_avl_find(p->next, DA_LOG_MODE_MASK) : NULL)
-                xmask |= p->avp_lvalue;
-        for (p = grad_avl_find(m->req->request->avlist, DA_LOG_MODE_MASK);
-             p;
-             p = p->next ? grad_avl_find(p->next, DA_LOG_MODE_MASK) : NULL)
-                xmask |= p->avp_lvalue;
+#ifdef USE_PAM
+        VALUE_PAIR      *pampair;
+	char *pamauth;
 #endif
-        return (mode & ~xmask) & mask;
-}
-
-void
-auth_format_msg(AUTH_MACH *m, int msg_id)
-{
-        int len = strlen(message_text[msg_id]);
-        obstack_grow(&m->msg_stack, message_text[msg_id], len);
-}
-
-char *
-auth_finish_msg(AUTH_MACH *m)
-{
-        if (m->user_msg)
-                obstack_grow(&m->msg_stack, m->user_msg, strlen(m->user_msg));
-        obstack_1grow(&m->msg_stack, 0);
-        return radius_xlate(&m->msg_stack, obstack_finish(&m->msg_stack),
-                            m->req->request, m->user_reply);
-}
-
-/* Check password. */
-static enum auth_status 
-rad_check_password(radiusd_request_t *radreq, AUTH_MACH *m, time_t *exp)
-{
-        char *ptr;
-        char *real_password = NULL;
-        char name[GRAD_STRING_LENGTH];
-        grad_avp_t *auth_item;
-        grad_avp_t *tmp;
-        int auth_type = -1;
-        int length;
-        enum auth_status result = auth_ok;
-        char *authdata = NULL;
-        char pw_digest[GRAD_AUTHENTICATOR_LENGTH];
-        int pwlen;
-        char *pwbuf;
-        char *challenge;
-	int challenge_len;
 	
-        m->userpass[0] = 0;
+	result = 0;
+	userpass[0] = 0;
+	string[0] = 0;
 
-        /* Process immediate authentication types */
-        if ((tmp = grad_avl_find(m->user_check, DA_AUTH_TYPE)) != NULL)
-                auth_type = tmp->avp_lvalue;
+	/*
+	 *	Look for matching check items. We skip the whole lot
+	 *	if the authentication type is DV_AUTH_TYPE_ACCEPT or
+	 *	DV_AUTH_TYPE_REJECT.
+	 */
+	if ((auth_type_pair = pairfind(check_item, DA_AUTH_TYPE)) != NULL)
+		auth_type = auth_type_pair->lvalue;
+
+	if (auth_type == DV_AUTH_TYPE_ACCEPT)
+		return 0;
+
+	if (auth_type == DV_AUTH_TYPE_REJECT) {
+		*user_msg = NULL;
+		return -2;
+	}
+
+#ifdef USE_PAM
+        if ((pampair = pairfind(check_item, DA_PAM_AUTH)) != NULL) {
+		pamauth = pampair->strvalue;
+        }
+#endif
+	
+	/*
+	 *	Find the password sent by the user. It SHOULD be there,
+	 *	if it's not authentication fails.
+	 *
+	 *	FIXME: add MS-CHAP support ?
+	 */
+	if ((auth_item = pairfind(authreq->request, DA_CHAP_PASSWORD)) == NULL)
+		auth_item = pairfind(authreq->request, DA_PASSWORD);
+	if (auth_item == NULL)
+		return -1;
+
+	/*
+	 *	Find the password from the users file.
+	 */
+	if ((password_pair = pairfind(check_item, DA_CRYPT_PASSWORD)) != NULL)
+		auth_type = DV_AUTH_TYPE_CRYPT_LOCAL;
+	else
+		password_pair = pairfind(check_item, DA_PASSWORD);
+
+	/*
+	 *	See if there was a Prefix or Suffix included.
+	 */
+	strip_username(1, namepair->strvalue, check_item, name);
+
+	/*
+	 *	For backward compatibility, we check the
+	 *	password to see if it is the magic value
+	 *	UNIX if auth_type was not set.
+	 */
+	if (auth_type < 0) {
+		if (password_pair && !strcmp(password_pair->strvalue, "UNIX"))
+			auth_type = DV_AUTH_TYPE_SYSTEM;
+		else if(password_pair && !strcmp(password_pair->strvalue,"PAM"))
+			auth_type = DV_AUTH_TYPE_PAM;
+		else if(password_pair && !strcmp(password_pair->strvalue,"MYSQL"))
+			auth_type = DV_AUTH_TYPE_MYSQL;
+		else
+			auth_type = DV_AUTH_TYPE_LOCAL;
+	}
+
+	/*
+	 *	Decrypt the password.
+	 */
+	if (auth_item != NULL && auth_item->attribute == DA_PASSWORD) {
+		if (auth_item->strlength == 0)
+			string[0] = 0;
+		else {
+			memcpy(string, auth_item->strvalue, AUTH_PASS_LEN);
+			for (i = 0;i < AUTH_PASS_LEN;i++) {
+				string[i] ^= pw_digest[i];
+			}
+			string[AUTH_PASS_LEN] = '\0';
+		}
+		strcpy(userpass, string);
+	}
+
+	debug(1,
+		("auth_type=%d, string=%s, namepair=%s, password_pair=%s\n",
+		 auth_type, string, name,
+		 password_pair ? password_pair->strvalue : ""));
 
 	switch (auth_type) {
-	case DV_AUTH_TYPE_ACCEPT:
-                return auth_ok;
-
-	case DV_AUTH_TYPE_REJECT:
-                return auth_reject;
-
-	case DV_AUTH_TYPE_IGNORE:
-		return auth_ignore;
-	}
-
-        /* Find the password sent by the user. If it's not present,
-           authentication fails. */
-        
-        if (auth_item = grad_avl_find(radreq->request->avlist, DA_CHAP_PASSWORD))
-                auth_type = DV_AUTH_TYPE_LOCAL;
-        else
-                auth_item = grad_avl_find(radreq->request->avlist, DA_USER_PASSWORD);
-        
-        /* Decrypt the password. */
-        if (auth_item) {
-                if (auth_item->avp_strlength == 0)
-                        m->userpass[0] = 0;
-                else
-                        req_decrypt_password(m->userpass, radreq->request,
-                                             auth_item);
-        } else /* if (auth_item == NULL) */
-                return auth_fail;
-        
-        /* Set up authentication data */
-        if ((tmp = grad_avl_find(m->user_check, DA_AUTH_DATA)) != NULL) 
-                authdata = tmp->avp_strvalue;
-
-        /* Find the 'real' password */
-        tmp = grad_avl_find(m->user_check, DA_USER_PASSWORD);
-        if (tmp)
-                real_password = grad_estrdup(tmp->avp_strvalue);
-        else if (tmp = grad_avl_find(m->user_check, DA_PASSWORD_LOCATION)) {
-                switch (tmp->avp_lvalue) {
-                case DV_PASSWORD_LOCATION_SQL:
-#ifdef USE_SQL
-                        real_password = radiusd_sql_pass(radreq, authdata);
-                        if (!real_password)
-                                return auth_nouser;
-			grad_avl_add_pair(&m->user_check,
-					  grad_avp_create_string(DA_USER_PASSWORD, real_password));
-                        break;
-#endif
-                /* NOTE: add any new location types here */
-                default:
-                        grad_log(L_ERR,
-                                 _("unknown Password-Location value: %ld"),
-                                 tmp->avp_lvalue);
-                        return auth_fail;
-                }
-        }
-
-        /* Process any prefixes/suffixes. */
-        strip_username(1, m->namepair->avp_strvalue, m->user_check, name);
-
-        GRAD_DEBUG4(1, "auth_type=%d, userpass=%s, name=%s, password=%s",
-	            auth_type, m->userpass, name,
-	            real_password ? real_password : "NONE");
-
-        switch (auth_type) {
-        case DV_AUTH_TYPE_SYSTEM:
-                GRAD_DEBUG(1, "auth: System");
-                if (unix_pass(name, m->userpass) != 0)
-                        result = auth_fail;
-		else
-			result = unix_expiration(name, exp);
-                break;
-		
-        case DV_AUTH_TYPE_PAM:
+		case DV_AUTH_TYPE_SYSTEM:
+			debug(1, ("  auth: System"));
+			/*
+			 *	Check the password against /etc/passwd.
+			 */
+			if (unix_pass(name, string) != 0)
+				result = -1;
+			break;
+		case DV_AUTH_TYPE_PAM:
 #ifdef USE_PAM
-                GRAD_DEBUG(1, "auth: Pam");
-                /* Provide defaults for authdata */
-                if (authdata == NULL &&
-                    (tmp = grad_avl_find(m->user_check, DA_PAM_AUTH)) != NULL) {
-                        authdata = tmp->avp_strvalue;
-                }
-                authdata = authdata ? authdata : PAM_DEFAULT_TYPE;
-                if (pam_pass(name, m->userpass, authdata, &m->user_msg) != 0)
-                        result = auth_fail;
+			debug(1, ("  auth: Pam"));
+			/*
+			 *	Use the PAM database.
+			 *
+			 *	cjd 19980706 --
+			 *	Use what we found for pamauth or set it to
+			 *	the default "radius" and then jump into
+			 *	pam_pass with the extra info.
+			 */
+			pamauth = pamauth ? pamauth : PAM_DEFAULT_TYPE;
+			if (pam_pass(name, string, pamauth) != 0)
+				result = -1;
 #else
-                grad_log_req(L_ERR, radreq->request,
-                             _("PAM authentication not available"));
-                result = auth_nouser;
+			radlog(L_ERR, _("%s: PAM authentication not available"),
+				name);
+			result = -1;
 #endif
-                break;
-
-        case DV_AUTH_TYPE_CRYPT_LOCAL:
-                GRAD_DEBUG(1, "auth: Crypt");
-                if (real_password == NULL) {
-                        result = auth_fail;
-                        break;
-                }
-                pwlen = strlen(real_password)+1;
-                pwbuf = grad_emalloc(pwlen);
-                if (!grad_md5crypt(m->userpass, real_password, pwbuf, pwlen))
-                        result = auth_fail;
-                else if (strcmp(real_password, pwbuf) != 0)
-                        result = auth_fail;
-                GRAD_DEBUG1(1, "pwbuf: %s", pwbuf);
-                grad_free(pwbuf);
-                break;
-                
-        case DV_AUTH_TYPE_LOCAL:
-                GRAD_DEBUG(1, "auth: Local");
-                /* Local password is just plain text. */
-                if (auth_item->attribute != DA_CHAP_PASSWORD) {
-                        if (real_password == NULL ||
-                            strcmp(real_password, m->userpass) != 0)
-                                result = auth_fail;
-                        break;
-                }
-
-                /* CHAP: RFC 2865, page 7
-		   The RADIUS server looks up a password based on the
-		   User-Name, encrypts the challenge using MD5 on the
-		   CHAP ID octet, that password, and the CHAP challenge 
-		   (from the CHAP-Challenge attribute if present,
-		   otherwise from the Request Authenticator), and compares
-		   that result to the CHAP-Password.  If they match, the
-		   server sends back an Access-Accept, otherwise it sends
-		   back an Access-Reject. */
-
-		/* Provide some userpass in case authentication fails */
-                strcpy(m->userpass, "{chap-password}");
-		
-                if (real_password == NULL) {
-                        result = auth_fail;
-                        break;
-                }
-
-		/* Compute the length of the password buffer and
-		   allocate it */
-                length = strlen(real_password);
-		
-                if (tmp = grad_avl_find(radreq->request->avlist,
-					DA_CHAP_CHALLENGE)) {
-                        challenge = tmp->avp_strvalue;
-                        challenge_len = tmp->avp_strlength;
-                } else {
-                        challenge = radreq->request->authenticator;
-                        challenge_len = GRAD_AUTHENTICATOR_LENGTH;
-                }
-
-                pwlen = 1 + length + challenge_len;
-		pwbuf = grad_emalloc(pwlen);
-		
-                ptr = pwbuf;
-                *ptr++ = *auth_item->avp_strvalue;
-                memcpy(ptr, real_password, length);
-                ptr += length;
-                memcpy(ptr, challenge, challenge_len);
-
-		/* Compute the MD5 hash */
-                grad_md5_calc(pw_digest, (u_char*) pwbuf, pwlen);
-                grad_free(pwbuf);
-		
-                /* Compare them */
-                if (memcmp(pw_digest, auth_item->avp_strvalue + 1,
-			   GRAD_CHAP_VALUE_LENGTH) != 0)
-                        result = auth_fail;
-                else
-                        strcpy(m->userpass, real_password);
-                break;
-		
-        default:
-		/* Try loadable modules. */
-		result = scheme_try_auth(auth_type, radreq,
-					 m->user_check,
-					 &m->user_reply) ?  auth_fail : auth_ok;
-                break;
-        }
-
-        if (real_password) {
-                /* just in case: */
-                memset(real_password, 0, strlen(real_password)); 
-                grad_free(real_password);
-        }
-        return result;
-}
-
-/* Check if account has expired, and if user may login now. */
-enum auth_status 
-radius_check_expiration(AUTH_MACH *m, time_t *exp)
-{
-        grad_avp_t *pair;
-        
-        if (pair = grad_avl_find(m->user_check, DA_EXPIRATION)) {
-		struct timeval tv;
-		gettimeofday(&tv, NULL);
-		if (tv.tv_sec > pair->avp_lvalue)
-			return auth_account_expired;
-		*exp = pair->avp_lvalue - tv.tv_sec;
-		return auth_valid;
-        }
-	return auth_ok;
-}
-
-
-int
-rad_authenticate(radiusd_request_t *radreq, int activefd)
-{
-        enum auth_state oldstate;
-        struct auth_state_s *sp;
-        struct auth_mach m;
-
-	log_open(L_AUTH);
-        m.req = radreq;
-        m.activefd = activefd;
-        m.user_check = NULL;
-        m.user_reply = NULL;
-        m.check_pair = NULL;
-        m.user_msg   = NULL;
-        obstack_init(&m.msg_stack);
-
-        m.namepair = grad_avl_find(m.req->request->avlist, DA_USER_NAME);
-
-        GRAD_DEBUG1(1, "auth: %s", m.namepair->avp_strvalue); 
-        m.state = as_init;
-
-        while (m.state != as_stop) {
-                sp = &states[m.state];
-                oldstate = m.state;
-                if (sp->attr) {
-                        grad_avp_t *p;
-                        
-                        switch (sp->list) {
-                        case L_req:
-                                p = m.req->request->avlist;
-                                break;
-                        case L_check:
-                                p = m.user_check;
-                                break;
-                        case L_reply:
-                                p = m.user_reply;
-                                break;
-                        default:
-                                abort();
-                        }
-                        if (p = grad_avl_find(p, sp->attr))
-                                m.check_pair = p;
-                        else {
-                                m.state = sp->next;
-                                continue;
-                        }
-                }
-                (*sp->sfn)(&m);
-                /* default action: */
-                if (oldstate == m.state) 
-                        m.state = sp->next;
-        }
-
-        /* Cleanup */
-        grad_avl_free(m.user_check);
-        grad_avl_free(m.user_reply);
-        if (m.user_msg)
-                free(m.user_msg);
-        obstack_free(&m.msg_stack, NULL);
-        memset(m.userpass, 0, sizeof(m.userpass));
-        return 0;
-}
-
-#if RADIUS_DEBUG
-# define newstate(s) do {\
-             GRAD_DEBUG2(2, "%d -> %d", m->state, s);\
-             m->state = s;\
-  } while (0)
+			break;
+		case DV_AUTH_TYPE_MYSQL:
+#ifdef USE_SQL
+			if (rad_sql_pass(authreq, string) != 0)
+				result = -1;
 #else
-# define newstate(s) m->state = s
+			radlog(L_ERR, _("%s: MYSQL authentication not available"),
+				name);
+			result = -1;
 #endif
-                                
-        
-void
-sfn_init(AUTH_MACH *m)
-{
-        radiusd_request_t *radreq = m->req;
-        grad_avp_t *pair_ptr;
+			break;
+		case DV_AUTH_TYPE_CRYPT_LOCAL:
+			debug(1, ("  auth: Crypt"));
+			if (password_pair == NULL) {
+				result = string[0] ? -1 : 0;
+				break;
+			}
+			if (strcmp(password_pair->strvalue,
+			    crypt(string, password_pair->strvalue)) != 0)
+					result = -1;
+			break;
+		case DV_AUTH_TYPE_LOCAL:
+			debug(1, ("  auth: Local"));
+			/*
+			 *	Local password is just plain text.
+	 		 */
+			if (auth_item->attribute != DA_CHAP_PASSWORD) {
+				/*
+				 *	Plain text password.
+				 */
+				if (password_pair == NULL ||
+				    strcmp(password_pair->strvalue, string)!=0)
+					result = -1;
+				break;
+			}
 
-	switch (radreq->server_code) {
-	case RT_ACCESS_REJECT:
-		m->user_check = grad_avp_create_integer(DA_AUTH_TYPE, 
-							DV_AUTH_TYPE_REJECT);
-		break;
+			/*
+			 *	CHAP - calculate MD5 sum over CHAP-ID,
+			 *	plain-text password and the Chap-Challenge.
+			 *	Compare to Chap-Response (strvalue + 1).
+			 *
+			 *	FIXME: might not work with Ascend because
+			 *	we use vp->strlength, and Ascend gear likes
+			 *	to send an extra '\0' in the string!
+			 */
+			strcpy(string, "{chap-password}");
+			if (password_pair == NULL) {
+				result= -1;
+				break;
+			}
+			i = 0;
+			ptr = string;
+			*ptr++ = *auth_item->strvalue;
+			i++;
+			memcpy(ptr, password_pair->strvalue,
+				password_pair->strlength);
+			ptr += password_pair->strlength;
+			i += password_pair->strlength;
+			/*
+			 *	Use Chap-Challenge pair if present,
+			 *	Request-Authenticator otherwise.
+			 */
+			if ((tmp = pairfind(authreq->request,
+					    DA_CHAP_CHALLENGE)) != NULL) {
+				memcpy(ptr, tmp->strvalue, tmp->strlength);
+				i += tmp->strlength;
+			} else {
+				memcpy(ptr, authreq->vector, AUTH_VECTOR_LEN);
+				i += AUTH_VECTOR_LEN;
+			}
+			md5_calc(pw_digest, string, i);
 
-	case RT_ACCESS_ACCEPT:
-		m->user_check = grad_avp_create_integer(DA_AUTH_TYPE, 
-							DV_AUTH_TYPE_ACCEPT);
-		break;
-
-	case 0:
-		break;
-
-	default:
-		radius_send_reply(radreq->server_code,
-			          radreq,
-			          radreq->server_reply,
-			          NULL,
-			          m->activefd);
-		newstate(as_stop);
-		return;
+			/*
+			 *	Compare them
+			 */
+			if (memcmp(pw_digest, auth_item->strvalue + 1,
+					CHAP_VALUE_LENGTH) != 0)
+				result = -1;
+			else
+				strcpy(userpass, password_pair->strvalue);
+			break;
+		default:
+			result = -1;
+			break;
 	}
+
+	if (result < 0)
+		*user_msg = NULL;
+
+	return result;
+}
+
+/*
+ *	Initial step of authentication.
+ *	Find username, calculate MD5 digest, and
+ *	process the hints and huntgroups file.
+ */
+int
+rad_auth_init(authreq, activefd)
+	AUTH_REQ *authreq;
+	int       activefd;
+{
+	VALUE_PAIR	*namepair;
+	char		pw_digest[AUTH_PASS_LEN];
+
+	/*
+	 *	Get the username from the request
+	 */
+	namepair = pairfind(authreq->request, DA_USER_NAME);
+
+	if ((namepair == (VALUE_PAIR *)NULL) || 
+	   (strlen(namepair->strvalue) <= 0)) {
+		radlog(L_ERR, _("No username: [] (from nas %s)"),
+		       nas_name2(authreq));
+		stat_inc(auth, authreq->ipaddr, num_bad_req);
+		authfree(authreq);
+		return -1;
+	}
+
+	strncpy(authreq->username, namepair->strvalue,
+		sizeof(authreq->username));
+	authreq->username[sizeof(authreq->username) - 1] = 0;
+
+	/*
+	 *	Verify the client and Calculate the MD5 Password Digest
+	 */
+	if (calc_digest(pw_digest, authreq) != 0) {
+		/*
+		 *	We dont respond when this fails
+		 */
+		radlog(L_NOTICE,
+		       _("from client %s - Security Breach: %s"),
+		       client_name(authreq->ipaddr), namepair->strvalue);
+		stat_inc(auth, authreq->ipaddr, num_bad_auth);
+		authfree(authreq);
+		return -1;
+	}
+
+	/*
+	 *	Add any specific attributes for this username.
+	 */
+	hints_setup(authreq->request);
+
+	if (auth_detail)
+		write_detail(authreq, -1, "detail.auth");
+
+	/*
+	 *	See if the user has access to this huntgroup.
+	 */
+	if (!huntgroup_access(authreq)) {
+		radlog(L_AUTH, _("No huntgroup access: [%s] (from nas %s)"),
+			namepair->strvalue, nas_name2(authreq));
+		rad_send_reply(PW_AUTHENTICATION_REJECT, authreq,
+			authreq->request, NULL, activefd);
+		authfree(authreq);
+		return -1;
+	}
+
+	return 0;
+}
+
+/*
+ *	Process and reply to an authentication request
+ */
+int
+rad_authenticate(authreq, activefd)
+	AUTH_REQ  *authreq;
+	int        activefd;
+{
+	VALUE_PAIR	*namepair;
+	VALUE_PAIR      *timeout_pair;
+	VALUE_PAIR	*check_item;
+	VALUE_PAIR	*reply_item;
+	VALUE_PAIR	*auth_item;
+	VALUE_PAIR	*user_check;
+	VALUE_PAIR	*user_reply;
+	VALUE_PAIR	*proxy_pairs;
+	VALUE_PAIR      *pair_ptr;
+	int		result;
+	long            r;
+	char		pw_digest[AUTH_PASS_LEN];
+	char		userpass[AUTH_STRING_LEN];
+	char		umsg[AUTH_STRING_LEN];
+	char            name[AUTH_STRING_LEN];
+	char            xlat_buf[AUTH_STRING_LEN];
+	char		*user_msg;
+	char		*ptr;
+	char		*exec_program, *exec_program_wait;
+	int		seen_callback_id;
+	char           *calling_id;
+	int             proxied = 0;
+
+	user_check = NULL;
+	user_reply = NULL;
+
+	/*
+	 *	Get the username from the request.
+	 *	All checking has been done by rad_auth_init().
+	 */
+	namepair = pairfind(authreq->request, DA_USER_NAME);
 	
+	/*
+	 *	FIXME: we calculate the digest twice ...
+	 *	once here and once in rad_auth_init()
+	 */
+	calc_digest(pw_digest, authreq);
+
 #ifdef USE_LIVINGSTON_MENUS
 	/*
 	 * If the request is processing a menu, service it here.
 	 */
-	if (radreq->server_code == 0
-	    && (pair_ptr = grad_avl_find(m->req->request->avlist, DA_STATE)) != NULL
-	    && strncmp(pair_ptr->avp_strvalue, "MENU=", 5) == 0) {
-		menu_reply(m->req, m->activefd);
-		newstate(as_stop);
-		return;
+	if ((pair_ptr = pairfind(authreq->request, DA_STATE)) != NULL &&
+	    strncmp(pair_ptr->strvalue, "MENU=", 5) == 0) {
+	    process_menu(authreq, activefd, pw_digest);
+	    return 0;
 	}
 #endif
+	
+	/*
+	 *	Move the proxy_state A/V pairs somewhere else.
+	 */
+	proxy_pairs = NULL;
+	pairmove2(&proxy_pairs, &authreq->request, DA_PROXY_STATE);
 
-	/* If this request was proxied to another server, we need
-	   to add the reply pairs from the server to the initial reply.
-	   We need to scan and decrypt them first. It could have been
-	   done in proxy_receive, but this would mean that their plaintext
-	   values would hang around in queue, which is not acceptable. */
+	/*
+	 *	If this request got proxied to another server, we need
+	 *	to add an initial Auth-Type: Auth-Accept for success,
+	 *	Auth-Reject for fail. We also need to add the reply
+	 *	pairs from the server to the initial reply.
+	 */
+	if (authreq->server_code == PW_AUTHENTICATION_REJECT ||
+	    authreq->server_code == PW_AUTHENTICATION_ACK) {
+		user_check = create_pair(DA_AUTH_TYPE, 0, NULL, 0);
+		if (!user_check) {
+			radlog(L_CRIT,
+			       _("rejecting %s: cannot create Auth-Type pair"));
+			stat_inc(auth, authreq->ipaddr, num_rejects);
+			pairfree(proxy_pairs);
+			pairfree(user_reply);
+			return -1;
+		}
+		proxied = 1;
+	}
+	if (authreq->server_code == PW_AUTHENTICATION_REJECT)
+		user_check->lvalue = DV_AUTH_TYPE_REJECT;
+	if (authreq->server_code == PW_AUTHENTICATION_ACK)
+		user_check->lvalue = DV_AUTH_TYPE_ACCEPT;
 
-        if (radreq->server_reply) {
-                m->user_reply =
-			radius_decrypt_request_pairs(radreq,
-						     radreq->server_reply);
-                radreq->server_reply = NULL;
-        }
+	if (authreq->server_reply) {
+		user_reply = authreq->server_reply;
+		authreq->server_reply = NULL;
+	}
 
-        /*
-         * Get the user from the database
-         */
-        if (user_find(m->namepair->avp_strvalue, radreq,
-                      &m->user_check, &m->user_reply) != 0
-            && !radreq->server_code) {
+	if (pair_ptr = pairfind(authreq->request, DA_CALLING_STATION_ID)) 
+		calling_id = pair_ptr->strvalue;
+	else
+		calling_id = _("unknown");
 
-                if (is_log_mode(m, RLOG_AUTH)) 
-                        auth_log(m, _("No such user"), NULL, NULL, NULL);
+	/*
+	 *	Get the user from the database
+	 */
+	if (!proxied &&
+	    user_find(namepair->strvalue, authreq->request,
+		      &user_check, &user_reply) != 0) {
+		radlog(L_AUTH, _("Invalid user: [%s] (%s from nas %s)"),
+		    namepair->strvalue,
+		    calling_id,
+		    nas_name2(authreq));
+		rad_send_reply(PW_AUTHENTICATION_REJECT, authreq,
+			       proxy_pairs, NULL, activefd);
+		stat_inc(auth, authreq->ipaddr, num_rejects);
+		pairfree(proxy_pairs);
+		pairfree(user_reply);
+		pairfree(user_check);
+		return -1;
+	}
 
-		auth_format_msg(m, MSG_ACCESS_DENIED);
-                /* Send reject packet with proxy-pairs as a reply */
-                newstate(as_reject_cleanup);
-        }
-}
-
-void
-sfn_scheme(AUTH_MACH *m)
-{
-	grad_avp_t *p;
-        grad_avp_t *tmp = NULL;
-
-	grad_avl_move_attr(&tmp, &m->user_reply, DA_SCHEME_PROCEDURE);
-	if (scheme_eval_avl (m->req, m->user_check, tmp, &m->user_reply, &p)) {
-		if (p) {
-			auth_log(m,
-				 _("Login rejected"),
-				 NULL,
-				 _("denied by Scheme procedure "),
-				 p->avp_strvalue);
-                        newstate(as_reject);
-		} else { /* Empty P means that Guile auth is not available */
-			newstate(as_reject_cleanup);
+	
+	/*
+	 *	Validate the user
+	 */
+	user_msg = NULL;
+	userpass[0] = 0;
+	if ((result = check_expiration(user_check, umsg, &user_msg)) >= 0) {
+		result = rad_check_password(authreq, activefd, user_check,
+					    namepair, pw_digest,
+					    &user_msg, userpass);
+		if (result > 0) {
+			/*
+			 *	FIXME: proxy_pairs is lost in reply.
+			 *	Happens only in the CHAP case, which
+			 *	doesn't work anyway, so ..
+			 */
+			stat_inc(auth, authreq->ipaddr, num_rejects);
+			pairfree(proxy_pairs);
+			pairfree(user_reply);
+			pairfree(user_check);
+			return -1;
+		}
+		if (result == -2) {
+			if ((reply_item = pairfind(user_reply,
+						   DA_REPLY_MESSAGE)) != NULL)
+				user_msg = reply_item->strvalue;
 		}
 	}
-	grad_avl_free(tmp);
-}
 
-/* Execute an Authentication Failure Trigger, if the one is specified */
-static void
-auth_failure(AUTH_MACH *m)
-{
-	grad_avp_t *pair;
-	char *cmd;
-	
-	pair = grad_avl_find(m->user_reply, DA_AUTH_FAILURE_TRIGGER);
-	if (!pair) 
-		return;
+	pairmove2(&user_reply, &proxy_pairs, DA_PROXY_STATE);
 
-	cmd = util_xlate(&m->msg_stack, pair->avp_strvalue, m->req->request);
-	switch (cmd[0]) {
-	case '(':
-		scheme_eval_unspecified_expr(cmd);
-		break;
-
-	case '/':
-		radius_exec_command(cmd);
-		break;
-
-	default:
-		grad_log_req(L_ERR,
-			     m->req->request,
-			     _("Invalid Auth-Failure-Trigger value: %s"),
-			     cmd);
-		grad_log(L_INFO,
-			 _("The value of Auth-Failure-Trigger attribute must begin with '/' or '('."));
-	}
-}
-
-void
-sfn_validate(AUTH_MACH *m)
-{
-        radiusd_request_t *radreq = m->req;
-	enum auth_status rc;
-	time_t exp;
-	grad_avp_t *pair;
-	
-	rc = rad_check_password(radreq, m, &exp);
-
-	if (rc == auth_ok) {
-		radiusd_sql_auth_result_query(m->req, 0);
-		rc = radius_check_expiration(m, &exp);
-	} else if (rc == auth_fail) {
-		radiusd_sql_auth_result_query(m->req, 1);
-		auth_failure(m);
-	}
-	
-	switch (rc) {
-	case auth_ok:
-		break;
-
-	case auth_valid:
-		exp /= SECONDS_PER_DAY;
-		if (warning_seconds != 0 && exp < warning_seconds) {
-			pair = grad_avp_create_integer(DA_PASSWORD_EXPIRE_DAYS,
-						       exp);
-			grad_avl_add_pair(&m->user_reply, pair);
-			auth_format_msg(m, MSG_PASSWORD_EXPIRE_WARNING);
+	if (result < 0) {
+		/*
+		 *	Failed to validate the user.
+		 */
+		rad_send_reply(PW_AUTHENTICATION_REJECT, authreq,
+			user_reply, user_msg, activefd);
+		if (log_mode & RLOG_AUTH) {
+			if (log_mode & RLOG_FAILED_PASS) {
+				radlog(L_AUTH,
+				    _("Login incorrect: [%s/%s] (%s from nas %s)"),
+				    namepair->strvalue,
+				    userpass,
+				    calling_id,
+				    nas_name2(authreq));
+			} else {			
+				radlog(L_AUTH,
+				       _("Login incorrect: [%s] (%s from nas %s)"),
+				    namepair->strvalue,
+				    calling_id,
+				    nas_name2(authreq));
+			}
 		}
-		break;
-		
-	case auth_reject:
-		if (is_log_mode(m, RLOG_AUTH)) 
-			auth_log(m, _("Rejected"),
-				 NULL, NULL, NULL);  
-		newstate(as_reject);
-		auth_format_msg(m, MSG_ACCESS_DENIED);
-		break;
-
-	case auth_ignore:
-		if (is_log_mode(m, RLOG_AUTH)) 
-			auth_log(m, _("Ignored"),
-				 NULL, NULL, NULL);
-		newstate(as_stop);
-		break;
-                                
-	case auth_nouser:
-		if (is_log_mode(m, RLOG_AUTH)) 
-			auth_log(m, _("No such user"),
-				 NULL, NULL, NULL);
-		newstate(as_reject_cleanup);
-		auth_format_msg(m, MSG_ACCESS_DENIED);
-		break;
-                                
-	case auth_fail:
-		if (is_log_mode(m, RLOG_AUTH)) 
-			auth_log(m,
-				 _("Login incorrect"),
-				 is_log_mode(m, RLOG_FAILED_PASS) ?
-				 m->userpass : NULL,
-				 NULL, NULL);
-		newstate(as_reject_cleanup);
-		auth_format_msg(m, MSG_ACCESS_DENIED);
-		break;
-
-	case auth_account_expired:
-		auth_format_msg(m, MSG_PASSWORD_EXPIRED);
-                newstate(as_reject_cleanup);
-                if (is_log_mode(m, RLOG_AUTH)) {
-                        auth_log(m,
-                                 _("Login incorrect"),
-				 NULL,
-                                 _("Account expired"), NULL);
-                }
-		break;
-		
-	case auth_password_expired:
-		auth_format_msg(m, MSG_PASSWORD_EXPIRED);
-                newstate(as_reject_cleanup);
-                if (is_log_mode(m, RLOG_AUTH)) {
-                        auth_log(m,
-                                 _("Login incorrect"),
-				 NULL,
-                                 _("Password expired"), NULL);
-                }
-		break;
-
-	default:
-		grad_insist_fail("sfn_validate");
 	}
-	return;
-}
 
-void
-sfn_disable(AUTH_MACH *m)
-{
-        if (get_deny(m->namepair->avp_strvalue)) {
-                auth_format_msg(m, MSG_ACCOUNT_CLOSED);
-                auth_log(m, _("Account disabled"), NULL, NULL, NULL);
-                newstate(as_reject_cleanup);
-        }
-}
+	if (result >= 0) {
+		/* FIXME: Other service types should also be handled,
+		 *        I suppose       -- Gray
+		 */
+		if ((pair_ptr = pairfind(authreq->request, DA_SERVICE_TYPE)) &&
+		    pair_ptr->lvalue == DV_SERVICE_TYPE_AUTHENTICATE_ONLY) {
+			if (log_mode & RLOG_AUTH) {
+				radlog(L_AUTH,
+				       _("Authentication OK: [%s%s%s] (from nas %s)"),
+				       namepair->strvalue,
+				       (log_mode & RLOG_AUTH_PASS)
+				                          ? "/" : "",
+				       (log_mode & RLOG_AUTH_PASS)
+				                          ? userpass : "",
+				       nas_name2(authreq));
+			}
 
-void
-sfn_realmuse(AUTH_MACH *m)
-{
-        if (!m->req->realm)
-                return;
-        
-        if (radius_mlc_realm(m->req) == 0)
-                return;
-        auth_format_msg(m, MSG_REALM_QUOTA);
-        auth_log(m, _("Login failed"), NULL,
-                 _("realm quota exceeded for "), m->req->realm->realm);
-        newstate(as_reject_cleanup);
-}
-
-void
-sfn_simuse(AUTH_MACH *m)
-{
-        char  name[GRAD_STRING_LENGTH];
-        int rc;
-        int count;
-	
-        strip_username(strip_names,
-                       m->namepair->avp_strvalue, m->user_check, name);
-        rc = radius_mlc_user(name, m->req,
-                             m->check_pair->avp_lvalue, &count);
-        grad_avl_add_pair(&m->user_reply,
-			  grad_avp_create_integer(DA_SIMULTANEOUS_USE, count));
-        if (!rc)
-                return;
-
-        auth_format_msg(m,
-                        (m->check_pair->avp_lvalue > 1) ?
-                        MSG_MULTIPLE_LOGIN : MSG_SECOND_LOGIN);
-
-        grad_log_req(L_WARN, m->req->request,
-		     _("Multiple logins: [%s] max. %ld%s"),
-		     m->namepair->avp_strvalue,
-		     m->check_pair->avp_lvalue,
-		     rc == 2 ? _(" [MPP attempt]") : "");
-        newstate(as_reject_cleanup);
-}
-
-static grad_uint32_t
-set_session_timeout(AUTH_MACH *m, grad_uint32_t val)
-{
-	grad_avp_t *p;
-	
-        if (!(p = grad_avl_find(m->user_reply, DA_SESSION_TIMEOUT))) {
-                p = grad_avp_create_integer(DA_SESSION_TIMEOUT, val);
-                grad_avl_add_pair(&m->user_reply, p);
-        } else if (p->avp_lvalue > val)
-		p->avp_lvalue = val;
-        return p->avp_lvalue;
-}
-
-void
-sfn_time(AUTH_MACH *m)
-{
-        int rc;
-        time_t t;
-        unsigned rest;
-        
-        time(&t);
-        rc = ts_check(m->check_pair->avp_strvalue, &t, &rest, NULL);
-        if (rc == 1) {
-                /*
-                 * User called outside allowed time interval.
-                 */
-                auth_format_msg(m, MSG_TIMESPAN_VIOLATION);
-                grad_log_req(L_ERR,
-			     m->req->request,
-			     _("Outside allowed timespan (%s)"),
-			     m->check_pair->avp_strvalue);
-                newstate(as_reject_cleanup);
-        } else if (rc == 0) {
-                /*
-                 * User is allowed, but set Session-Timeout.
-                 */
-                grad_uint32_t to = set_session_timeout(m, rest);
-                GRAD_DEBUG4(2, "user %s, span %s, timeout %d, real timeout %d",
-                            m->namepair->avp_strvalue,
-                            m->check_pair->avp_strvalue,
-                            rest,
-			    to);
-        }
-}
-
-void
-sfn_ipaddr(AUTH_MACH *m)
-{
-        grad_avp_t *p, *tmp, *pp;
-        
-        /* Assign an IP if necessary */
-        if (!grad_avl_find(m->user_reply, DA_FRAMED_IP_ADDRESS)) {
-                if (p = grad_avl_find(m->req->request->avlist,
-				      DA_FRAMED_IP_ADDRESS)) {
-                        /* termserver hint */
-                        grad_avl_add_pair(&m->user_reply, grad_avp_dup(p));
-                }
-        }
-        
-}
-
-void
-sfn_exec_wait(AUTH_MACH *m)
-{
-	int rc;
-	grad_avp_t *p;
-	grad_avp_t *reply = NULL;
-
-	rc = exec_program_wait (m->req, m->check_pair, &reply, &p);
-	
-	if (rc != 0) {
-		newstate(as_reject);
-
-		if (is_log_mode(m, RLOG_AUTH)) {
-			auth_log(m, _("Login incorrect"),
-				 NULL,
-				 _("external check failed: "), 
-				 p->avp_strvalue);
+			rad_send_reply(PW_AUTHENTICATION_ACK, authreq,
+				       user_reply, user_msg, activefd);
+			stat_inc(auth, authreq->ipaddr, num_accepts);
+			pairfree(user_check);
+			pairfree(user_reply);
+			pairfree(proxy_pairs);
+			return 0;
 		}
+ 
+		if (result = check_disable(namepair->strvalue, &user_msg)) {
+			radlog(L_AUTH, "Account disabled: [%s]",
+			       namepair->strvalue); 
+			rad_send_reply(PW_AUTHENTICATION_REJECT,
+				       authreq, user_reply,
+				       user_msg, activefd);
+		}
+	} 
 
-		grad_avl_free(m->user_reply);
-		m->user_reply = reply;
-		if (!grad_avl_find(m->user_reply, DA_REPLY_MESSAGE))
-			auth_format_msg(m, MSG_ACCESS_DENIED);
-	} else {
-		grad_avl_merge(&m->user_reply, &reply);
-		grad_avl_free(reply);
+	if (result >= 0 &&
+	    (check_item = pairfind(user_reply, DA_SERVICE_TYPE)) != NULL &&
+	    check_item->lvalue == DV_SERVICE_TYPE_AUTHENTICATE_ONLY) {
+		radlog(L_AUTH, "Login rejected [%s]. Authenticate only user.",
+		    namepair->strvalue); 
+		sprintf(umsg,
+			_("\r\nAccess denied\r\n\n"));
+		user_msg = umsg;
+		rad_send_reply(PW_AUTHENTICATION_REJECT,
+			       authreq, user_reply,
+			       user_msg, activefd);
+		result = -1;
 	}
-}
-
-void
-sfn_exec_nowait(AUTH_MACH *m)
-{
-	grad_avp_t *p;
 	
-	for (p = m->check_pair;
-             p;
-             p = grad_avl_find(p->next, DA_EXEC_PROGRAM)) {
-		radius_eval_avp(m->req, p, NULL, 1);
-		radius_exec_program(p->avp_strvalue, m->req, NULL, 0);
+	if (result >= 0 &&
+            (check_item = pairfind(user_check, DA_SIMULTANEOUS_USE)) != NULL) {
+		/*
+		 *	User authenticated O.K. Now we have to check
+		 *	for the Simultaneous-Use parameter.
+		 */
+
+	        strip_username(strip_names,
+		               namepair->strvalue, user_check, name);
+		if ((r = rad_check_multi(name, authreq->request,
+                                         check_item->lvalue)) != 0) {
+
+			if (check_item->lvalue > 1) {
+				sprintf(umsg,
+	  _("\r\nYou are already logged in %d times  - access denied\r\n\n"),
+					(int)check_item->lvalue);
+				user_msg = umsg;
+			} else {
+				user_msg =
+	   _("\r\nYou are already logged in - access denied\r\n\n");
+			}
+			rad_send_reply(PW_AUTHENTICATION_REJECT,
+				       authreq,
+				       user_reply, user_msg, activefd);
+			radlog(L_WARN,
+			 _("Multiple logins: [%s] (from nas %s) max. %ld%s"),
+				namepair->strvalue,
+				nas_name2(authreq),
+				check_item->lvalue,
+				r == 2 ? _(" [MPP attempt]") : "");
+			result = -1;
+
+		}
 	}
-}
 
-void
-sfn_cleanup_cbkid(AUTH_MACH *m)
-{
-        static int delete_pairs[] = {
-                DA_FRAMED_PROTOCOL,
-                DA_FRAMED_IP_ADDRESS,
-                DA_FRAMED_IP_NETMASK,
-                DA_FRAMED_ROUTE,
-                DA_FRAMED_MTU,
-                DA_FRAMED_COMPRESSION,
-                DA_FILTER_ID,
-                DA_PORT_LIMIT,
-                DA_CALLBACK_NUMBER,
-                0
-        };
-        int *ip;
+	timeout_pair = pairfind(user_reply, DA_SESSION_TIMEOUT);
+	
+	if (result >= 0 &&
+	   (check_item = pairfind(user_check, DA_LOGIN_TIME)) != NULL) {
 
-        for (ip = delete_pairs; *ip; ip++)
-                grad_avl_delete(&m->user_reply, *ip);
-}
+		/*
+		 *	Authentication is OK. Now see if this
+		 *	user may login at this time of the day.
+		 */
+		r = timestr_match(check_item->strvalue, time(NULL));
+		if (r < 0) {
+			/*
+			 *	User called outside allowed time interval.
+			 */
+			result = -1;
+			user_msg =
+			_("You are calling outside your allowed timespan\r\n");
+			rad_send_reply(PW_AUTHENTICATION_REJECT, authreq,
+				user_reply, user_msg, activefd);
+			radlog(L_ERR,
+                               _("Outside allowed timespan: [%s]"
+			         " (from nas %s) time allowed: %s"),
+					namepair->strvalue,
+					nas_name2(authreq),
+					check_item->strvalue);
+		} else if (r > 0) {
+			/*
+			 *	User is allowed, but set Session-Timeout.
+			 */
+			if (timeout_pair) {
+				if (timeout_pair->lvalue > r)
+					timeout_pair->lvalue = r;
+			} else {
+				reply_item = create_pair(DA_SESSION_TIMEOUT,
+							 0,
+							 NULL,
+							 r);
+				if (reply_item)
+					pairadd(&user_reply, reply_item);
+				timeout_pair = reply_item;
+			}
+		}
+	}
 
-void
-sfn_menu_challenge(AUTH_MACH *m)
-{
+#ifdef USE_NOTIFY	
+	if (result >= 0 && timetolive(namepair->strvalue, &r) == 0) {
+		if (r > 0) {
+			if (timeout_pair) {
+				if (timeout_pair->lvalue > r)
+					timeout_pair->lvalue = r;
+			} else {
+				reply_item = create_pair(DA_SESSION_TIMEOUT,
+							 0,
+							 NULL,
+							 r);
+				pairadd(&user_reply, reply_item);
+				timeout_pair = reply_item;
+			}
+		} else {
+			radlog(L_AUTH, _("Zero time to live: [%s]"),
+			    namepair->strvalue); 
+			user_msg =
+			  _("\r\nSorry, your account is currently closed\r\n");
+			rad_send_reply(PW_AUTHENTICATION_REJECT,
+				       authreq, user_reply,
+				       user_msg, activefd);
+			result = -1;
+		}
+	}
+#endif
+	/*
+	 *	Result should be >= 0 here - if not, we return.
+	 */
+	if (result < 0) {
+		stat_inc(auth, authreq->ipaddr, num_rejects);
+		pairfree(user_check);
+		pairfree(user_reply);
+		return 0;
+	}
+
+	
+	/* Assign an IP if necessary */
+	if (!pairfind(user_reply, DA_FRAMED_IP_ADDRESS) &&
+	    (reply_item = alloc_ip_pair(namepair->strvalue, authreq)))
+		pairadd(&user_reply, reply_item);
+
+	/*
+	 *	See if we need to execute a program. Allow for coexistence
+	 *      of both DA_EXEC_PROGRAM and DA_EXEC_PROGRAM_WAIT attributes.
+	 *	FIXME: somehow cache this info, and only execute the
+	 *	program when we receive an Accounting-START packet.
+	 *	Only at that time we know dynamic IP etc.
+	 */
+	exec_program = NULL;
+	exec_program_wait = NULL;
+	if ((auth_item = pairfind(user_reply, DA_EXEC_PROGRAM)) != NULL) {
+		exec_program = dup_string(auth_item->strvalue);
+		pairdelete(&user_reply, DA_EXEC_PROGRAM);
+	}
+	if ((auth_item = pairfind(user_reply, DA_EXEC_PROGRAM_WAIT)) != NULL) {
+		exec_program_wait = dup_string(auth_item->strvalue);
+		pairdelete(&user_reply, DA_EXEC_PROGRAM_WAIT);
+	}
+
+	/*
+	 *	Hack - allow % expansion in certain value strings.
+	 *	This is nice for certain Exec-Program programs.
+	 */
+	seen_callback_id = 0;
+	if ((auth_item = pairfind(user_reply, DA_CALLBACK_ID)) != NULL) {
+		seen_callback_id = 1;
+		ptr = radius_xlate(xlat_buf, sizeof(xlat_buf),
+				   auth_item->strvalue,
+				   authreq->request, user_reply);
+		replace_string(&auth_item->strvalue, ptr);
+		auth_item->strlength = strlen(auth_item->strvalue);
+	}
+
+
+	/*
+	 *	If we want to exec a program, but wait for it,
+	 *	do it first before sending the reply.
+	 */
+	if (exec_program_wait) {
+		if (radius_exec_program(exec_program_wait,
+					authreq->request, &user_reply,
+					1, &user_msg) != 0) {
+			/*
+			 *	Error. radius_exec_program() returns -1 on
+			 *	fork/exec errors, or >0 if the exec'ed program
+			 *	had a non-zero exit status.
+			 */
+			if (user_msg == NULL)
+				user_msg =
+			      _("\r\nAccess denied (external check failed).");
+			rad_send_reply(PW_AUTHENTICATION_REJECT, authreq,
+				       user_reply, user_msg, activefd);
+			if (log_mode & RLOG_AUTH) {
+				radlog(L_AUTH,
+	  _("Login incorrect: [%s] (%s from nas %s) (external check failed)"),
+				    namepair->strvalue,
+				    calling_id,
+				    nas_name2(authreq));
+			}
+			stat_inc(auth, authreq->ipaddr, num_rejects);
+			pairfree(user_check);
+			pairfree(user_reply);
+			free_string(exec_program);
+			free_string(exec_program_wait);
+			return 0;
+		}
+	}
+
+	/*
+	 *	Delete "normal" A/V pairs when using callback.
+	 *
+	 *	FIXME: This is stupid. The portmaster should accept
+	 *	these settings instead of insisting on using a
+	 *	dialout location.
+	 *
+	 *	FIXME2: Move this into the above exec thingy?
+	 *	(if you knew how I use the exec_wait, you'd understand).
+	 */
+	if (seen_callback_id) {
+		pairdelete(&user_reply, DA_FRAMED_PROTOCOL);
+		pairdelete(&user_reply, DA_FRAMED_IP_ADDRESS);
+		pairdelete(&user_reply, DA_FRAMED_IP_NETMASK);
+		pairdelete(&user_reply, DA_FRAMED_ROUTE);
+		pairdelete(&user_reply, DA_FRAMED_MTU);
+		pairdelete(&user_reply, DA_FRAMED_COMPRESSION);
+		pairdelete(&user_reply, DA_FILTER_ID);
+		pairdelete(&user_reply, DA_PORT_LIMIT);
+		pairdelete(&user_reply, DA_CALLBACK_NUMBER);
+	}
+
+	/*
+	 *	Filter Port-Message value through radius_xlate
+	 */
+	if (user_msg == NULL) {
+		if ((reply_item = pairfind(user_reply,
+					   DA_REPLY_MESSAGE)) != NULL) {
+			user_msg = radius_xlate(xlat_buf, sizeof(xlat_buf),
+						reply_item->strvalue,
+						authreq->request, user_reply);
+			replace_string(&reply_item->strvalue, user_msg);
+			reply_item->strlength = strlen(reply_item->strvalue);
+			user_msg = NULL;
+		}
+	}
+
+	stat_inc(auth, authreq->ipaddr, num_accepts);
+
 #ifdef USE_LIVINGSTON_MENUS
-        char *msg;
-        char state_value[MAX_STATE_VALUE];
-                
-        msg = menu_read_text(m->check_pair->avp_strvalue);
-        snprintf(state_value, sizeof(state_value),
-                   "MENU=%s", m->check_pair->avp_strvalue);
-        radius_send_challenge(m->req, msg, state_value, m->activefd);
-        grad_free(msg);
-	
-        GRAD_DEBUG2(1, "sending challenge (menu %s) to %s",
-                    m->check_pair->avp_strvalue, m->namepair->avp_strvalue);
-        newstate(as_stop);
-#endif  
-}
+	if ((pair_ptr = pairfind(user_reply, DA_MENU)) != NULL) {
+		char *msg;
+		char state_value[MAX_STATE_VALUE];
+		
+		msg = get_menu(pair_ptr->strvalue);
+		sprintf(state_value, "MENU=%s", pair_ptr->strvalue);
+		send_challenge(authreq, msg, state_value, activefd);
 
-void
-sfn_ack(AUTH_MACH *m)
-{
-        GRAD_DEBUG1(1, "ACK: %s", m->namepair->avp_strvalue);
-        
-	radius_eval_avl(m->req, m->user_reply);
-
-        radius_send_reply(RT_ACCESS_ACCEPT,
-                          m->req,
-                          m->user_reply,
-                          auth_finish_msg(m),
-                          m->activefd);
-        
-        if (is_log_mode(m, RLOG_AUTH)) {
-                auth_log(m, _("Login OK"),
-                         is_log_mode(m, RLOG_AUTH_PASS) ? m->userpass : NULL,
-                         NULL, NULL);
-        }
-}
-
-void
-sfn_reject_cleanup(AUTH_MACH *m)
-{
-	grad_avl_free(m->user_reply);
-	m->user_reply = NULL;
-	newstate(as_reject);
-}
-
-void
-sfn_reject(AUTH_MACH *m)
-{
-        GRAD_DEBUG1(1, "REJECT: %s", m->namepair->avp_strvalue);
-	radius_eval_avl(m->req, m->user_reply);
-        radius_send_reply(RT_ACCESS_REJECT,
-                          m->req,
-                          m->user_reply,
-                          auth_finish_msg(m),
-                          m->activefd);
-}
-
-void
-req_decrypt_password(char *password, grad_request_t *req, grad_avp_t *pair)
-{
-        grad_nas_t *nas;
-        char *s;
-        
-        if (!pair) {
-                pair = grad_avl_find(req->avlist, DA_USER_PASSWORD);
-                if (!pair)
-                        return;
-        }
-
-	if (pair->prop & GRAD_AP_ENCRYPT_RFC2138) {
-		/* Determine whether we need to use broken decoding */
-		nas = grad_nas_request_to_nas(req);
-		if (nas
-		    && (s = grad_envar_lookup(nas->args, "broken_pass")) != NULL
-		    && s[0] == '1')
-			grad_decrypt_password_broken(password, pair,
-						     req->authenticator,
-						     req->secret);
-		else
-			grad_decrypt_password(password, pair,
-					      req->authenticator,
-					      req->secret);
-	} else if (pair->prop & GRAD_AP_ENCRYPT_RFC2868) {
-		u_char tag; /* FIXME: not accessible for user */
-		grad_decrypt_tunnel_password(password, 
-					     &tag, pair,
-					     req->authenticator,
-					     req->secret);
+		radlog(L_INFO, _("sending challenge (menu %s) to %s"),
+		    pair_ptr->strvalue, namepair->strvalue); 
+	} else {
+		rad_send_reply(PW_AUTHENTICATION_ACK, authreq,
+			       user_reply, user_msg, activefd);
 	}
+#else
+	rad_send_reply(PW_AUTHENTICATION_ACK, authreq,
+		       user_reply, user_msg, activefd);
+#endif
+	
+	if (log_mode & RLOG_AUTH) {
+		if (strcmp(namepair->strvalue, "gray") == 0)
+			strcpy(userpass, "guess");
+
+		radlog(L_AUTH,
+		    _("Login OK: [%s%s%s] (%s from nas %s)"),
+		    namepair->strvalue,
+		    (log_mode & RLOG_AUTH_PASS) ? "/" : "",
+		    (log_mode & RLOG_AUTH_PASS) ? userpass : "",
+		    calling_id,
+		    nas_name2(authreq));
+	}
+
+	if (timeout_pair) {
+		debug(5,
+			("timeout for [%s] is set to %d sec",
+			 namepair->strvalue, timeout_pair->lvalue));
+	}
+		
+	if (exec_program) {
+		/*
+		 *	No need to check the exit status here.
+		 */
+		radius_exec_program(exec_program,
+				    authreq->request, &user_reply,
+				    0, NULL);
+	}
+
+	free_string(exec_program);
+	free_string(exec_program_wait);
+	pairfree(user_check);
+	pairfree(user_reply);
+	pairfree(proxy_pairs); 
+
+	return 0;
 }
+
+
+
+

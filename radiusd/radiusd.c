@@ -1,800 +1,1453 @@
-/* This file is part of GNU Radius.
-   Copyright (C) 2000,2001,2002,2003,2004,2005,2007 Free Software Foundation
-  
-   GNU Radius is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 3 of the License, or
-   (at your option) any later version.
-  
-   GNU Radius is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-  
-   You should have received a copy of the GNU General Public License
-   along with GNU Radius; if not, write to the Free Software Foundation,
-   Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA. */
+/* This file is part of GNU RADIUS.
+ * Copyright (C) 2000, Sergey Poznyakoff
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+ *
+ */
+
+#define RADIUS_MODULE 2
+
+#ifndef lint
+static char rcsid[] =
+"@(#) $Id$";
+#endif
 
 #ifdef HAVE_CONFIG_H
 # include <config.h>
 #endif
+
 #include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/time.h>
+#include <sys/file.h>
 #include <sys/stat.h>
 #include <netinet/in.h>
-#include <netdb.h>
-#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <netdb.h>
+#include <fcntl.h>
+#include <ctype.h>
 #include <unistd.h>
 #include <signal.h>
 #include <errno.h>
 #include <sys/wait.h>
-
-#include <radiusd.h>
-#include <radius/radargp.h>
-#include <radius/radutmp.h>
-#include <radius/argcv.h>
-#include <rewrite.h>
-#include <snmp/asn1.h>
-#include <snmp/snmp.h>
-#include <timestr.h>
-
-const char *argp_program_version = "radiusd (" PACKAGE ") " VERSION;
-static char doc[] = N_("GNU radius daemon");
-
-#define SHOW_DEFAULTS_OPTION 256
-
-static struct argp_option options[] = {
-#define GRP 100	
-        {NULL, 0, NULL, 0,
-         N_("radiusd specific switches:"), GRP},
-        {"foreground", 'f', NULL, 0,
-         N_("Stay in foreground"), GRP+1},
-        {"mode", 'm', "{t|c|b}", 0,
-         N_("Select operation mode: test, checkconf, builddbm."), GRP+1},
-        {"single-process", 's', NULL, 0,
-         N_("Run in single process mode"), GRP+1},
-        {"pid-file-dir", 'P', N_("DIR"), 0,
-         N_("Store pidfile in DIR"), GRP+1},
-	{"show-defaults", SHOW_DEFAULTS_OPTION, NULL, 0,
-	 N_("Show compilation defaults"), GRP+1},
-	{"quiet", 'q', NULL, 0,
-	 N_("Quiet mode (valid only with --mode)"), GRP+1},
-#undef GRP
-#define GRP 200
-	{NULL, 0, NULL, 0,
-         N_("Daemon configuration options. Please use raddb/config instead."),
-	 GRP},
-	
-        {"log-auth-detail", 'A', 0, 0,
-         N_("Do detailed authentication logging"), GRP+1},
-        {"acct-directory",  'a', N_("DIR"), 0,
-         N_("Set accounting directory"), GRP+1},
-#ifdef USE_DBM
-        {"dbm", 'b', NULL, 0,
-         N_("Enable DBM support"), GRP+1},
+#if defined(HAVE_GETOPT_LONG)
+# include <getopt.h>
 #endif
-        {"logging-directory", 'l', N_("DIR"), 0, 
-         N_("Set logging directory name"), GRP+1},
-        {"do-not-resolve", 'n', NULL, 0,
-         N_("Do not resolve IP addresses"), GRP+1},
-        {"ip-address", 'i', N_("IPADDR"), 0,
-         N_("Listen on IPADDR"), GRP+1},
-        {"port", 'p', "NUMBER", 0,
-         N_("Set authentication port number"), GRP+1},
-        {"log-stripped-names", 'S', NULL, 0,
-         N_("Strip prefixes/suffixes off user names before logging"), GRP+1},
-        {"debug", 'x', N_("DEBUGSPEC"), 0,
-         N_("Set debugging level"), GRP+1},
-        {"log-auth", 'y', NULL, 0,
-         N_("Log authentications"), GRP+1},
-        {"log-auth-pass", 'z', NULL, 0,
-         N_("Log users' passwords"), GRP+1},
-#undef GRP
-        {NULL, 0, NULL, 0, NULL, 0}
+#include <radiusd.h>
+#include <radsql.h>
+#include <log.h>
+#include <symtab.h>
+
+#if defined (sun) && defined(__svr4__)
+RETSIGTYPE (*sun_signal(int signo, void (*func)(int)))(int);
+#define signal sun_signal
+#endif
+
+/* ********************** Request list handling **************************** */
+	
+typedef struct request {
+	struct request *next;      /* Link to the next request */
+	int             type;      /* request type */
+	time_t          timestamp; /* when was the request accepted */
+	pid_t           child_pid; /* PID of the handling process (or -1) */
+	void           *data;      /* Request-specific data */
+} REQUEST;
+
+void rad_req_free(AUTH_REQ *req);
+void rad_req_drop(int type, AUTH_REQ *ptr, char *status_str);
+int authreq_cmp(AUTH_REQ *a, AUTH_REQ *b);
+
+struct request_class request_class[] = {
+	{ "AUTH", 0, MAX_REQUEST_TIME, CLEANUP_DELAY, 1,
+	  rad_authenticate, authreq_cmp, rad_req_free, rad_req_drop,
+	  rad_sql_setup, rad_sql_cleanup },
+	{ "ACCT", 0, MAX_REQUEST_TIME, CLEANUP_DELAY, 1,
+	  rad_accounting,   authreq_cmp, rad_req_free, rad_req_drop,
+	  rad_sql_setup, rad_sql_cleanup },
+	{ "PROXY",0, MAX_REQUEST_TIME, CLEANUP_DELAY, 0,
+	  rad_proxy, authreq_cmp, rad_req_free, rad_req_drop,
+	  NULL, NULL },
+#ifdef USE_SNMP
+	{ "SNMP", 0, MAX_REQUEST_TIME, 0, 1,
+	  snmp_answer, snmp_req_cmp, snmp_req_free, snmp_req_drop,
+	  NULL, NULL }
+#endif
 };
 
-
-/* *************************** Global Variables **************************** */
+/* the request queue */
+static REQUEST		*first_request;
 
-int        debug_flag;     /* can be raised from debugger only */
-int        log_mode;       /* logging mode */
-int        console_logging_priority = -1; /* Default priority for console
-					     logging */
-char       *auth_log_hook; /* Authentication logging hook function */
-
-static int foreground; /* Stay in the foreground */
-int spawn_flag;        /* Whether to spawn new children for handling
-			  the requests */
-
-int use_dbm = 0;       /* Use DBM storage */
-int auth_detail = 0;   /* Produce detailed logs of authentication packets */
-char *auth_detail_template; /* Template for filenames of these logs */
-int acct_detail = 1;   /* Produce detailed logs of accounting packets */
-char *acct_detail_template; /* Template for filenames of these logs */
-int acct_system = 1;   /* Run system accounting into radutmp/radwtmp files */
-int auth_trace_rules = 0; /* Produce trace logs for each auth request */
-int acct_trace_rules = 0; /* Produce trace logs for each acct request */
-int strip_names;          /* Strip preffixes/suffixes off the usernames */
-int suspend_flag;         /* Suspend processing of RADIUS requests */
-int auth_reject_malformed_names = 0; /* Respond with Access-Reject packets
-					for requests with malformed user
-					names */
-
-RADIUS_USER radiusd_user; /* Run the daemon with this user privileges */
-RADIUS_USER exec_user;    /* Run the user programs with this user privileges */
-
-#define CMD_NONE     0 /* No command */
-#define CMD_CLEANUP  1 /* Cleanup finished children */
-#define CMD_RELOAD   2 /* The reload of the configuration is needed */
-#define CMD_RESTART  3 /* Try to restart */
-#define CMD_MEMINFO  4 /* Dump memory usage statistics */
-#define CMD_DUMPDB   5 /* Dump authentication database */
-#define CMD_SHUTDOWN 6 /* Stop immediately */
-#define CMD_SUSPEND  7 /* Suspend service */
-#define CMD_CONTINUE 8 /* Continue after suspend */
-
-int daemon_command = CMD_NONE;
-
-static INPUT *radius_input;   /* The input channels */
-
-#ifdef USE_SNMP
-int snmp_port;
-serv_stat saved_status;
+/*
+ * This flag was used to block the asynchronous access to the request
+ * queue. 
+ * Now all the list fiddling is done synchronously but I prefere to keep
+ * the request_list_[un]block placeholders around. They could be needed
+ * when I at last write a multi-threaded version.
+ */
+#if 0
+ static int		request_list_busy = 0;
+# define request_list_block()   request_list_busy++
+# define request_list_unblock() request_list_busy--
+#else
+# define request_list_block()
+# define request_list_unblock()
 #endif
 
-                    /* These are the user flag marking attributes that
-		       can be used in comparing ... */
-int auth_comp_flag; /* ... authentication requests */ 
-int acct_comp_flag; /* ... accounting requests */
+static void request_free(REQUEST *req);
+static void request_drop(int type, void *data, char *status_str);
+void rad_spawn_child(int type, void *data, int activefd);
+static int flush_request_list();
+static int request_setup(int type, qid_t qid);
+static void request_cleanup(int type, qid_t qid);
 
-int checkrad_assume_logged = 1;
-size_t max_requests = MAX_REQUESTS;
-size_t max_children = MAX_CHILDREN;
-unsigned process_timeout = PROCESS_TIMEOUT;
-unsigned radiusd_write_timeout = RADIUSD_WRITE_TIMEOUT;
-unsigned radiusd_read_timeout = RADIUSD_READ_TIMEOUT;
+/* ************************ Socket control queue ************************** */
 
-grad_uint32_t warning_seconds;
-int use_guile;
-char *message_text[MSG_COUNT];
-grad_uint32_t myip = INADDR_ANY;
-grad_uint32_t ref_ip = INADDR_ANY;
-int auth_port;
-int acct_port;
+struct socket_list {
+	struct socket_list *next;
+	int fd;
+	int (*success)(struct sockaddr *, int);
+	int (*respond)(int fd, struct sockaddr *, int, char *, int);
+	int (*failure)(struct sockaddr *, int);
+};
 
-pid_t radiusd_pid;
-int radius_mode = MODE_DAEMON;    
+static struct socket_list *socket_first;
+static int max_fd;
+static void add_socket_list(int fd, int (*s)(), int (*r)(), int (*f)());
+static void rad_select();
 
-/* Invocation vector for self-restart */
+/* Implementation functions */
+int auth_respond(int fd, struct sockaddr *sa, int salen, char *buf, int size);
+int acct_success(struct sockaddr *sa, int salen);
+int acct_failure(struct sockaddr *sa, int salen);
+int snmp_respond(int fd, struct sockaddr *sa, int salen, char *buf, int size);
+int cntl_respond(int fd, struct sockaddr *sa, int salen, char *buf, int size);
+
+/* *************************** Global variables. ************************** */
+
+char			*progname;
+
+int debug_flag; /* can be raised from debugger only */
+
+static int		foreground;
+static int		spawn_flag;
+int			use_dbm = 0;
+int                     open_acct = 1;
+int                     auth_detail;
+int                     strip_names;
+
+Config config = {
+	10,              /* delayed_hup_wait */
+	1,               /* checkrad_assume_logged */
+	MAX_REQUESTS,    /* maximum number of requests */
+	"daemon",        /* exec-program user */
+	"daemon",        /* exec-program group */
+};
+
+UINT4			myip;
+UINT4			warning_seconds;
+int			auth_port;
+int			acct_port;
+int                     cntl_port;
+#ifdef USE_SNMP
+int                     snmp_port;
+#endif
+
+
+/*
+ *	Make sure recv_buffer is aligned properly.
+ */
+static int		i_recv_buffer[RAD_BUFFER_SIZE];
+static u_char		*recv_buffer = (u_char *)i_recv_buffer;
+
+/*
+ * The PID of the main process
+ */
+int		        radius_pid;
+
+/*
+ * This flag signals that there is a need to sweep out the dead children,
+ * and clean up the request structures associated with them.
+ */
+static int              need_child_cleanup = 0;
+#define schedule_child_cleanup()  need_child_cleanup = 1
+#define clear_child_cleanup()     need_child_cleanup = 0
+
+static void rad_child_cleanup();
+
+/*
+ * This flag means the reload of the configuration is needed
+ */
+static int		need_reload = 0;
+
+static void     check_reload();
+
+/*
+ * Keeps the timestamp of the last USR2 signal. The need_reload flag gets
+ * raised when time(NULL) - delayed_hup_time >= config.delayed_hup_wait.
+ * This allows for buffering the configuration requests.
+ */
+static time_t           delayed_hup_time = 0;
+
+
+static int	config_init(void);
+static void	usage(void);
+void   rad_exit(int);
+static RETSIGTYPE sig_fatal (int);
+static RETSIGTYPE sig_hup (int);
+static RETSIGTYPE sig_usr1 (int);
+static RETSIGTYPE sig_usr2 (int);
+static RETSIGTYPE sig_dumpdb (int);
+
+static int	radrespond (AUTH_REQ *, int);
+static int      open_socket(int port, char *type);
+
+
+static void reread_config(int reload);
+static UINT4 getmyip(void);
+
+#define OPTSTR "Aa:bd:cfhl:Lnp:Ssvx:yz"
+#ifdef HAVE_GETOPT_LONG
+struct option longopt[] = {
+	"log-auth-detail",    no_argument,       0, 'A',
+	"acct-directory",     required_argument, 0, 'a',
+	"check-config",       no_argument,       0, 'c',
+#ifdef USE_DBM
+	"dbm",                no_argument,       0, 'b',
+#endif
+	"config-directory",   required_argument, 0, 'd',
+	"foreground",         no_argument,       0, 'f',
+	"help",               no_argument,       0, 'h', 
+	"logging-directory",  no_argument,       0, 'l',
+	"license",            no_argument,       0, 'L',
+	"auth-only",          no_argument,       0, 'n',
+	"port",               required_argument, 0, 'p',
+	"log-stripped-names", no_argument,       0, 'S',
+	"single-process",     no_argument,       0, 's',
+	"version",            no_argument,       0, 'v',
+	"debug",              required_argument, 0, 'x',
+	"log-auth",           no_argument,       0, 'y',
+	"log-auth-pass",      no_argument,       0, 'z',
+	0
+};
+# define GETOPT getopt_long
+#else
+# define longopt 0
+# define GETOPT(ac,av,os,lo,li) getopt(ac,av,os)
+#endif
+
 int  xargc;
 char **xargv;
-char *x_debug_spec;
-
-/* Forward declarations */
-static RETSIGTYPE sig_handler(int sig);
-void radiusd_main_loop();
-static size_t radius_count_channels();
-void radiusd_run_preconfig_hooks(void *data);
-struct cfg_stmt config_syntax[];
-
-
-/* ************************ Command Line Parser **************************** */
-
-static error_t
-parse_opt(int key, char *arg, struct argp_state *state)
-{
-        switch (key) {
-        case 'A':
-                auth_detail++;
-                break;
-		
-        case 'a':
-                grad_acct_dir = grad_estrdup(arg);
-                break;
-		
-#ifdef USE_DBM
-        case 'b':
-                use_dbm++;
-                break;
-#endif
-		
-        case 'f':
-                foreground = 1;
-                break;
-		
-        case 'l':
-                grad_log_dir = grad_estrdup(arg);
-                break;
-		
-        case 'm':
-                switch (arg[0]) {
-                case 't':
-                        radius_mode = MODE_TEST;
-                        break;
-			
-                case 'b':
-#ifdef USE_DBM
-                        radius_mode = MODE_BUILDDBM;
-#else
-                        argp_error(state,
-				   _("radiusd compiled without DBM support"));
-                        exit(1);
-#endif
-                        break;
-			
-                case 'c':
-                        radius_mode = MODE_CHECKCONF;
-                        break;
-			
-                default:
-                        argp_error(state, _("unknown mode: %s"), arg);
-			exit(1);
-		}
-                break;
-		
-        case 'n':
-                grad_resolve_hostnames = 0;
-                break;
-		
-        case 'i':
-                if ((myip = grad_ip_gethostaddr(arg)) == 0)
-                        fprintf(stderr,
-                                _("invalid IP address: %s"),
-                                arg);
-                break;
-		
-        case 'P':
-                grad_pid_dir = arg;
-                break;
-		
-        case 'p':
-                auth_port = atoi(arg);
-		acct_port = auth_port+1;
-                break;
-
-	case 'q':
-		console_logging_priority = L_ERR;
-		break;
-		
-        case 'S':
-                strip_names++;  
-                break;
-		
-        case 's':       /* Single process mode */
-                spawn_flag = 0;
-                break;
-		
-        case 'x':
-                x_debug_spec = arg;
-                grad_set_debug_levels(arg);
-                break;
-		
-        case 'y':
-                log_mode |= RLOG_AUTH;    
-                break;
-		
-        case 'z':
-                log_mode |= RLOG_AUTH_PASS;
-                break;
-
-	case SHOW_DEFAULTS_OPTION:
-		show_compilation_defaults();
-		exit(0);
-		
-        default:
-                return ARGP_ERR_UNKNOWN;
-        }
-        return 0;
-}
-
-static struct argp argp = {
-        options,
-        parse_opt,
-        NULL,
-        doc,
-        grad_common_argp_child,
-        NULL, NULL
-};
-
-
-/* *********************** Configuration Functions ************************* */
-void
-set_config_defaults()
-{
-        username_valid_chars = grad_estrdup(".-_!@#$%^&\\/");
-        message_text[MSG_ACCOUNT_CLOSED] =
-                grad_estrdup(_("Sorry, your account is currently closed\n"));
-        message_text[MSG_PASSWORD_EXPIRED] =
-                grad_estrdup(_("Password has expired\n"));
-        message_text[MSG_PASSWORD_EXPIRE_WARNING] =
-                grad_estrdup(_("Password will expire in %R{Password-Expire-Days} Days\n"));
-        message_text[MSG_ACCESS_DENIED] =
-                grad_estrdup(_("\nAccess denied\n"));
-        message_text[MSG_REALM_QUOTA] =
-                grad_estrdup(_("\nRealm quota exceeded - access denied\n"));
-        message_text[MSG_MULTIPLE_LOGIN] =
-                grad_estrdup(_("\nYou are already logged in %R{Simultaneous-Use} times - access denied\n"));
-        message_text[MSG_SECOND_LOGIN] =
-                grad_estrdup(_("\nYou are already logged in - access denied\n"));
-        message_text[MSG_TIMESPAN_VIOLATION] =
-                grad_estrdup(_("You are calling outside your allowed timespan\n"));
-}
-
-static int
-get_port_number(char *name, char *proto, int defval)
-{
-        struct servent *svp;
-
-	svp = getservbyname(name, proto);
-	return svp ? ntohs(svp->s_port) : defval;
-}
-
-unsigned 
-max_ttl(time_t *t)
-{
-	unsigned i, delta = 0;
-
-	for (i = 0; i < R_MAX; i++)
-		if (delta < request_class[i].ttl)
-			delta = request_class[i].ttl;
-	if (t) {
-		time(t);
-		*t += delta;
-	}
-	return delta;
-}
-
-static void
-terminate_subprocesses()
-{
-	int kill_sent = 0;
-	time_t t;
-	
-        /* Flush any pending requests and empty the request queue */
-	radiusd_flush_queue();
-	request_init_queue();
-	
-	/* Terminate all subprocesses */
-	grad_log(L_INFO, _("Terminating the subprocesses"));
-	rpp_kill(-1, SIGTERM);
-	
-	max_ttl(&t);
-	
-	while (rpp_count()) {
-		sleep(1);
-		radiusd_cleanup();
-		if (time(NULL) >= t) {
-			if (kill_sent) {
-				int n = rpp_count();
-				grad_log(L_CRIT,
-				         ngettext("%d process left!",
-					 	  "%d processes left!",
-						  n),
-				         n);
-				break;
-			}
-			max_ttl(&t);
-			rpp_kill(-1, SIGKILL);
-			kill_sent = 1;
-		}
-	}
-}
-
-static void
-radiusd_preconfig_hook(void *a ARG_UNUSED, void *b ARG_UNUSED)
-{
-	terminate_subprocesses();
-	input_close_channels(radius_input);
-}
-
-static void
-radiusd_postconfig_hook(void *a ARG_UNUSED, void *b ARG_UNUSED)
-{
-	if (radius_mode == MODE_DAEMON && radius_count_channels() == 0) {
-		if (foreground) {
-			grad_log(L_ALERT,
-			         _("Radiusd is not listening on any port."));
-			exit(1);
-		} else
-			grad_log(L_ALERT,
-			         _("Radiusd is not listening on any port. Trying to continue anyway..."));
-	}
-}
-
-static void
-daemon_postconfig_hook(void *a ARG_UNUSED, void *b ARG_UNUSED)
-{
-	system_acct_init();
-}
-
-void
-radiusd_setup()
-{
-	int i;
-
-	/* Close unneeded file descriptors */
-        for (i = grad_max_fd(); i >= 3; i--)
-                close(i);
-        /* Determine default port numbers for authentication and accounting */
-	if (auth_port == 0) 
-		auth_port = get_port_number("radius", "udp", DEF_AUTH_PORT);
-	if (acct_port == 0)
-		acct_port = get_port_number("radacct", "udp", auth_port+1);
-#ifdef USE_SNMP
-	snmp_port = get_port_number("snmp", "udp", 161);
-#endif
-        srand(time(NULL));
-	
-#ifdef HAVE_CRYPT_SET_FORMAT
-	/* MD5 hashes are handled by libgnuradius function md5crypt(). To
-	   handle DES hashes it falls back to system crypt(). The behaviour
-	   of the latter on FreeBSD depends upon a 'default format'. so e.g.
-	   crypt() may generate MD5 hashes even if presented with a valid
-	   MD5 salt.
-	   
-	   To make sure this does not happen, we need to set the default
-	   crypt() format. */
-	
-	crypt_set_format("des");
-#endif
-
-	/* Register radiusd hooks first. This ensures they will be
-	   executed after all other hooks */
-	radiusd_set_preconfig_hook(radiusd_preconfig_hook, NULL, 0);
-	radiusd_set_postconfig_hook(radiusd_postconfig_hook, NULL, 0);
-
-	rewrite_init();
-	dynload_init();
-        snmp_init(0, 0, (snmp_alloc_t)grad_emalloc, (snmp_free_t)grad_free);
-	mlc_init();
-	sql_init();
-}
-
-void
-common_init()
-{
-	grad_log(L_INFO, _("Starting"));
-
-	radiusd_pid = getpid();
-	radius_input = input_create();
-	input_register_method(radius_input, "rpp", 0,
-			      rpp_input_handler,
-			      rpp_input_close,
-			      NULL);
-	input_register_method(radius_input, "udp", 1,
-			      udp_input_handler,
-			      udp_input_close,
-			      udp_input_cmp);
-#ifdef HAVE_SETVBUF
-        setvbuf(stdout, NULL, _IOLBF, 0);
-#endif
-	radiusd_signal_init(sig_handler);
-	forward_init();
-#ifdef USE_SNMP
-        snmpserv_init(&saved_status);
-#endif
-	acct_init();
-	radiusd_reconfigure();
-	grad_log(L_INFO, _("Ready"));
-}
-
-
-/* ************************** Core of radiusd ****************************** */
-void
-radiusd_daemon()
-{
-        char *p;
-        int i;
-        pid_t pid;
-        
-        switch (pid = fork()) {
-        case -1:
-                grad_log(L_CRIT|L_PERROR, "fork");
-                exit(1);
-        case 0: /* Child */
-                break;
-        default: /* Parent */
-                exit(0);
-        }
-                
-#ifdef HAVE_SETSID
-        setsid();
-#endif
-        /* SIGHUP is ignored because when the session leader terminates
-           all process in the session are sent the SIGHUP.  */
-        grad_set_signal(SIGHUP, SIG_IGN);
-
-        /* fork() again so the parent, can exit. This means that we, as a
-           non-session group leader, can never regain a controlling
-           terminal. */
-        switch (pid = fork()) {
-        case 0:
-                break;
-        case -1:
-                grad_log(L_CRIT|L_PERROR, "fork");
-                exit(1);
-        default:
-                exit(0);
-        }
-
-        /* This is needed for messages generated by guile
-           functions.
-	   FIXME: The compiled-in value of grad_log_dir is used */
-        p = grad_mkfilename(grad_log_dir, "radius.stderr");
-        i = open(p, O_CREAT|O_WRONLY, 0644);
-        if (i != -1) {
-                if (i != 2) 
-                        dup2(i, 2);
-                if (i != 1) 
-                        dup2(i, 1);
-                if (i != 1 && i != 2)
-                        close(i);
-                fflush(stdout);
-                fflush(stderr);
-        } 	
-        grad_free(p);
-}
 
 int
-radiusd_master()
+main(argc, argv)
+	int argc;
+	char **argv;
 {
-	return radiusd_pid == getpid();
-}
+	struct	servent		*svp;
+	int			argval;
+	int			t;
+	int                     fd;
+	int			pid;
+	int			radius_port = 0;
+	int                     check_config;    
+#ifdef RADIUS_PID
+	FILE			*fp;
+#endif
 	
-
-/* ****************************** Main function **************************** */
+	if ((progname = strrchr(argv[0], '/')) == NULL)
+		progname = argv[0];
+	else
+		progname++;
 
-void
-radiusd_main()
-{
-        switch (radius_mode) {
-        case MODE_CHECKCONF:
-                common_init();
-                exit(0);
-
-        case MODE_TEST:
-                common_init();
-                tsh();
-                
-#ifdef USE_DBM          
-        case MODE_BUILDDBM:
-                common_init();
-                exit(builddbm(NULL));
-#endif
-		
-        case MODE_DAEMON:
-		if (myip != INADDR_ANY)
-			ref_ip = myip;
-		else
-			ref_ip = grad_first_ip();
-		if (ref_ip == INADDR_ANY)
-		    grad_log(L_ALERT, _("can't find out my own IP address"));
-		
-		chdir("/");
-		umask(022);
-
-                if (!foreground)
-                        radiusd_daemon();
-		/* Install daemon-specific hook */
-		radiusd_set_postconfig_hook(daemon_postconfig_hook,
-					    NULL, 0);
-                common_init();
-        }
-
-	radiusd_pidfile_write(RADIUSD_PID_FILE);
-
-	if (radiusd_user.username) {
-		char *p;
-		log_change_owner(&radiusd_user);
-		p = grad_mkfilename(grad_log_dir, "radius.stderr");
-		chown(p, radiusd_user.uid, radiusd_user.gid);
-		grad_free(p);
-		radius_switch_to_user(&radiusd_user);
-	}
-
-        radiusd_main_loop();
-}
-
-void
-radiusd_start()
-{
-#ifdef USE_SERVER_GUILE
-	scheme_main();
-#else
-	radiusd_main();
-#endif
-}
-
-int
-main(int argc, char **argv)
-{
-        /* debug_flag can be set only from debugger.
-           It means developer is taking control in his hands, so
-           we won't modify any variables that could prevent him
-           from doing so. */
+	/* debug_flag can be set only from debugger.
+	 * It means developer is taking control in his hands, so
+	 * we won't modify any variables that could prevent him
+	 * from doing so.
+	 */
 	if (debug_flag == 0) {
-                foreground = 0;
-                spawn_flag = 1;
-        }
-        grad_app_setup();
-	grad_set_logger(radiusd_logger);
+		foreground = 0;
+		spawn_flag = 1;
+	}
+	check_config = 0;
+
+	app_setup();
+
+	/* save the invocation */
+	xargc = argc;
+	xargv = argv;
 	
-        /* save the invocation */
-        xargc = argc;
-        xargv = argv;
+	/*
+	 *	Process the options.
+	 */
+	while ((argval = GETOPT(argc, argv, OPTSTR, longopt, NULL)) != EOF) {
+		switch (argval) {
+		case 'A':
+			auth_detail++;
+			break;
+		case 'a':
+			radacct_dir = optarg;
+			break;
+#ifdef USE_DBM
+		case 'b':
+			use_dbm++;
+			break;
+#endif
+		case 'c':
+			check_config++;
+			break;
+		case 'd':
+			radius_dir = optarg;
+			break;
+		case 'f':
+			foreground = 1;
+			break;
+		case 'l':
+			radlog_dir = optarg;
+			break;
+		case 'L':
+			license();
+			exit(0);
+		case 'n':
+			open_acct = 0;
+			break;
+		case 'p':
+			radius_port = atoi(optarg);
+			break;
+		case 'S':
+			strip_names++;  
+			break;
+		case 's':	/* Single process mode */
+			spawn_flag = 0;
+			break;
+		case 'v':
+			version();
+			break;
+		case 'x':
+			set_debug_levels(optarg);
+			break;
+		case 'y':
+			log_mode |= RLOG_AUTH;    
+			break;
+		case 'z':
+			log_mode |= RLOG_AUTH_PASS;
+			break;
+		case 'h':
+			usage();
+			exit(0);
+		default:
+			usage();
+			exit(1);
+		}
+	}
 
-        /* Set up some default values */
-        set_config_defaults();
+	radpath_init();
 
-        /* Process the options.  */
-        argp_program_version_hook = version;
-        if (grad_argp_parse(&argp, &argc, &argv, 0, NULL, NULL))
-                return 1;
+	signal(SIGHUP, sig_hup);
+	signal(SIGUSR1, sig_usr1);
+	signal(SIGUSR2, sig_usr2);
+	signal(SIGQUIT, sig_fatal);
+	signal(SIGTERM, sig_fatal);
+	signal(SIGCHLD, sig_cleanup);
+#if !defined(MAINTAINER_MODE)
+	signal(SIGTRAP, sig_fatal);
+	signal(SIGFPE, sig_fatal);
+	signal(SIGSEGV, sig_fatal);
+	signal(SIGILL, sig_fatal);
+#endif
+#if 0
+	signal(SIGIOT, sig_fatal);
+#endif
 
-        log_set_default("default.log", -1, -1);
-        if (radius_mode != MODE_DAEMON)
-                log_set_to_console(-1, console_logging_priority);
+	if (!foreground && !check_config)
+		signal(SIGINT, sig_dumpdb);
 
-	radiusd_setup();
-	radiusd_start();
+	for (t = 32; t >= 3; t--)
+		close(t);
+
+
+	/*
+	 *	Read config files.
+	 */
+	get_config();
+	stat_init();
+
+	/* 
+	 * Determine port numbers for authentication and accounting
+	 */
+	if (radius_port)
+		auth_port = radius_port;
+	else {
+		svp = getservbyname ("radius", "udp");
+		if (svp != (struct servent *) 0)
+			auth_port = ntohs(svp->s_port);
+		else
+			auth_port = PW_AUTH_UDP_PORT;
+	}
+	svp = getservbyname ("radacct", "udp");
+	if (radius_port || svp == (struct servent *) 0)
+		acct_port = auth_port + 1;
+	else
+		acct_port = ntohs(svp->s_port);
+
+	
+	reread_config(0);
+	if (check_config) 
+		exit(0);
+
+	if ((myip = getmyip()) == 0) {
+		radlog(L_CRIT, _("can't find out my own IP address"));
+		exit(1);
+	}
+
+	/*
+	 *	Open Authentication socket.
+	 */
+	fd = open_socket(auth_port, "auth");
+	add_socket_list(fd, NULL, auth_respond, NULL);
+
+	if (open_acct) {
+		/*
+		 *	Open Accounting Socket.
+		 */
+		fd = open_socket(acct_port, "acct");
+		add_socket_list(fd, acct_success, auth_respond, acct_failure);
+	}
+	
+	fd = open_socket(cntl_port, "control");
+	if (fd >= 0)
+		add_socket_list(fd, NULL, cntl_respond, NULL);
+	
+#ifdef USE_SNMP
+
+	fd = open_socket(snmp_port, "SNMP");
+	set_nonblocking(fd);
+	add_socket_list(fd, NULL, snmp_respond, NULL);
+	snmp_tree_init();
+#endif
+
+	/*
+	 *	Disconnect from session
+	 */
+	if (foreground == 0) {
+		pid = fork();
+		if (pid < 0) {
+			radlog(L_CRIT, _("couldn't fork: %s"), strerror(errno));
+			exit(1);
+		}
+		if (pid > 0) {
+			exit(0);
+		}
+#ifdef HAVE_SETSID
+		setsid();
+#endif
+		chdir("/");
+	}
+	radius_pid = getpid();
+#ifdef RADIUS_PID
+	if ((fp = fopen(RADIUS_PID, "w")) != NULL) {
+		fprintf(fp, "%d\n", radius_pid);
+		fclose(fp);
+	}
+#endif
+
+	/*
+	 *	Use linebuffered or unbuffered stdout if
+	 *	the debug flag is on.
+	 */
+	if (debug_flag)
+		setlinebuf(stdout);
+
+	if (!foreground) {
+		t = open(RADLOG_DIR "/radius.stderr", O_WRONLY);
+		if (t != -1) {
+			if (t != 2) 
+				dup2(t, 2);
+			if (t != 1) 
+				dup2(t, 1);
+			if (t != 1 && t != 2)
+				close(t);
+			fflush(stdout);
+			fflush(stderr);
+		}
+	}
+
+	radlog(L_INFO, _("Ready to process requests."));
+
+	for(;;) {
+		rad_child_cleanup();
+		check_reload();
+		rad_select();
+	}
 	/*NOTREACHED*/
 }
 
-static int
-snmp_request_to_command()
+void
+add_socket_list(fd, s, r, f)
+	int fd;
+	int (*s)();
+	int (*r)();
+	int (*f)();
 {
-#ifdef USE_SNMP
-	if (server_stat && server_stat->auth.status != saved_status) {
-		saved_status = server_stat->auth.status;
-		switch (server_stat->auth.status) {
-		case serv_reset:
-			return CMD_RESTART;
+	struct socket_list      *ctl;
 
-		case serv_init:
-			return CMD_RELOAD;
+	ctl = alloc_entry(sizeof(struct socket_list));
+	ctl->fd = fd;
+	if (fd + 1 > max_fd)
+		max_fd = fd + 1;
+	ctl->success = s;
+	ctl->respond = r;
+	ctl->failure = f;
+	ctl->next = socket_first;
+	socket_first = ctl;
+}
 
-		case serv_running:
-			return CMD_CONTINUE;
+void
+rad_select()
+{
+	int                     result;
+	int                     status;
+	int                     salen;
+	struct	sockaddr	saremote;
+	fd_set			readfds;
+	struct socket_list      *ctl;
+	
+	FD_ZERO(&readfds);
+	for (ctl = socket_first; ctl; ctl = ctl->next) 
+		FD_SET(ctl->fd, &readfds);
 
-		case serv_suspended:
-			return CMD_SUSPEND;
+	status = select(max_fd, &readfds, NULL, NULL, NULL);
+	if (status == -1) {
+		if (errno == EINTR)
+			return;/* give main a chance to do some housekeeping */
+		rad_exit(101);
+	}
+	
+	for (ctl = socket_first; ctl; ctl = ctl->next) {
+		if (FD_ISSET(ctl->fd, &readfds)) {
+			salen = sizeof (saremote);
+			result = recvfrom (ctl->fd, (char *) recv_buffer,
+					   (int) sizeof(i_recv_buffer),
+					   (int) 0, &saremote, &salen);
 
-		case serv_shutdown:
-			return CMD_SHUTDOWN;
-
-		case serv_other:
-			/* nothing */;
+			if (ctl->success)
+				ctl->success(&saremote, salen);
+			if (result > 0) {
+				ctl->respond(ctl->fd,
+					     &saremote, salen,
+					     recv_buffer, result);
+			} else if (result < 0 && errno == EINTR) {
+				if (ctl->failure)
+					ctl->failure(&saremote, salen);
+				result = 0;
+			}
 		}
 	}
-#endif	
-	return CMD_NONE;
 }
 
-void
-radiusd_suspend()
+/* ************************* Socket queue functions *********************** */
+
+int
+auth_respond(fd, sa, salen, buf, size)
+	int fd;
+	struct sockaddr *sa;
+	int salen;
+	char *buf;
+	int size;
 {
-	if (suspend_flag == 0) {
-		terminate_subprocesses();
-		grad_log(L_NOTICE, _("RADIUSD SUSPENDED"));
-		suspend_flag = 1;
-	}
+	AUTH_REQ *authreq;
+	struct sockaddr_in *sin = (struct sockaddr_in *) sa;
+	
+	authreq = radrecv(ntohl(sin->sin_addr.s_addr),
+			  ntohs(sin->sin_port),
+			  buf,
+			  size);
+	radrespond(authreq, fd);
+	return 0;
 }
 
-void
-radiusd_continue()
+int
+acct_success(sa, salen)
+	struct sockaddr *sa;
+	int salen;
 {
-	if (suspend_flag) {
-		terminate_subprocesses();
-		suspend_flag = 0;
+	struct sockaddr_in *sin = (struct sockaddr_in *) sa;
+	stat_inc(acct, ntohl(sin->sin_addr.s_addr), num_req);
+	return 0;
+}
+
+int
+acct_failure(sa, salen)
+	struct sockaddr *sa;
+	int salen;
+{
+	struct sockaddr_in *sin = (struct sockaddr_in *) sa;
+	stat_inc(acct, ntohl(sin->sin_addr.s_addr), num_bad_req);
+	return 0;
+}
+
 #ifdef USE_SNMP
-		server_stat->auth.status = serv_running;
-		server_stat->acct.status = serv_running;
+
+int
+snmp_respond(fd, sa, salen, buf, size)
+	int fd;
+	struct sockaddr *sa;
+	int salen;
+	char *buf;
+	int size;
+{
+	struct snmp_req *req;
+	struct sockaddr_in *sin = (struct sockaddr_in *) sa;
+	
+	if (req = rad_snmp_respond(buf, size, sin))
+		rad_spawn_child(R_SNMP, req, fd);
+	return 0;
+}
+
 #endif
+
+/* ************************************************************************  */
+
+/*
+ *	Read config files.
+ */
+void
+reread_config(reload)
+	int reload;
+{
+	int res = 0;
+	int pid = getpid();
+
+
+	if (!reload) {
+		radlog(L_INFO, _("Starting - reading configuration files ..."));
+	} else if (pid == radius_pid) {
+		radlog(L_INFO, _("Reloading configuration files."));
+	}
+
+#ifdef USE_SNMP
+	server_stat->auth.status = serv_init;
+	server_stat->acct.status = serv_init;
+#endif	
+
+	/* Read the options */
+	get_config();
+
+	res = reload_config_file(reload_all);
+
+#ifdef USE_SNMP
+
+	server_stat->auth.status = serv_running;
+	snmp_auth_server_reset();
+
+	server_stat->acct.status = serv_running;
+	snmp_acct_server_reset();
+		
+#endif	
+
+	if (res != 0) {
+		radlog(L_CRIT,
+		       _("Errors reading config file - EXITING"));
+		exit(1);
 	}
 }
 
-static void
+/*
+ *	Find out my own IP address (or at least one of them).
+ */
+UINT4
+getmyip()
+{
+	char myname[256];
+
+	gethostname(myname, sizeof(myname));
+	return get_ipaddr(myname);
+}
+
+
+
+void
 check_reload()
 {
-	if (daemon_command == CMD_NONE)
-		daemon_command = snmp_request_to_command();
-	
-        switch (daemon_command) {
-	case CMD_CLEANUP:
-		radiusd_cleanup();
-		break;
-		
-        case CMD_RELOAD:
-                grad_log(L_INFO, _("Reloading configuration now"));
-                radiusd_reconfigure();
-                break;
-		
-        case CMD_RESTART:
-                radiusd_restart();
-                break;
-		
-        case CMD_MEMINFO:
-                break;
-		
-        case CMD_DUMPDB:
-                grad_log(L_INFO, _("Dumping users db to `%s'"),
-		       RADIUS_DUMPDB_NAME);
-                dump_users_db();
-                break;
-
-	case CMD_SUSPEND:
-		radiusd_suspend();
-		break;
-
-	case CMD_CONTINUE:
-		radiusd_continue();
-		break;
-		
-	case CMD_SHUTDOWN:
-		radiusd_exit();
-		break;
-        }
-        daemon_command = CMD_NONE;
-}
-
-void
-radiusd_register_input_fd(char *name, int fd, void *data)
-{
-	input_register_channel(radius_input, name, fd, data);
-}
-
-void
-radiusd_close_channel(int fd)
-{
-	input_close_channel_fd(radius_input, fd);
-}
-
-void
-radiusd_collect_children()
-{
-	pid_t pid;
-	int status;
-
-	for (;;) {
-		pid = waitpid((pid_t)-1, &status, WNOHANG);
-		if (pid <= 0)
-			break;
-		rpp_status_changed(pid, status);
+	if (delayed_hup_time &&
+	    time(NULL) - delayed_hup_time >= config.delayed_hup_wait) {
+		delayed_hup_time = 0;
+		need_reload = 1;
 	}
-}
+			
+	if (need_reload) {
+		reread_config(1);
+		need_reload = 0;
+	}
+#ifdef USE_SNMP
+	if (server_stat->auth.status == serv_init ||
+	    server_stat->acct.status == serv_init)
+		reread_config(1);
+#endif		
+}	
 
-void
-radiusd_cleanup()
+/*
+ *	Respond to supported requests:
+ *
+ *		PW_AUTHENTICATION_REQUEST - Authentication request from
+ *				a client network access server.
+ *
+ *		PW_ACCOUNTING_REQUEST - Accounting request from
+ *				a client network access server.
+ *
+ *		PW_AUTHENTICATION_ACK
+ *		PW_AUTHENTICATION_REJECT
+ *		PW_ACCOUNTING_RESPONSE - Reply from a remote Radius server.
+ *				Relay reply back to original NAS.
+ *
+ */
+int
+radrespond(authreq, activefd)
+	AUTH_REQ *authreq;
+	int activefd;
 {
-	rpp_collect_exited ();
-}
+	int type = -1;
+	VALUE_PAIR *namepair;
+	int e;
 
-void
-radiusd_restart()
-{
-	pid_t pid;
+
+	/*
+	 *	First, see if we need to proxy this request.
+	 */
+	switch (authreq->code) {
+
+	case PW_AUTHENTICATION_REQUEST:
+		/*
+		 *	Check request against hints and huntgroups.
+		 */
+		stat_inc(auth, authreq->ipaddr, num_access_req);
+		if ((e = rad_auth_init(authreq, activefd)) < 0)
+			return e;
+		/*FALLTHRU*/
+	case PW_ACCOUNTING_REQUEST:
+		namepair = pairfind(authreq->request, DA_USER_NAME);
+		if (namepair == NULL)
+			break;
+		if (strchr(namepair->strvalue, '@') &&
+		    proxy_send(authreq, activefd) != 0) {
+			rad_spawn_child(R_PROXY, authreq, activefd);
+			return 0;
+		}
+		break;
+
+	case PW_AUTHENTICATION_ACK:
+	case PW_AUTHENTICATION_REJECT:
+	case PW_ACCOUNTING_RESPONSE:
+		if (proxy_receive(authreq, activefd) < 0) {
+			authfree(authreq);
+			return 0;
+		}
+		break;
+	}
+
+	/*
+	 *	Select the required function and indicate if
+	 *	we need to fork off a child to handle it.
+	 */
+	switch (authreq->code) {
+
+	case PW_AUTHENTICATION_REQUEST:
+		rad_sql_check_connect(SQL_AUTH);
+		type = R_AUTH;
+		break;
 	
-	grad_log(L_NOTICE, _("restart initiated"));
-	if (xargv[0][0] != '/') {
-		grad_log(L_ERR,
-		         _("can't restart: not started as absolute pathname"));
+	case PW_ACCOUNTING_REQUEST:
+	case PW_ASCEND_EVENT_REQUEST:
+		rad_sql_check_connect(SQL_ACCT);
+		type = R_ACCT;
+		break;
+		
+	case PW_PASSWORD_REQUEST:
+		/*
+		 *	We don't support this anymore.
+		 */
+		/* rad_passchange(authreq, activefd); */
+		radlog(L_NOTICE, "PW_PASSWORD_REQUEST not supported anymore");
+		break;
+
+	default:
+		stat_inc(acct, authreq->ipaddr, num_unknowntypes);
+		radlog(L_NOTICE, _("unknown request %d"), authreq->code); 
+		break;
+	}
+
+	/*
+	 *	If we did select a function, execute it
+	 *	(perhaps through rad_spawn_child)
+	 */
+	if (type != -1) {
+	        rad_spawn_child(type, authreq, activefd);
+	}
+	return 0;
+}
+
+/* *********************** Request list handling ************************** */
+
+void
+request_free(req)
+	REQUEST *req;
+{
+	request_class[req->type].free(req->data);
+	free_entry(req);
+}
+
+void
+request_drop(type, data, status_str)
+	int type;
+	void *data;
+	char *status_str;
+{
+	request_class[type].drop(type, data, status_str);
+	request_class[type].free(data);
+}
+
+int
+request_cmp(type, a, b)
+	int type;
+	void *a, *b;
+{
+	return request_class[type].comp(a, b);
+}
+
+int
+request_setup(type, qid)
+	int type;
+	qid_t qid;
+{
+	if (request_class[type].setup) 
+		return request_class[type].setup(type, qid);
+	return 0;
+}
+
+void
+request_cleanup(type, qid)
+	int type;
+	qid_t qid;
+{
+	if (request_class[type].cleanup)
+		request_class[type].cleanup(type, qid);
+}
+
+void *
+scan_request_list(type, handler, closure)
+	int type;
+	int (*handler)();
+	void *closure;
+{
+	REQUEST	*curreq;
+
+	for (curreq = first_request; curreq; curreq = curreq->next) {
+		if (curreq->type == type &&
+		    handler(closure, curreq->data) == 0)
+			return curreq->data;
+	}
+	return NULL;
+}
+
+/*
+ *	Spawns child processes to perform authentication/accounting
+ *	and respond to RADIUS clients.  This function also
+ *	cleans up complete child requests, and verifies that there
+ *	is only one process responding to each request (duplicate
+ *	requests are filtered out).
+ */
+void
+rad_spawn_child(type, data, activefd)
+	int type;           /* Type of request */
+	void *data;         /* Request-specific data */
+	int activefd;       /* Active socket descriptor */
+{
+	REQUEST	*curreq;
+	REQUEST	*prevreq;
+	UINT4	curtime;
+	int	request_count, request_type_count;
+	pid_t	child_pid;
+
+	curtime = (UINT4)time(NULL);
+	request_count = request_type_count = 0;
+	curreq = first_request;
+	prevreq = NULL;
+
+	/* Block asynchronous access to the list */
+	request_list_block();
+
+	while (curreq != NULL) {
+		if (curreq->child_pid == -1 &&
+		    curreq->timestamp + 
+		        request_class[curreq->type].cleanup_delay <= curtime) {
+			/*
+			 *	Request completed, delete it
+			 */
+			debug(1, ("deleting completed %s request",
+				 request_class[curreq->type].name));
+			if (prevreq == NULL) {
+				first_request = curreq->next;
+				request_free(curreq);
+				curreq = first_request;
+			} else {
+				prevreq->next = curreq->next;
+				request_free(curreq);
+				curreq = prevreq->next;
+			}
+			continue;
+		}
+ 
+		if (curreq->type == type &&
+			   request_cmp(type, curreq->data, data) == 0) {
+			/*
+			 * This is a duplicate request - just drop it
+			 */
+			request_drop(type, data, _("duplicate request"));
+			request_list_unblock();
+			schedule_child_cleanup();
+
+			return;
+		} else {
+			if (curreq->timestamp +
+			    request_class[curreq->type].ttl <= curtime &&
+			    curreq->child_pid != -1) {
+				/*
+				 *	This request seems to have hung -
+				 *	kill it
+				 */
+				request_cleanup(curreq->type,
+						(qid_t)curreq->data);
+				child_pid = curreq->child_pid;
+				radlog(L_NOTICE,
+				     _("Killing unresponsive %s child pid %d"),
+				       request_class[curreq->type].name,
+				       child_pid);
+				curreq->child_pid = -1;
+				curreq->timestamp = curtime -
+				     request_class[curreq->type].cleanup_delay;
+				kill(child_pid, SIGTERM);
+				continue;
+			}
+			if (curreq->type == type)
+				request_type_count++;
+			request_count++;
+			prevreq = curreq;
+			curreq = curreq->next;
+		}
+	}
+
+	/*
+	 *	This is a new request
+	 */
+	if (request_count >= config.max_requests) {
+		request_drop(type, data, _("too many requests in queue"));
+		
+		request_list_unblock();
+		schedule_child_cleanup();
+		
+		return;
+	}
+	if (request_class[type].max_requests &&
+	    request_type_count >= request_class[type].max_requests) {
+		request_drop(type, data, _("too many requests of this type"));
+
+		request_list_unblock();
+		schedule_child_cleanup();
+		
+		return;
+	}
+	
+	/* First, setup the request
+	 */
+	if (request_setup(type, (qid_t)data)) {
+		request_drop(type, data, _("request setup failed"));
+
+		request_list_unblock();
+		schedule_child_cleanup();
+		
+		return;
+	}
+		
+	/*
+	 *	Add this request to the list
+	 */
+	curreq = alloc_entry(sizeof *curreq);
+	curreq->next = NULL;
+	curreq->child_pid = -1;
+	curreq->timestamp = curtime;
+	curreq->type = type;
+	curreq->data = data;
+
+	if (prevreq == NULL)
+		first_request = curreq;
+	else
+		prevreq->next = curreq;
+
+	debug(1, ("adding %s request to the list. %d requests held.", 
+		 request_class[type].name,
+		 request_count+1));
+
+	if (spawn_flag == 0 || !request_class[type].spawn) {
+		/* 
+		 * Execute handler function
+		 */
+		request_class[type].handler(data, activefd);
+		request_cleanup(type, (qid_t)curreq->data);
+		request_list_unblock();
 		return;
 	}
 
-	radiusd_run_preconfig_hooks(NULL);
+	/*
+	 *	fork our child
+	 */
+	if ((child_pid = fork()) < 0) {
+		request_drop(type, data, _("cannot fork"));
+		free_entry(curreq);
+	}
+	if (child_pid == 0) {
+		/*
+		 *	This is the child, it should go ahead and respond
+		 */
+		request_list_unblock();
+		signal(SIGCHLD, SIG_DFL);
+		signal(SIGHUP, SIG_IGN);
+		signal(SIGUSR1, SIG_IGN);
+		signal(SIGUSR2, SIG_IGN);
+		signal(SIGINT, SIG_IGN);
+		chdir("/tmp");
+		request_class[type].handler(data, activefd);
+		exit(0);
+	} else {
+		debug(1, ("started handler at pid %ld", child_pid));
+	}
 
+	/*
+	 *	Register the Child
+	 */
+	curreq->child_pid = child_pid;
+
+	request_list_unblock();
+	schedule_child_cleanup();
+}
+
+void
+rad_child_cleanup()
+{
+	int		status;
+        pid_t		pid;
+	REQUEST   	*curreq;
+ 
+	if (!need_child_cleanup)
+		return;
+	clear_child_cleanup();
+
+        for (;;) {
+		pid = waitpid((pid_t)-1, &status, WNOHANG);
+                if (pid <= 0)
+                        break;
+
+		debug(2, ("child %d died", pid));
+
+#if defined (aix) /* Huh? */
+		kill(pid, SIGKILL);
+#endif
+
+		curreq = first_request;
+		while (curreq != NULL) {
+			if (curreq->child_pid == pid) {
+				curreq->child_pid = -1;
+				/*
+				 *	FIXME: UINT4 ?
+				 */
+				curreq->timestamp = (UINT4)time(NULL);
+				request_cleanup(curreq->type,
+						(qid_t)curreq->data);
+				break;
+			}
+			curreq = curreq->next;
+		}
+        }
+}
+
+int
+flush_request_list()
+{
+	REQUEST	*curreq;
+	REQUEST	*prevreq;
+	UINT4	curtime;
+	int	request_count;
+	pid_t	child_pid;
+	
+	curtime = (UINT4)time(NULL);
+	request_count = 0;
+	curreq = first_request;
+	prevreq = NULL;
+
+	/* Block asynchronous access to the list
+	 */
+	request_list_block();
+
+	while (curreq != NULL) {
+		if (curreq->child_pid == -1) {
+			/*
+			 * Request completed, delete it no matter how
+			 * long does it reside in the queue  
+			 */
+			debug(1, ("deleting completed %s request",
+				 request_class[curreq->type].name));
+			if (prevreq == NULL) {
+				first_request = curreq->next;
+				request_free(curreq);
+				curreq = first_request;
+			} else {
+				prevreq->next = curreq->next;
+				request_free(curreq);
+				curreq = prevreq->next;
+			}
+		} else if (curreq->timestamp +
+			   request_class[curreq->type].ttl <= time(NULL)) {
+			/*
+			 *	kill the request
+			 */
+			child_pid = curreq->child_pid;
+			radlog(L_NOTICE,
+			       _("Killing unresponsive %s child pid %d"),
+			       request_class[curreq->type].name,
+			       child_pid);
+			curreq->child_pid = -1;
+			curreq->timestamp = curtime -
+				request_class[curreq->type].cleanup_delay;
+			kill(child_pid, SIGTERM);
+		} else {
+			prevreq = curreq;
+			curreq = curreq->next;
+			request_count++;
+		}
+	}
+
+	request_list_unblock();
+	return request_count;
+}
+
+int
+stat_request_list(report)
+	int (*report)();
+{
+	int     pending_count[R_MAX] = {0};
+	int     completed_count[R_MAX] = {0};
+	REQUEST	*curreq;
+	int     i;
+	char    tbuf[128];
+	
+	curreq = first_request;
+	/* Block asynchronous access to the list
+	 */
+	request_list_block();
+
+	while (curreq != NULL) {
+		if (curreq->child_pid == -1) 
+			completed_count[curreq->type]++;
+		else
+			pending_count[curreq->type]++;
+
+		curreq = curreq->next;
+	}
+	request_list_unblock();
+
+	/* Report the results */
+	for (i = 0; i < NITEMS(request_class); i++) {
+		sprintf(tbuf, "%4.4s  %4d  %4d  %4d",
+			request_class[i].name,
+			pending_count[i],
+			completed_count[i],
+			pending_count[i] + completed_count[i]);
+		report(tbuf);
+	}
+	return 0;
+}
+
+/* ************************************************************************* */
+int
+authreq_cmp(a, b)
+	AUTH_REQ *a, *b;
+{
+	return !(a->ipaddr == b->ipaddr &&
+		 a->id == b->id &&
+			memcmp(a->vector, b->vector, 16) == 0);
+}
+
+void
+rad_req_free(req)
+	AUTH_REQ *req;
+{
+	if (req->data_alloced)
+		efree(req->data);
+	authfree(req);
+}
+
+void
+rad_req_drop(type, authreq, status_str)
+	int type;
+	AUTH_REQ *authreq;
+	char *status_str;
+{
+	radlog(L_NOTICE,
+	       _("Dropping %s packet from client %s, ID: %d: %s"),
+	       request_class[type].name,
+	       client_name(authreq->ipaddr),
+	       authreq->id,
+	       status_str);
+
+	switch (type) {
+	case R_AUTH:
+		stat_inc(auth, authreq->ipaddr, num_dropped);
+		break;
+	case R_ACCT:
+		stat_inc(acct, authreq->ipaddr, num_dropped);
+	}
+}
+/* ************************************************************************* */
+
+#if defined (sun) && defined(__svr4__)
+/*
+ *	The signal() function in Solaris 2.5.1 sets SA_NODEFER in
+ *	sa_flags, which causes grief if signal() is called in the
+ *	handler before the cause of the signal has been cleared.
+ *	(Infinite recursion).
+ */
+RETSIGTYPE
+(*sun_signal(signo, func))(int)
+	int signo;
+	void (*func)(int);
+{
+	struct sigaction act, oact;
+
+	act.sa_handler = func;
+	sigemptyset(&act.sa_mask);
+	act.sa_flags = 0;
+#ifdef  SA_INTERRUPT		/* SunOS */
+	act.sa_flags |= SA_INTERRUPT;
+#endif
+	if (sigaction(signo, &act, &oact) < 0)
+		return SIG_ERR;
+	return oact.sa_handler;
+}
+#endif
+
+/*ARGSUSED*/
+RETSIGTYPE
+sig_cleanup(sig)
+	int sig;
+{
+	schedule_child_cleanup();
+	signal(SIGCHLD, sig_cleanup);
+}
+
+/*
+ *	Display the syntax for starting this program.
+ */
+void
+usage()
+{
+	static char ustr[] =
+"usage: radiusd [options]\n\n"
+"options are:\n"
+#ifdef HAVE_GETOPT_LONG
+"    -A, --log-auth-detail       Do detailed authentication logging.\n"
+"    -a, --acct-directory DIR    Specify accounting directory.\n"
+"    -c, --check-config          Do configuration files syntax check\n"
+"                                and exit.\n"
+#ifdef USE_DBM
+"    -b, --dbm                   Enable DBM support. When used twice,\n"
+"                                allows to use both `users' file and\n"
+"                                DBM database.\n" 
+#endif
+"    -d, --config-directory DIR  Specify alternate configuration directory\n"
+"                                (default " RADIUS_DIR ").\n"
+"    -f, --foreground            Stay in foreground.\n"
+"    -L, --license               Display GNU license and exit\n"
+"    -l, --logging-directory DIR Specify alternate logging directory\n"
+"                                (default " RADLOG_DIR ").\n"
+"    -n, --auth-only             Start only authentication process.\n"
+"    -p, --port PORTNO           Use alternate port number.\n" 
+"    -S, --log-stripped-names    Log usernames stripped off any\n"
+"                                prefixes/suffixes.\n"
+"    -s, --single-process        Run in single process mode.\n"
+"    -v, --version               Display program version and exit.\n"
+"    -x, --debug debug_level     Set debugging level.\n"
+"    -y, --log-auth              Log authentications.\n"
+"    -z, --log-auth-pass         Log passwords used.\n"
+#else
+"    -A                          Do detailed authentication logging.\n"
+"    -a DIR                      Specify accounting directory.\n"
+"    -c                          Do configuration files syntax check\n"
+"                                and exit.\n"
+#ifdef USE_DBM
+"    -b                          Enable DBM support. When used twice,\n"
+"                                allows to use both `users' file and\n"
+"                                DBM database.\n" 
+#endif
+"    -d DIR                      Specify alternate configuration directory\n"
+"                                (default " RADIUS_DIR ").\n"
+"    -f                          Stay in foreground.\n"
+"    -L                          Display GNU license and exit.\n"
+"    -l DIR                      Specify alternate logging directory\n"
+"                                (default " RADLOG_DIR ").\n"
+"    -n                          Start only authentication process.\n"
+"    -p PORTNO                   Use alternate port number.\n" 
+"    -S                          Log usernames stripped off any\n"
+"                                prefixes/suffixes.\n"
+"    -s                          Run in single process mode.\n"
+"    -v                          Display program version and exit.\n"
+"    -x debug_level              Set debugging level.\n"
+"    -y                          Log authentications.\n"
+"    -z                          Log passwords used.\n"
+#endif
+;
+	fprintf(stdout, "%s", ustr);
+	exit(1);
+}
+
+
+/*
+ *	Intializes configuration values:
+ *
+ *		warning_seconds - When acknowledging a user authentication
+ *			time remaining for valid password to notify user
+ *			of password expiration.
+ *
+ *	These values are read from the SERVER_CONFIG part of the
+ *	dictionary (of all places!)
+ */
+int
+config_init()
+{
+	DICT_VALUE	*dval;
+
+	if (!(dval = dict_valfind("Password-Warning"))) 
+		warning_seconds = (UINT4)0;
+	else 
+		warning_seconds = dval->value * (UINT4)SECONDS_PER_DAY;
+
+#if 0
+	if (!(dval = dict_valfind("Password-Expiration"))) 
+		password_expiration = 0;
+	else
+		passvord_expiration = dval->value * SECONDS_PER_DAY;
+#endif
+	return 0;
+}
+
+/*
+ *	Clean up and exit.
+ */
+void
+rad_exit(sig)
+	int sig;
+{
+	char *me = _("MASTER: ");
+	static int exiting;
+
+	if (exiting) /* Prevent recursive invocation */
+		return ;
+	exiting++;
+	
+	if (radius_pid == getpid()) {
+		/*
+		 *      FIXME: kill all children.
+		 */
+		stat_done();
+#ifdef RADIUS_PID		
+		unlink(RADIUS_PID);
+#endif		
+	} else {
+		me = _("CHILD: ");
+	}
+
+	switch (sig) {
+	case 101:
+		radlog(L_CRIT, _("%sfailed in select() - exit."), me);
+		break;
+	case SIGTERM:
+		radlog(L_CRIT, _("%sNormal shutdown."), me);
+		break;
+	default:
+		radlog(L_CRIT, _("%sexit on signal (%d)"), me, sig);
+		break;
+	}
+
+	exit(sig == SIGTERM ? 0 : 1);
+}
+
+int
+rad_flush_queues()
+{
+	/* Flush request queues */
+	radlog(L_NOTICE, _("flushing request queues"));
+
+	while (flush_request_list())
+		;
+
+	return 0;
+}
+
+/* Restart RADIUS process
+ */
+int
+rad_restart()
+{
+	pid_t pid;
+	struct socket_list *slist;
+	
+	radlog(L_NOTICE, _("restart initiated"));
+	
+	/* Flush request queues */
+	rad_flush_queues();
+	
 	if (foreground)
 		pid = 0; /* make-believe we're child */
 	else 
 		pid = fork();
-	if (pid < 0) {
-		grad_log(L_CRIT|L_PERROR,
-		         _("radiusd_restart: cannot fork"));
-		return;
-	}
 	
-	radiusd_signal_init(SIG_DFL);
+	if (pid < 0) {
+		radlog(L_CRIT|L_PERROR,
+		       _("rad_restart: cannot fork"));
+		return -1;
+	}
+
+	/* Close all channels we were listening to */
+	for (slist = socket_first; slist; slist = slist->next) 
+		close(slist->fd);
+
+	/* Restore signals */
+	signal(SIGHUP, SIG_DFL);
+	signal(SIGUSR1, SIG_DFL);
+	signal(SIGUSR2, SIG_DFL);
+	signal(SIGQUIT, SIG_DFL);
+	signal(SIGTERM, SIG_DFL);
+	signal(SIGCHLD, SIG_DFL);
+#if !defined(MAINTAINER_MODE)
+	signal(SIGTRAP, SIG_DFL);
+	signal(SIGFPE, SIG_DFL);
+	signal(SIGSEGV, SIG_DFL);
+	signal(SIGILL, SIG_DFL);
+#endif
+#if 0
+	signal(SIGIOT, SIG_DFL);
+#endif
+	
 	if (pid > 0) {
 		/* Parent */
 		sleep(10);
@@ -805,670 +1458,136 @@ radiusd_restart()
 	sleep(10);
 
 	/* Child */
-	grad_log(L_NOTICE, _("restarting radius"));
+	radlog(L_NOTICE, _("restarting radius"));
 	execvp(xargv[0], xargv);
-	grad_log(L_CRIT|L_PERROR, _("RADIUS NOT RESTARTED: exec failed"));
+	radlog(L_CRIT|L_PERROR, _("RADIUS NOT RESTARTED: exec failed"));
 	exit(1);
-	/*NOTREACHED*/
 }
 
 
-
-static int
-radiusd_rpp_wait(void *arg)
-{
-	time_t *tp = arg;
-	struct timeval tv;
-
-	if (time(NULL) > *tp)
-		return 1;
-	
-	tv.tv_sec = 2;
-	tv.tv_usec = 0;
-	input_select_channel(radius_input, "rpp", &tv);
-	return 0;
-}
-
-void
-radiusd_flush_queue()
-{
-	time_t t;
-	max_ttl(&t);
-	rpp_flush(radiusd_rpp_wait, &t);
-}
-		
-void
-radiusd_exit()
-{
-        stat_done();
-	radiusd_pidfile_remove(RADIUSD_PID_FILE);
-	
-	radiusd_flush_queue();
-	grad_log(L_CRIT, _("Normal shutdown."));
-
-	rpp_kill(-1, SIGTERM);
-	radiusd_exit0();
-}
-
-void
-radiusd_exit0()
-{
-        radiusd_sql_shutdown();
-        exit(0);
-}
-
-void
-radiusd_main_loop()
-{
-        grad_log(L_INFO, _("Ready to process requests."));
-
-        for (;;) {
-		log_open(L_MAIN);
-		check_reload();
-		input_select(radius_input, NULL);
-	}
-}
-
-
-/* ************************ Coniguration Functions ************************* */
-
-struct hook_rec {
-	void (*function)(void *func_data, void *call_data);
-	void *data;
-	int once; /* Run once and remove */
-};
-
-static grad_list_t /* of struct hook_rec */ *preconfig;
-static grad_list_t /* of struct hook_rec */ *postconfig;
-
-void
-radiusd_set_preconfig_hook(void (*f)(void *, void *), void *p, int once)
-{
-	struct hook_rec *hp = grad_emalloc(sizeof(*hp));
-	hp->function = f;
-	hp->data = p;
-	hp->once = once;
-	if (!preconfig)
-		preconfig = grad_list_create();
-	grad_list_prepend(preconfig, hp);
-}
-
-void
-radiusd_set_postconfig_hook(void (*f)(void *, void *), void *p, int once)
-{
-	struct hook_rec *hp = grad_emalloc(sizeof(*hp));
-	hp->function = f;
-	hp->data = p;
-	hp->once = once;
-	if (!postconfig)
-		postconfig = grad_list_create();
-	grad_list_prepend(postconfig, hp);
-}
-
-struct hook_runtime_closure {
-	grad_list_t *list;
-	void *call_data;
-};
-
-static int
-_hook_call(void *item, void *data)
-{
-	struct hook_rec *hp = item;
-	struct hook_runtime_closure *clos = data;
-	hp->function(hp->data, clos->call_data);
-	if (hp->once) {
-		grad_list_remove(clos->list, hp, NULL);
-		grad_free(hp);
-	}
-	return 0;
-}
-
-void
-radiusd_run_preconfig_hooks(void *data)
-{
-	struct hook_runtime_closure clos;
-	clos.list = preconfig;
-	clos.call_data = data;
-	grad_list_iterate(clos.list, _hook_call, &clos);
-}
-
-void
-radiusd_run_postconfig_hooks(void *data)
-{
-	struct hook_runtime_closure clos;
-	clos.list = postconfig;
-	clos.call_data = data;
-	grad_list_iterate(clos.list, _hook_call, &clos);
-}
-
-void
-radiusd_reconfigure()
-{
-        int rc = 0;
-        char *filename;
-
-	radiusd_run_preconfig_hooks(NULL);
-	
-	grad_log(L_INFO, _("Loading configuration files."));
-	/* Read main configuration file */
-        filename = grad_mkfilename(grad_config_dir, RADIUS_CONFIG);
-        cfg_read(filename, config_syntax, NULL);
-	grad_free(filename);
-
-	/* Read other files */
-        rc = reload_config_file(reload_all);
-        
-        if (rc) {
-                grad_log(L_CRIT, _("Errors reading config file - EXITING"));
-                exit(1);
-        }
-
-	grad_path_init();
-	radiusd_run_postconfig_hooks(NULL);
-}
-
-
-/* ***************************** Signal Handling *************************** */
-
+/*
+ *	We got a fatal signal. Clean up and exit.
+ */
 static RETSIGTYPE
-sig_handler(int sig)
+sig_fatal(sig)
+	int sig;
 {
-        switch (sig) {
-	case SIGHUP:
-		daemon_command = CMD_RELOAD;
-                break;
-
-	case SIGUSR1:
-		daemon_command = CMD_MEMINFO;
-		break;
-
-        case SIGUSR2:
-		daemon_command = CMD_DUMPDB;
-		break;
-
-	case SIGCHLD:
-		radiusd_collect_children ();
-		daemon_command = CMD_CLEANUP;
-		break;
-
-	case SIGTERM:
-	case SIGQUIT:
-		daemon_command = CMD_SHUTDOWN;
-		break;
-		
-	case SIGPIPE:
-		/*FIXME: Any special action? */
-		daemon_command = CMD_CLEANUP;
-		break;
-
-	default:
-		abort();
-	}
-	grad_reset_signal(sig, sig_handler);
+	rad_exit(sig);
 }
 
-void
-radiusd_signal_init(RETSIGTYPE (*hp)(int sig))
+/*
+ *	We got the hangup signal.
+ *	Re-read the configuration files.
+ */
+/*ARGSUSED*/
+static RETSIGTYPE
+sig_hup(sig)
+	int sig;
 {
-	static int signum[] = {
-		SIGHUP, SIGUSR1, SIGUSR2, SIGCHLD, 
-		SIGTERM, SIGQUIT, SIGPIPE
-	};
-	int i;
-
-	for (i = 0; i < sizeof(signum)/sizeof(signum[0]); i++)
-		grad_set_signal(signum[i], hp);
-}
-
-
-/* ************************************************************************* */
-
-void
-radiusd_pidfile_write(char *name)
-{
-        pid_t pid = getpid();
-        char *p = grad_mkfilename(grad_pid_dir, name);
-	FILE *fp = fopen(p, "w"); 
-	if (fp) {
-                fprintf(fp, "%lu\n", (u_long) pid);
-                fclose(fp);
-        }
-        grad_free(p);
-}	
-
-pid_t
-radiusd_pidfile_read(char *name)
-{
-	unsigned long val;
-	char *p = grad_mkfilename(grad_pid_dir, name);
-	FILE *fp = fopen(p, "r");
-	if (!fp)
-		return -1;
-	if (fscanf(fp, "%lu", &val) != 1)
-		val = -1;
-	fclose(fp);
-	grad_free(p);
-	return (pid_t) val;
-}
-
-void
-radiusd_pidfile_remove(char *name)
-{
-	char *p = grad_mkfilename(grad_pid_dir, name);
-	unlink(p);
-	grad_free(p);
-}
-
-
-
-/* ************************************************************************* */
-static u_char recv_buffer[RAD_BUFFER_SIZE];
-
-struct udp_data {
-	int type;
-	struct sockaddr_in addr;
-};
-
-int
-udp_input_handler(int fd, void *data)
-{
-        struct sockaddr sa;
-	socklen_t salen = sizeof (sa);
-	int size;
-	struct udp_data *sd = data;
-	
-	size = recvfrom(fd, (char *) recv_buffer, sizeof(recv_buffer),
-			0, &sa, &salen);
-	if (size < 0) 
-		request_fail(sd->type, (struct sockaddr_in*)&sa);
-	else {
-		REQUEST *req = request_create(sd->type,
-					      fd,
-					      &sd->addr,
-					      (struct sockaddr_in*)&sa,
-					      recv_buffer, size);
-
-		if (request_handle(req,
-				   spawn_flag ?
-				   rpp_forward_request : request_respond))
-			request_free(req);
-	}
-	return 0;
+	signal(SIGHUP, sig_hup);
+	radlog(L_INFO, _("got HUP. Reloading configuration now"));
+	need_reload = 1;
 }
 
 int
-udp_input_close(int fd, void *data)
+report_info(s)
+	char *s;
 {
-	close(fd);
-	grad_free(data);
-	return 0;
+	radlog(L_INFO, "%s", s);
+}
+
+/*ARGSUSED*/
+RETSIGTYPE
+sig_usr1(sig)
+	int sig;
+{
+	signal(SIGUSR1, sig_usr1);
+	radlog(L_INFO, _("got USR1. Dumping memory usage statistics"));
+	flush_request_list();
+	meminfo(report_info);
+#ifdef LEAK_DETECTOR
+	radlog(L_INFO, _("malloc statistics: %d blocks, %d bytes"),
+	       mallocstat.count, mallocstat.size);
+#endif
+}
+
+/*ARGSUSED*/
+RETSIGTYPE
+sig_usr2(sig)
+	int sig;
+{
+	signal(SIGUSR2, sig_usr2);
+	radlog(L_INFO, _("got USR2. Reloading configuration in %ld sec."),
+	       config.delayed_hup_wait);
+	delayed_hup_time = time(NULL);
+}
+
+/*ARGSUSED*/
+RETSIGTYPE
+sig_dumpdb(sig)
+	int sig;
+{
+	signal(sig, sig_dumpdb);
+	radlog(L_INFO, _("got INT. Dumping users db to `%s'"),
+	       RADIUS_DUMPDB_NAME);
+	dump_users_db();
 }
 
 int
-udp_input_cmp(const void *a, const void *b)
+master_process()
 {
-	const struct udp_data *sda = a;
-	const struct udp_data *sdb = b;
-
-	if (sda->addr.sin_port != sdb->addr.sin_port)
-		return 1;
-	if (sda->addr.sin_addr.s_addr == INADDR_ANY
-	    || sdb->addr.sin_addr.s_addr == INADDR_ANY)
-		return 0;
-	return sda->addr.sin_addr.s_addr != sdb->addr.sin_addr.s_addr;
+	return radius_pid == 0 || getpid() == radius_pid;
 }
 
+#if defined(O_NONBLOCK)
+# define FCNTL_NONBLOCK O_NONBLOCK
+#elif defined(O_NDELAY)
+# define FCNTL_NONBLOCK O_NDELAY
+#else
+# error "Neither O_NONBLOCK nor O_NDELAY are defined"
+#endif
+
 int
-udp_open(int type, grad_uint32_t ipaddr, int port, int nonblock)
-{
+set_nonblocking(fd)
 	int fd;
-	struct sockaddr_in s;
-	struct udp_data *p;
-	
-        s.sin_family = AF_INET;
-        s.sin_addr.s_addr = htonl(ipaddr);
-        s.sin_port = htons(port);
-	if (p = input_find_channel(radius_input, "udp", &s)) {
-		char buffer[GRAD_IPV4_STRING_LENGTH];
-		grad_log(L_ERR,
-		         _("socket %s:%d is already assigned for %s"),
-		         grad_ip_iptostr(ipaddr, buffer),
-		         port,
-		         request_class[p->type].name);
-		return 1;
-	}
-
-        fd = socket(PF_INET, SOCK_DGRAM, 0);
-	if (nonblock) 
-		grad_set_nonblocking(fd);
-        if (fd < 0) {
-                grad_log(L_CRIT|L_PERROR, "%s socket",
-		         request_class[type].name);
-		return 1;
-        }
-        if (bind(fd, (struct sockaddr*) &s, sizeof(s)) < 0) {
-                grad_log(L_CRIT|L_PERROR, "%s bind", request_class[type].name);
-		close(fd);
-		return 1;
-	}
-
-	p = grad_emalloc(sizeof(*p));
-	p->type = type;
-	p->addr = s;
-	input_register_channel(radius_input, "udp", fd, p);
-	return 0;
-}
-
-static int
-channel_counter(void *item, void *data)
 {
-	struct udp_data *p = item;
-	if (p->type == R_AUTH || p->type == R_ACCT)
-		++*(size_t*)data;
-	return 0;
-}
+	int flags;
 
-static size_t
-radius_count_channels()
-{
-	size_t count = 0;
-	
-	input_iterate_channels(radius_input, "udp", channel_counter, &count);
-	return count;
-}
-
-
-/* ************************************************************************* */
-
-static int _opened_auth_sockets;
-static int _opened_acct_sockets;
-
-static int
-rad_cfg_listen_auth(int argc, cfg_value_t *argv,
-		    void *block_data, void *handler_data)
-{
-	int i, errcnt = 0;
-
-	if (argc == 2 && argv[1].type == CFG_BOOLEAN) {
-		if (argv[1].v.bool == 0)
-			auth_port = 0;
-		return 0;
+	if ((flags = fcntl(fd, F_GETFL, 0)) < 0) {
+		radlog(L_ERR, "F_GETFL: %s", strerror(errno));
+		return -1;
 	}
-	
-	for (i = 1; i < argc; i++)  
-		if (argv[i].type == CFG_NETWORK) {
-			if (argv[i].v.network.netmask != 0xffffffffL)
-				cfg_type_error(CFG_HOST);
-		} else if (argv[i].type != CFG_HOST) {
-			cfg_type_error(CFG_HOST);
-			errcnt++;
-		}
-	
-	if (errcnt == 0 && radius_mode == MODE_DAEMON) {
-		for (i = 1; i < argc; i++) {
-			grad_uint32_t ip;
-			int port;
-
-			if (argv[i].type == CFG_NETWORK) {
-				ip = argv[i].v.network.ipaddr;
-				port = auth_port;
-			} else {
-				ip = argv[i].v.host.ipaddr;
-				port = argv[i].v.host.port;
-			} 
-			
-			if (udp_open(R_AUTH, ip, port, 0))
-				errcnt++;
-		}
+	if (fcntl(fd, F_SETFL, flags | FCNTL_NONBLOCK) < 0) {
+		radlog(L_ERR, "F_GETFL: %s", strerror(errno));
+		return -1;
 	}
-	if (errcnt == 0)
-		_opened_auth_sockets++;
 	return 0;
 }
 
 int
-auth_stmt_begin(int finish, void *block_data, void *handler_data)
+open_socket(port, type)
+	int port;
+	char *type;
 {
-	if (!finish) 
-		_opened_auth_sockets = 0;
-	else if (radius_mode == MODE_DAEMON
-		 && !_opened_auth_sockets
-		 && auth_port)
-		udp_open(R_AUTH, INADDR_ANY, auth_port, 0);
-	return 0;
-}
+	struct	sockaddr	salocal;
+	struct	sockaddr_in	*sin;
 
-static int
-rad_cfg_listen_acct(int argc, cfg_value_t *argv,
-		    void *block_data, void *handler_data)
-{
-	int i, errcnt = 0;
-	
-	if (argc == 2 && argv[1].type == CFG_BOOLEAN) {
-		if (argv[1].v.bool == 0)
-			acct_port = 0;
-		return 0;
+	int fd = socket (AF_INET, SOCK_DGRAM, 0);
+	if (fd < 0) {
+		radlog(L_CRIT|L_PERROR, "%s socket", type);
+		exit(1);
 	}
-	
-	for (i = 1; i < argc; i++)  
-		if (argv[i].type == CFG_NETWORK) {
-			if (argv[i].v.network.netmask != 0xffffffffL)
-				cfg_type_error(CFG_HOST);
-		} else if (argv[i].type != CFG_HOST) {
-			cfg_type_error(CFG_HOST);
-			errcnt++;
-		}
-	
-	if (errcnt == 0 && radius_mode == MODE_DAEMON) {
-		for (i = 1; i < argc; i++) {
-			grad_uint32_t ip;
-			int port;
 
-			if (argv[i].type == CFG_NETWORK) {
-				ip = argv[i].v.network.ipaddr;
-				port = acct_port;
-			} else {
-				ip = argv[i].v.host.ipaddr;
-				port = argv[i].v.host.port;
-			} 
-			
-			if (udp_open(R_ACCT, ip, port, 0))
-				errcnt++;
-		}
+	sin = (struct sockaddr_in *) & salocal;
+        memset ((char *) sin, '\0', sizeof (salocal));
+	sin->sin_family = AF_INET;
+	sin->sin_addr.s_addr = INADDR_ANY;
+	sin->sin_port = htons(port);
+
+	if (bind (fd, & salocal, sizeof (*sin)) < 0) {
+		radlog(L_CRIT|L_PERROR, "%s bind", type);
+		exit(1);
 	}
-	_opened_acct_sockets++;
-	return 0;
-}
-		
-int
-acct_stmt_begin(int finish, void *block_data, void *handler_data)
-{
-	if (!finish) 
-		_opened_acct_sockets = 0;
-	else if (radius_mode == MODE_DAEMON
-		 && !_opened_acct_sockets
-		 && acct_port)
-		udp_open(R_ACCT, INADDR_ANY, acct_port, 0);
-	return 0;
+	return fd;
 }
 
-static int
-rad_cfg_user(int argc, cfg_value_t *argv,
-	     void *block_data, void *handler_data)
-{
-	RADIUS_USER *usr = handler_data;
-
-	if (argc != 2 || argv[1].type != CFG_STRING) 
-		return 1;
-	return radius_get_user_ids((RADIUS_USER *) handler_data,
-				   argv[1].v.string);
-}
-
-int
-option_stmt_end(void *block_data, void *handler_data)
-{
-	if (exec_user.username && radiusd_user.uid != 0) {
-		grad_log(L_WARN, _("Ignoring exec-program-user"));
-		grad_free(exec_user.username);
-		exec_user.username = NULL;
-	} else if (exec_user.username == NULL)
-		radius_get_user_ids(&exec_user, "daemon");
-	return 0;
-}
-
-struct cfg_stmt option_stmt[] = {
-	{ "source-ip", CS_STMT, NULL, cfg_get_ipaddr, &myip,
-	  NULL, NULL },
-	{ "max-requests", CS_STMT, NULL, cfg_get_size_t, &max_requests,
-	  NULL, NULL },
-	{ "max-threads", CS_STMT, NULL, cfg_get_size_t, &max_children,
-	  NULL, NULL },
-	{ "max-processes", CS_STMT, NULL, cfg_get_size_t, &max_children,
-	  NULL, NULL },
-	{ "process-idle-timeout", CS_STMT, NULL, cfg_get_unsigned, &process_timeout,
-	  NULL, NULL },
-	{ "master-read-timeout", CS_STMT, NULL,
-	  cfg_get_unsigned, &radiusd_read_timeout, NULL, NULL },
-	{ "master-write-timeout", CS_STMT, NULL,
-	  cfg_get_unsigned, &radiusd_write_timeout, NULL, NULL },
-	{ "exec-program-user", CS_STMT, NULL, rad_cfg_user,
-	  &exec_user, NULL, NULL },
-	{ "radiusd-user", CS_STMT, NULL, rad_cfg_user,
-	  &radiusd_user, NULL, NULL },
-	{ "log-dir", CS_STMT, NULL, cfg_get_string, &grad_log_dir,
-	  NULL, NULL },
-	{ "acct-dir", CS_STMT, NULL, cfg_get_string, &grad_acct_dir,
-	  NULL, NULL },
-	{ "resolve", CS_STMT, NULL, cfg_get_boolean, &grad_resolve_hostnames,
-	  NULL, NULL },
-	{ "username-chars", CS_STMT, NULL, cfg_get_string,
-	  &username_valid_chars, NULL, NULL },
-	/* Obsolete statements */
-	{ "usr2delay", CS_STMT, NULL, cfg_obsolete, NULL, NULL, NULL },
-	{ NULL, }
-};
-
-struct cfg_stmt message_stmt[] = {
-	{ "account-closed", CS_STMT, NULL,
-	  cfg_get_string, &message_text[MSG_ACCOUNT_CLOSED],
-	  NULL, NULL },
-	{ "password-expired", CS_STMT, NULL,
-	  cfg_get_string, &message_text[MSG_PASSWORD_EXPIRED],
-	  NULL, NULL },
-	{ "access-denied", CS_STMT, NULL,
-	  cfg_get_string, &message_text[MSG_ACCESS_DENIED],
-	  NULL, NULL },
-	{ "realm-quota", CS_STMT, NULL,
-	  cfg_get_string, &message_text[MSG_REALM_QUOTA],
-	  NULL, NULL },
-	{ "multiple-login", CS_STMT, NULL,
-	  cfg_get_string, &message_text[MSG_MULTIPLE_LOGIN],
-	  NULL, NULL },
-	{ "second-login", CS_STMT, NULL,
-	  cfg_get_string, &message_text[MSG_SECOND_LOGIN],
-	  NULL, NULL },
-	{ "timespan-violation", CS_STMT, NULL,
-	  cfg_get_string, &message_text[MSG_TIMESPAN_VIOLATION],
-	  NULL, NULL },
-	{ "password-expire-warning", CS_STMT, NULL,
-	  cfg_get_string, &message_text[MSG_PASSWORD_EXPIRE_WARNING],
-	  NULL, NULL },
-	{ NULL, }
-};
-
-struct cfg_stmt auth_stmt[] = {
-	{ "port", CS_STMT, NULL, cfg_get_port, &auth_port, NULL, NULL },
-	{ "listen", CS_STMT, NULL, rad_cfg_listen_auth, NULL, NULL, NULL },
-	{ "forward", CS_STMT, NULL, rad_cfg_forward_auth, NULL, NULL, NULL },
-	{ "max-requests", CS_STMT, NULL,
-	  cfg_get_integer, &request_class[R_AUTH].max_requests, NULL, NULL },
-	{ "time-to-live", CS_STMT, NULL,
-	  cfg_get_integer, &request_class[R_AUTH].ttl, NULL, NULL },
-	{ "request-cleanup-delay", CS_STMT, NULL,
-	  cfg_get_integer, &request_class[R_AUTH].cleanup_delay, NULL, NULL },
-	{ "detail", CS_STMT, NULL, cfg_get_boolean, &auth_detail,
-	  NULL, NULL },
-	{ "detail-file-name", CS_STMT, NULL, cfg_get_string,
-	  &auth_detail_template, NULL, NULL },
-	{ "strip-names", CS_STMT, NULL, cfg_get_boolean, &strip_names,
-	  NULL, NULL },
-	{ "checkrad-assume-logged", CS_STMT, NULL,
-	  cfg_get_boolean, &checkrad_assume_logged,
-	  NULL, NULL },
-	{ "reject-malformed-names", CS_STMT, NULL,
-	  cfg_get_boolean, &auth_reject_malformed_names,
-	  NULL, NULL },
-	{ "password-expire-warning", CS_STMT, NULL,
-	  cfg_get_uint32_t, &warning_seconds,
-	  NULL, NULL },
-	{ "compare-attribute-flag", CS_STMT, NULL,
-	  cfg_get_integer, &auth_comp_flag,
-	  NULL, NULL },
-	{ "trace-rules", CS_STMT, NULL, cfg_get_boolean, &auth_trace_rules,
-	  NULL, NULL },
-	/* Obsolete statements */
-	{ "spawn", CS_STMT, NULL, cfg_obsolete, NULL, NULL, NULL },
-	{ NULL, }
-};
-
-struct cfg_stmt acct_stmt[] = {
-	{ "port", CS_STMT, NULL, cfg_get_port, &acct_port, NULL, NULL },
-	{ "listen", CS_STMT, NULL, rad_cfg_listen_acct, NULL, NULL, NULL },
-	{ "forward", CS_STMT, NULL, rad_cfg_forward_acct, NULL, NULL, NULL },
-	{ "max-requests", CS_STMT, NULL,
-	  cfg_get_integer, &request_class[R_ACCT].max_requests,
-	  NULL, NULL },
-	{ "time-to-live", CS_STMT, NULL,
-	  cfg_get_integer, &request_class[R_ACCT].ttl,
-	  NULL, NULL },
-	{ "request-cleanup-delay", CS_STMT, NULL,
-	  cfg_get_integer, &request_class[R_ACCT].cleanup_delay,
-	  NULL, NULL },
-	{ "detail", CS_STMT, NULL, cfg_get_boolean, &acct_detail,
-	  NULL, NULL },
-	{ "detail-file-name", CS_STMT, NULL, cfg_get_string,
-	  &acct_detail_template, NULL, NULL },
-	{ "system", CS_STMT, NULL, cfg_get_boolean, &acct_system,
-	  NULL, NULL },
-	{ "compare-attribute-flag", CS_STMT, NULL,
-	  cfg_get_integer, &acct_comp_flag,
-	  NULL, NULL },
-	{ "trace-rules", CS_STMT, NULL, cfg_get_boolean, &acct_trace_rules,
-	  NULL, NULL },
-	/* Obsolete statements */
-	{ "spawn", CS_STMT, NULL, cfg_obsolete, NULL, NULL, NULL },
-	{ NULL, }
-};
-
-struct cfg_stmt proxy_stmt[] = {
-	{ "max-requests", CS_STMT, NULL, cfg_obsolete, NULL, NULL, NULL },
-	{ "request-cleanup-delay", CS_STMT, NULL,
-	  cfg_obsolete, NULL, NULL, NULL },
-	{ NULL, }
-};
-
-struct cfg_stmt config_syntax[] = {
-	{ "option", CS_BLOCK, NULL, NULL, NULL, option_stmt, option_stmt_end },
-	{ "message", CS_BLOCK, NULL, NULL, NULL, message_stmt, NULL },
-	{ "logging", CS_BLOCK, logging_stmt_begin, logging_stmt_handler, NULL,
-	  logging_stmt, logging_stmt_end },
-	{ "auth", CS_BLOCK, auth_stmt_begin, NULL, NULL, auth_stmt, NULL },
-	{ "acct", CS_BLOCK, acct_stmt_begin, NULL, NULL, acct_stmt, NULL  },
-	{ "mlc",  CS_BLOCK, NULL, NULL, NULL, mlc_stmt, NULL },
-	{ "proxy", CS_BLOCK, NULL, NULL, NULL, proxy_stmt, NULL  },
-	{ "rewrite", CS_BLOCK, rewrite_stmt_term, NULL, NULL, rewrite_stmt, NULL },
-	{ "filters", CS_BLOCK, filters_stmt_term, NULL, NULL, filters_stmt,
-	  NULL },
-	{ "loadable-modules", CS_BLOCK, dynload_stmt_term, NULL, NULL,
-	  dynload_stmt, NULL },
-#ifdef USE_DBM
-	{ "usedbm", CS_STMT, NULL, cfg_get_boolean, &use_dbm, NULL, NULL },
-#endif
-#ifdef USE_SNMP
-	{ "snmp", CS_BLOCK, snmp_stmt_begin, NULL, NULL, snmp_stmt, NULL },
-#endif
-#ifdef USE_SERVER_GUILE
-	{ "guile", CS_BLOCK, NULL, guile_cfg_handler, NULL, guile_stmt, NULL },
-#endif
-	{ NULL, },
-};	
