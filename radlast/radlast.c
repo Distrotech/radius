@@ -207,7 +207,9 @@ main(argc, argv)
 			adduser(*argv);
 		}
 	}
+
 	radpath_init();
+        dict_init();
 	read_naslist();
 
 	if (nas_name) {
@@ -623,11 +625,14 @@ char *
 proto_str(id)
 	int id;
 {
-	if (id == 'S')
-		return "SLIP";
-	if (id == 'P')
-		return "PPP";
-	return "shell";
+	DICT_VALUE *dval = value_lookup(id, "Framed-Protocol");
+	static char buf[64];
+	
+	if (!dval) {
+		snprintf(buf, sizeof(buf), "%lu", id);
+		return buf;
+	}
+	return dval->name;
 }
 
 /* NOTE:
