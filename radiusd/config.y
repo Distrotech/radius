@@ -157,7 +157,7 @@ static void asgn(void *base, Value *value, int type, int once);
 %token T_STRIP_NAMES T_TTL T_USERNAME_CHARS T_USR2DELAY T_ACECLIENTIP
 
 %token T_SOURCE_IP T_ACCT_DIR T_ACCT T_CNTL T_PROXY T_CHANNEL
-%token T_SYSLOG T_NOTIFY T_SNMP T_COMMUNITY T_ACL
+%token T_SYSLOG T_NOTIFY T_SNMP T_COMMUNITY T_ACL T_COMPARE_ATTRIBUTE_FLAG
 
 %token <number> T_FACILITY T_LOGLEVEL T_LOGOPT T_SEVERITY T_SNMP_ACCESS 
 %token <number> T_NUMBER
@@ -339,6 +339,10 @@ auth_def        : listen_stmt
                   {
 			  asgn(&warning_seconds, &$2, AT_INT, 0);
 		  }
+                | T_COMPARE_ATTRIBUTE_FLAG value
+                  {
+			  asgn(&auth_comp_flag, &$2, AT_INT, 0);
+		  }
                 ;
 
         /* Acct statement */
@@ -399,6 +403,10 @@ acct_def        : listen_stmt
                   {
 			  asgn(&acct_detail, &$2, AT_BOOL, 0);
 		  }      
+                | T_COMPARE_ATTRIBUTE_FLAG value
+                  {
+			  asgn(&acct_comp_flag, &$2, AT_INT, 0);
+		  }
                 ;
 
 
