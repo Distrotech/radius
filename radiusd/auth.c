@@ -938,56 +938,52 @@ sfn_validate(m)
 	RADIUS_REQ *radreq = m->req;
 	int rc;
 	
-	/*
-	 * Validate the user
-	 */
-	if ((rc = check_expiration(m)) == AUTH_OK) {
-		rc = rad_check_password(radreq,
-					m->user_check, m->namepair,
-					&m->user_msg,
-					m->userpass);
-
-		if (rc != AUTH_OK) { 
-			stat_inc(auth, radreq->ipaddr, num_rejects);
-			newstate(as_reject);
-			auth_format_msg(m, MSG_ACCESS_DENIED);
-
-			if (is_log_mode(m, RLOG_AUTH)) {
-				switch (rc) {
-				case AUTH_REJECT:
-					auth_log(m, _("Rejected"),
-						 NULL, NULL, NULL);  
-					return;
-				
-				case AUTH_NOUSER:
-					auth_log(m, _("Invalid user"),
-						 NULL, NULL, NULL);
-					return;
-				
-				case AUTH_FAIL:
-					break;
-				}
-			}
-		}		
-              /*if (p = avl_find(m->user_reply, DA_REPLY_MESSAGE))
-			m->user_msg = dup_string(p->strvalue);*/
-	}
-
 	avl_move_attr(&m->user_reply, &m->proxy_pairs, DA_PROXY_STATE);
-
+	rc = rad_check_password(radreq,
+				m->user_check, m->namepair,
+				&m->user_msg,
+				m->userpass);
 	if (rc != AUTH_OK) {
-		/*
-		 * Failed to validate the user.
-		 */
+		stat_inc(auth, radreq->ipaddr, num_rejects);
 		newstate(as_reject);
+		auth_format_msg(m, MSG_ACCESS_DENIED);
+
 		if (is_log_mode(m, RLOG_AUTH)) {
-			auth_log(m,
-				 _("Login incorrect"),
-				 is_log_mode(m, RLOG_FAILED_PASS) ?
-				                       m->userpass : NULL,
-				 NULL, NULL);
+			switch (rc) {
+			case AUTH_REJECT:
+				auth_log(m, _("Rejected"),
+					 NULL, NULL, NULL);  
+				return;
+				
+			case AUTH_NOUSER:
+				auth_log(m, _("Invalid user"),
+					 NULL, NULL, NULL);
+				return;
+				
+			case AUTH_FAIL:
+				auth_log(m,
+					 _("Login incorrect"),
+					 is_log_mode(m, RLOG_FAILED_PASS) ?
+					 m->userpass : NULL,
+					 NULL, NULL);
+				return;
+
+			default:
+				insist_fail("sfn_validate");
+			}
 		}
 	}
+
+	if (check_expiration(m) != AUTH_OK) {
+                newstate(as_reject);
+                if (is_log_mode(m, RLOG_AUTH)) {
+                        auth_log(m,
+                                 _("Login incorrect"),
+                                 is_log_mode(m, RLOG_FAILED_PASS) ?
+				 m->userpass : NULL,
+                                 _("Password expired"), "");
+                }
+        }
 }
 
 void
