@@ -1267,7 +1267,8 @@ rad_sql_retrieve_pairs(conn, query, return_pairs, op_too)
 		chop(attribute);
 		chop(value);
 		
-		pair = install_pair(attribute, op, value);
+		pair = install_pair0("rad_sql_retrieve_pairs", __LINE__,
+                                     attribute, op, value);
 		
                 if (pair) {
 			avl_merge(return_pairs, &pair);
