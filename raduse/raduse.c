@@ -689,10 +689,17 @@ dump(fd)
         
         while (read(fd, &stat, sizeof(stat)) == sizeof(stat)) {
                 if (stat.ip != 0) {
-                        nas = nas_lookup_ip(stat.ip);
+			char *shortname;
+			
+			nas = nas_lookup_ip(stat.ip);
+			if (nas)
+				shortname = nas->shortname;
+			else
+				shortname = ip_hostname(stat.ip);
+			
                         printf("%8d %16.16s %4d\n",
                                off,
-                               nas->shortname,
+                               shortname,
                                stat.port_no);
                 }
                 off += sizeof(stat);
