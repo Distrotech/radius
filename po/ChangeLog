@@ -1,3 +1,8 @@
+2013-06-21  gettextize  <bug-gnu-gettext@gnu.org>
+
+	* Makefile.in.in: Upgrade to gettext-0.18.2.
+	* Rules-quot: Upgrade to gettext-0.18.2.
+
 2007-06-19  Sergey Poznyakoff  <gray@gnu.org.ua>
 
 	Remove .po from the CVS. We will get them right from the TP site.

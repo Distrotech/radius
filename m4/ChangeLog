@@ -1,0 +1,4 @@
+2013-06-21  gettextize  <bug-gnu-gettext@gnu.org>
+
+	* gettext.m4: Upgrade to gettext-0.18.2.
+
