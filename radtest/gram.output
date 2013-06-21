@@ -1,0 +1,3205 @@
+Terminals unused in grammar
+
+   T_BOGUS
+
+
+State 45 conflicts: 1 shift/reduce
+State 84 conflicts: 6 shift/reduce
+State 94 conflicts: 1 shift/reduce
+State 117 conflicts: 1 shift/reduce
+State 146 conflicts: 1 shift/reduce
+State 168 conflicts: 1 shift/reduce
+
+
+Grammar
+
+    0 $accept: program $end
+
+    1 program: /* empty */
+    2        | input
+    3        | input stmt
+
+    4 input: lstmt
+    5      | input lstmt
+
+    6 list: lstmt
+    7     | list lstmt
+
+    8 lstmt: EOL
+    9      | stmt EOL
+   10      | error EOL
+
+   11 maybe_eol: /* empty */
+   12          | EOL
+
+   13 stmt: T_BEGIN list T_END
+   14     | if cond maybe_eol stmt
+   15     | if cond maybe_eol stmt else stmt
+   16     | case expr in caselist T_END
+
+   17 $@1: /* empty */
+
+   18 stmt: while $@1 cond EOL stmt
+
+   19 $@2: /* empty */
+
+   20 $@3: /* empty */
+
+   21 stmt: do EOL $@2 stmt EOL WHILE $@3 cond
+   22     | PRINT prlist
+   23     | NAME EQ expr
+   24     | SEND send_flags port_type req_code expr_or_pair_list
+   25     | EXPECT req_code expr_or_pair_list
+   26     | EXIT maybe_expr
+   27     | BREAK nesting_level
+   28     | CONTINUE nesting_level
+   29     | INPUT
+   30     | INPUT expr NAME
+   31     | SET
+   32     | SHIFT maybe_expr
+   33     | function_def list T_END
+   34     | T_RETURN maybe_expr
+   35     | NAME '(' maybe_prlist ')'
+
+   36 function_def: NAME EOL T_BEGIN EOL
+
+   37 if: IF
+
+   38 case: CASE
+
+   39 do: DO
+
+   40 while: WHILE
+
+   41 else: ELSE maybe_eol
+
+   42 in: IN maybe_eol
+
+   43 caselist: casecond
+   44         | caselist casecond
+
+   45 casecond: expr ')' stmt nls
+
+   46 nls: EOL
+   47    | nls EOL
+
+   48 name: /* empty */
+   49     | NAME
+
+   50 string: NAME
+   51       | QUOTE
+   52       | BSTRING
+
+   53 nesting_level: /* empty */
+   54              | NUMBER
+
+   55 port_type: AUTH
+   56          | ACCT
+
+   57 req_code: NUMBER
+   58         | NAME
+
+   59 send_flags: /* empty */
+   60           | send_flag_list
+
+   61 send_flag_list: send_flag
+   62               | send_flag_list send_flag
+
+   63 send_flag: NAME EQ NUMBER
+
+   64 expr_or_pair_list: /* empty */
+   65                  | pair_list
+   66                  | expr
+
+   67 cond: bool
+   68     | NOT cond
+   69     | '(' cond ')'
+   70     | cond AND cond
+   71     | cond OR cond
+   72     | cond EQ cond
+   73     | cond LT cond
+   74     | cond GT cond
+   75     | cond NE cond
+   76     | cond LE cond
+   77     | cond GE cond
+
+   78 bool: expr
+
+   79 expr: value
+   80     | GETOPT string name name
+   81     | '(' expr ')'
+   82     | expr '[' NAME closure ']'
+   83     | expr '+' expr
+   84     | expr '-' expr
+   85     | expr '*' expr
+   86     | expr '/' expr
+   87     | expr '%' expr
+   88     | '-' expr
+   89     | '+' expr
+
+   90 maybe_expr: /* empty */
+   91           | expr
+
+   92 value: imm_value
+   93      | IDENT
+   94      | PARM
+   95      | ARGCOUNT
+   96      | NAME '(' maybe_prlist ')'
+
+   97 closure: /* empty */
+   98        | '*'
+
+   99 imm_value: NUMBER
+  100          | IPADDRESS
+  101          | QUOTE
+  102          | BSTRING
+  103          | NAME
+  104          | '(' maybe_pair_list ')'
+
+  105 maybe_prlist: /* empty */
+  106             | prlist
+
+  107 maybe_pair_list: /* empty */
+  108                | pair_list
+
+  109 pair_list: pair
+  110          | pair_list pair
+  111          | pair_list ',' pair
+  112          | pair_list error
+
+  113 pair: NAME op expr
+
+  114 op: EQ
+  115   | LT
+  116   | GT
+  117   | NE
+  118   | LE
+  119   | GE
+
+  120 prlist: pritem
+  121       | prlist ',' pritem
+  122       | prlist pritem
+
+  123 pritem: expr
+
+
+Terminals, with rules where they appear
+
+$end (0) 0
+'%' (37) 87
+'(' (40) 35 69 81 96 104
+')' (41) 35 45 69 81 96 104
+'*' (42) 85 98
+'+' (43) 83 89
+',' (44) 111 121
+'-' (45) 84 88
+'/' (47) 86
+'[' (91) 82
+']' (93) 82
+error (256) 10 112
+EOL (258) 8 9 10 12 18 21 36 46 47
+AUTH (259) 55
+ACCT (260) 56
+SEND (261) 24
+EXPECT (262) 25
+T_BEGIN (263) 13 36
+T_END (264) 13 16 33
+IF (265) 37
+ELSE (266) 41
+WHILE (267) 21 40
+DO (268) 39
+BREAK (269) 27
+CONTINUE (270) 28
+INPUT (271) 29 30
+SHIFT (272) 32
+GETOPT (273) 80
+CASE (274) 38
+IN (275) 42
+T_RETURN (276) 34
+SET (277) 31
+PRINT (278) 22
+EXIT (279) 26
+T_BOGUS (280)
+ARGCOUNT (281) 95
+IDENT (282) 93
+PARM (283) 94
+NAME (284) 23 30 35 36 49 50 58 63 82 96 103 113
+NUMBER (285) 54 57 63 99
+QUOTE (286) 51 101
+BSTRING (287) 52 102
+IPADDRESS (288) 100
+PRITEM (289)
+OR (290) 71
+AND (291) 70
+NE (292) 75 117
+EQ (293) 23 63 72 114
+GE (294) 77 119
+GT (295) 74 116
+LE (296) 76 118
+LT (297) 73 115
+NOT (298) 68
+UMINUS (299)
+
+
+Nonterminals, with rules where they appear
+
+$accept (55)
+    on left: 0
+program (56)
+    on left: 1 2 3, on right: 0
+input (57)
+    on left: 4 5, on right: 2 3 5
+list (58)
+    on left: 6 7, on right: 7 13 33
+lstmt (59)
+    on left: 8 9 10, on right: 4 5 6 7
+maybe_eol (60)
+    on left: 11 12, on right: 14 15 41 42
+stmt (61)
+    on left: 13 14 15 16 18 21 22 23 24 25 26 27 28 29 30 31 32 33
+    34 35, on right: 3 9 14 15 18 21 45
+$@1 (62)
+    on left: 17, on right: 18
+$@2 (63)
+    on left: 19, on right: 21
+$@3 (64)
+    on left: 20, on right: 21
+function_def (65)
+    on left: 36, on right: 33
+if (66)
+    on left: 37, on right: 14 15
+case (67)
+    on left: 38, on right: 16
+do (68)
+    on left: 39, on right: 21
+while (69)
+    on left: 40, on right: 18
+else (70)
+    on left: 41, on right: 15
+in (71)
+    on left: 42, on right: 16
+caselist (72)
+    on left: 43 44, on right: 16 44
+casecond (73)
+    on left: 45, on right: 43 44
+nls (74)
+    on left: 46 47, on right: 45 47
+name (75)
+    on left: 48 49, on right: 80
+string (76)
+    on left: 50 51 52, on right: 80
+nesting_level (77)
+    on left: 53 54, on right: 27 28
+port_type (78)
+    on left: 55 56, on right: 24
+req_code (79)
+    on left: 57 58, on right: 24 25
+send_flags (80)
+    on left: 59 60, on right: 24
+send_flag_list (81)
+    on left: 61 62, on right: 60 62
+send_flag (82)
+    on left: 63, on right: 61 62
+expr_or_pair_list (83)
+    on left: 64 65 66, on right: 24 25
+cond (84)
+    on left: 67 68 69 70 71 72 73 74 75 76 77, on right: 14 15 18 21
+    68 69 70 71 72 73 74 75 76 77
+bool (85)
+    on left: 78, on right: 67
+expr (86)
+    on left: 79 80 81 82 83 84 85 86 87 88 89, on right: 16 23 30 45
+    66 78 81 82 83 84 85 86 87 88 89 91 113 123
+maybe_expr (87)
+    on left: 90 91, on right: 26 32 34
+value (88)
+    on left: 92 93 94 95 96, on right: 79
+closure (89)
+    on left: 97 98, on right: 82
+imm_value (90)
+    on left: 99 100 101 102 103 104, on right: 92
+maybe_prlist (91)
+    on left: 105 106, on right: 35 96
+maybe_pair_list (92)
+    on left: 107 108, on right: 104
+pair_list (93)
+    on left: 109 110 111 112, on right: 65 108 110 111 112
+pair (94)
+    on left: 113, on right: 109 110 111
+op (95)
+    on left: 114 115 116 117 118 119, on right: 113
+prlist (96)
+    on left: 120 121 122, on right: 22 106 121 122
+pritem (97)
+    on left: 123, on right: 120 121 122
+
+
+State 0
+
+    0 $accept: . program $end
+
+    error     shift, and go to state 1
+    EOL       shift, and go to state 2
+    SEND      shift, and go to state 3
+    EXPECT    shift, and go to state 4
+    T_BEGIN   shift, and go to state 5
+    IF        shift, and go to state 6
+    WHILE     shift, and go to state 7
+    DO        shift, and go to state 8
+    BREAK     shift, and go to state 9
+    CONTINUE  shift, and go to state 10
+    INPUT     shift, and go to state 11
+    SHIFT     shift, and go to state 12
+    CASE      shift, and go to state 13
+    T_RETURN  shift, and go to state 14
+    SET       shift, and go to state 15
+    PRINT     shift, and go to state 16
+    EXIT      shift, and go to state 17
+    NAME      shift, and go to state 18
+
+    $end  reduce using rule 1 (program)
+
+    program       go to state 19
+    input         go to state 20
+    lstmt         go to state 21
+    stmt          go to state 22
+    function_def  go to state 23
+    if            go to state 24
+    case          go to state 25
+    do            go to state 26
+    while         go to state 27
+
+
+State 1
+
+   10 lstmt: error . EOL
+
+    EOL  shift, and go to state 28
+
+
+State 2
+
+    8 lstmt: EOL .
+
+    $default  reduce using rule 8 (lstmt)
+
+
+State 3
+
+   24 stmt: SEND . send_flags port_type req_code expr_or_pair_list
+
+    NAME  shift, and go to state 29
+
+    $default  reduce using rule 59 (send_flags)
+
+    send_flags      go to state 30
+    send_flag_list  go to state 31
+    send_flag       go to state 32
+
+
+State 4
+
+   25 stmt: EXPECT . req_code expr_or_pair_list
+
+    NAME    shift, and go to state 33
+    NUMBER  shift, and go to state 34
+
+    req_code  go to state 35
+
+
+State 5
+
+   13 stmt: T_BEGIN . list T_END
+
+    error     shift, and go to state 1
+    EOL       shift, and go to state 2
+    SEND      shift, and go to state 3
+    EXPECT    shift, and go to state 4
+    T_BEGIN   shift, and go to state 5
+    IF        shift, and go to state 6
+    WHILE     shift, and go to state 7
+    DO        shift, and go to state 8
+    BREAK     shift, and go to state 9
+    CONTINUE  shift, and go to state 10
+    INPUT     shift, and go to state 11
+    SHIFT     shift, and go to state 12
+    CASE      shift, and go to state 13
+    T_RETURN  shift, and go to state 14
+    SET       shift, and go to state 15
+    PRINT     shift, and go to state 16
+    EXIT      shift, and go to state 17
+    NAME      shift, and go to state 18
+
+    list          go to state 36
+    lstmt         go to state 37
+    stmt          go to state 22
+    function_def  go to state 23
+    if            go to state 24
+    case          go to state 25
+    do            go to state 26
+    while         go to state 27
+
+
+State 6
+
+   37 if: IF .
+
+    $default  reduce using rule 37 (if)
+
+
+State 7
+
+   40 while: WHILE .
+
+    $default  reduce using rule 40 (while)
+
+
+State 8
+
+   39 do: DO .
+
+    $default  reduce using rule 39 (do)
+
+
+State 9
+
+   27 stmt: BREAK . nesting_level
+
+    NUMBER  shift, and go to state 38
+
+    $default  reduce using rule 53 (nesting_level)
+
+    nesting_level  go to state 39
+
+
+State 10
+
+   28 stmt: CONTINUE . nesting_level
+
+    NUMBER  shift, and go to state 38
+
+    $default  reduce using rule 53 (nesting_level)
+
+    nesting_level  go to state 40
+
+
+State 11
+
+   29 stmt: INPUT .
+   30     | INPUT . expr NAME
+
+    GETOPT     shift, and go to state 41
+    ARGCOUNT   shift, and go to state 42
+    IDENT      shift, and go to state 43
+    PARM       shift, and go to state 44
+    NAME       shift, and go to state 45
+    NUMBER     shift, and go to state 46
+    QUOTE      shift, and go to state 47
+    BSTRING    shift, and go to state 48
+    IPADDRESS  shift, and go to state 49
+    '+'        shift, and go to state 50
+    '-'        shift, and go to state 51
+    '('        shift, and go to state 52
+
+    $default  reduce using rule 29 (stmt)
+
+    expr       go to state 53
+    value      go to state 54
+    imm_value  go to state 55
+
+
+State 12
+
+   32 stmt: SHIFT . maybe_expr
+
+    GETOPT     shift, and go to state 41
+    ARGCOUNT   shift, and go to state 42
+    IDENT      shift, and go to state 43
+    PARM       shift, and go to state 44
+    NAME       shift, and go to state 45
+    NUMBER     shift, and go to state 46
+    QUOTE      shift, and go to state 47
+    BSTRING    shift, and go to state 48
+    IPADDRESS  shift, and go to state 49
+    '+'        shift, and go to state 50
+    '-'        shift, and go to state 51
+    '('        shift, and go to state 52
+
+    $default  reduce using rule 90 (maybe_expr)
+
+    expr        go to state 56
+    maybe_expr  go to state 57
+    value       go to state 54
+    imm_value   go to state 55
+
+
+State 13
+
+   38 case: CASE .
+
+    $default  reduce using rule 38 (case)
+
+
+State 14
+
+   34 stmt: T_RETURN . maybe_expr
+
+    GETOPT     shift, and go to state 41
+    ARGCOUNT   shift, and go to state 42
+    IDENT      shift, and go to state 43
+    PARM       shift, and go to state 44
+    NAME       shift, and go to state 45
+    NUMBER     shift, and go to state 46
+    QUOTE      shift, and go to state 47
+    BSTRING    shift, and go to state 48
+    IPADDRESS  shift, and go to state 49
+    '+'        shift, and go to state 50
+    '-'        shift, and go to state 51
+    '('        shift, and go to state 52
+
+    $default  reduce using rule 90 (maybe_expr)
+
+    expr        go to state 56
+    maybe_expr  go to state 58
+    value       go to state 54
+    imm_value   go to state 55
+
+
+State 15
+
+   31 stmt: SET .
+
+    $default  reduce using rule 31 (stmt)
+
+
+State 16
+
+   22 stmt: PRINT . prlist
+
+    GETOPT     shift, and go to state 41
+    ARGCOUNT   shift, and go to state 42
+    IDENT      shift, and go to state 43
+    PARM       shift, and go to state 44
+    NAME       shift, and go to state 45
+    NUMBER     shift, and go to state 46
+    QUOTE      shift, and go to state 47
+    BSTRING    shift, and go to state 48
+    IPADDRESS  shift, and go to state 49
+    '+'        shift, and go to state 50
+    '-'        shift, and go to state 51
+    '('        shift, and go to state 52
+
+    expr       go to state 59
+    value      go to state 54
+    imm_value  go to state 55
+    prlist     go to state 60
+    pritem     go to state 61
+
+
+State 17
+
+   26 stmt: EXIT . maybe_expr
+
+    GETOPT     shift, and go to state 41
+    ARGCOUNT   shift, and go to state 42
+    IDENT      shift, and go to state 43
+    PARM       shift, and go to state 44
+    NAME       shift, and go to state 45
+    NUMBER     shift, and go to state 46
+    QUOTE      shift, and go to state 47
+    BSTRING    shift, and go to state 48
+    IPADDRESS  shift, and go to state 49
+    '+'        shift, and go to state 50
+    '-'        shift, and go to state 51
+    '('        shift, and go to state 52
+
+    $default  reduce using rule 90 (maybe_expr)
+
+    expr        go to state 56
+    maybe_expr  go to state 62
+    value       go to state 54
+    imm_value   go to state 55
+
+
+State 18
+
+   23 stmt: NAME . EQ expr
+   35     | NAME . '(' maybe_prlist ')'
+   36 function_def: NAME . EOL T_BEGIN EOL
+
+    EOL  shift, and go to state 63
+    EQ   shift, and go to state 64
+    '('  shift, and go to state 65
+
+
+State 19
+
+    0 $accept: program . $end
+
+    $end  shift, and go to state 66
+
+
+State 20
+
+    2 program: input .
+    3        | input . stmt
+    5 input: input . lstmt
+
+    error     shift, and go to state 1
+    EOL       shift, and go to state 2
+    SEND      shift, and go to state 3
+    EXPECT    shift, and go to state 4
+    T_BEGIN   shift, and go to state 5
+    IF        shift, and go to state 6
+    WHILE     shift, and go to state 7
+    DO        shift, and go to state 8
+    BREAK     shift, and go to state 9
+    CONTINUE  shift, and go to state 10
+    INPUT     shift, and go to state 11
+    SHIFT     shift, and go to state 12
+    CASE      shift, and go to state 13
+    T_RETURN  shift, and go to state 14
+    SET       shift, and go to state 15
+    PRINT     shift, and go to state 16
+    EXIT      shift, and go to state 17
+    NAME      shift, and go to state 18
+
+    $end  reduce using rule 2 (program)
+
+    lstmt         go to state 67
+    stmt          go to state 68
+    function_def  go to state 23
+    if            go to state 24
+    case          go to state 25
+    do            go to state 26
+    while         go to state 27
+
+
+State 21
+
+    4 input: lstmt .
+
+    $default  reduce using rule 4 (input)
+
+
+State 22
+
+    9 lstmt: stmt . EOL
+
+    EOL  shift, and go to state 69
+
+
+State 23
+
+   33 stmt: function_def . list T_END
+
+    error     shift, and go to state 1
+    EOL       shift, and go to state 2
+    SEND      shift, and go to state 3
+    EXPECT    shift, and go to state 4
+    T_BEGIN   shift, and go to state 5
+    IF        shift, and go to state 6
+    WHILE     shift, and go to state 7
+    DO        shift, and go to state 8
+    BREAK     shift, and go to state 9
+    CONTINUE  shift, and go to state 10
+    INPUT     shift, and go to state 11
+    SHIFT     shift, and go to state 12
+    CASE      shift, and go to state 13
+    T_RETURN  shift, and go to state 14
+    SET       shift, and go to state 15
+    PRINT     shift, and go to state 16
+    EXIT      shift, and go to state 17
+    NAME      shift, and go to state 18
+
+    list          go to state 70
+    lstmt         go to state 37
+    stmt          go to state 22
+    function_def  go to state 23
+    if            go to state 24
+    case          go to state 25
+    do            go to state 26
+    while         go to state 27
+
+
+State 24
+
+   14 stmt: if . cond maybe_eol stmt
+   15     | if . cond maybe_eol stmt else stmt
+
+    GETOPT     shift, and go to state 41
+    ARGCOUNT   shift, and go to state 42
+    IDENT      shift, and go to state 43
+    PARM       shift, and go to state 44
+    NAME       shift, and go to state 45
+    NUMBER     shift, and go to state 46
+    QUOTE      shift, and go to state 47
+    BSTRING    shift, and go to state 48
+    IPADDRESS  shift, and go to state 49
+    '+'        shift, and go to state 50
+    '-'        shift, and go to state 51
+    NOT        shift, and go to state 71
+    '('        shift, and go to state 72
+
+    cond       go to state 73
+    bool       go to state 74
+    expr       go to state 75
+    value      go to state 54
+    imm_value  go to state 55
+
+
+State 25
+
+   16 stmt: case . expr in caselist T_END
+
+    GETOPT     shift, and go to state 41
+    ARGCOUNT   shift, and go to state 42
+    IDENT      shift, and go to state 43
+    PARM       shift, and go to state 44
+    NAME       shift, and go to state 45
+    NUMBER     shift, and go to state 46
+    QUOTE      shift, and go to state 47
+    BSTRING    shift, and go to state 48
+    IPADDRESS  shift, and go to state 49
+    '+'        shift, and go to state 50
+    '-'        shift, and go to state 51
+    '('        shift, and go to state 52
+
+    expr       go to state 76
+    value      go to state 54
+    imm_value  go to state 55
+
+
+State 26
+
+   21 stmt: do . EOL $@2 stmt EOL WHILE $@3 cond
+
+    EOL  shift, and go to state 77
+
+
+State 27
+
+   18 stmt: while . $@1 cond EOL stmt
+
+    $default  reduce using rule 17 ($@1)
+
+    $@1  go to state 78
+
+
+State 28
+
+   10 lstmt: error EOL .
+
+    $default  reduce using rule 10 (lstmt)
+
+
+State 29
+
+   63 send_flag: NAME . EQ NUMBER
+
+    EQ  shift, and go to state 79
+
+
+State 30
+
+   24 stmt: SEND send_flags . port_type req_code expr_or_pair_list
+
+    AUTH  shift, and go to state 80
+    ACCT  shift, and go to state 81
+
+    port_type  go to state 82
+
+
+State 31
+
+   60 send_flags: send_flag_list .
+   62 send_flag_list: send_flag_list . send_flag
+
+    NAME  shift, and go to state 29
+
+    $default  reduce using rule 60 (send_flags)
+
+    send_flag  go to state 83
+
+
+State 32
+
+   61 send_flag_list: send_flag .
+
+    $default  reduce using rule 61 (send_flag_list)
+
+
+State 33
+
+   58 req_code: NAME .
+
+    $default  reduce using rule 58 (req_code)
+
+
+State 34
+
+   57 req_code: NUMBER .
+
+    $default  reduce using rule 57 (req_code)
+
+
+State 35
+
+   25 stmt: EXPECT req_code . expr_or_pair_list
+
+    GETOPT     shift, and go to state 41
+    ARGCOUNT   shift, and go to state 42
+    IDENT      shift, and go to state 43
+    PARM       shift, and go to state 44
+    NAME       shift, and go to state 84
+    NUMBER     shift, and go to state 46
+    QUOTE      shift, and go to state 47
+    BSTRING    shift, and go to state 48
+    IPADDRESS  shift, and go to state 49
+    '+'        shift, and go to state 50
+    '-'        shift, and go to state 51
+    '('        shift, and go to state 52
+
+    $default  reduce using rule 64 (expr_or_pair_list)
+
+    expr_or_pair_list  go to state 85
+    expr               go to state 86
+    value              go to state 54
+    imm_value          go to state 55
+    pair_list          go to state 87
+    pair               go to state 88
+
+
+State 36
+
+    7 list: list . lstmt
+   13 stmt: T_BEGIN list . T_END
+
+    error     shift, and go to state 1
+    EOL       shift, and go to state 2
+    SEND      shift, and go to state 3
+    EXPECT    shift, and go to state 4
+    T_BEGIN   shift, and go to state 5
+    T_END     shift, and go to state 89
+    IF        shift, and go to state 6
+    WHILE     shift, and go to state 7
+    DO        shift, and go to state 8
+    BREAK     shift, and go to state 9
+    CONTINUE  shift, and go to state 10
+    INPUT     shift, and go to state 11
+    SHIFT     shift, and go to state 12
+    CASE      shift, and go to state 13
+    T_RETURN  shift, and go to state 14
+    SET       shift, and go to state 15
+    PRINT     shift, and go to state 16
+    EXIT      shift, and go to state 17
+    NAME      shift, and go to state 18
+
+    lstmt         go to state 90
+    stmt          go to state 22
+    function_def  go to state 23
+    if            go to state 24
+    case          go to state 25
+    do            go to state 26
+    while         go to state 27
+
+
+State 37
+
+    6 list: lstmt .
+
+    $default  reduce using rule 6 (list)
+
+
+State 38
+
+   54 nesting_level: NUMBER .
+
+    $default  reduce using rule 54 (nesting_level)
+
+
+State 39
+
+   27 stmt: BREAK nesting_level .
+
+    $default  reduce using rule 27 (stmt)
+
+
+State 40
+
+   28 stmt: CONTINUE nesting_level .
+
+    $default  reduce using rule 28 (stmt)
+
+
+State 41
+
+   80 expr: GETOPT . string name name
+
+    NAME     shift, and go to state 91
+    QUOTE    shift, and go to state 92
+    BSTRING  shift, and go to state 93
+
+    string  go to state 94
+
+
+State 42
+
+   95 value: ARGCOUNT .
+
+    $default  reduce using rule 95 (value)
+
+
+State 43
+
+   93 value: IDENT .
+
+    $default  reduce using rule 93 (value)
+
+
+State 44
+
+   94 value: PARM .
+
+    $default  reduce using rule 94 (value)
+
+
+State 45
+
+   96 value: NAME . '(' maybe_prlist ')'
+  103 imm_value: NAME .
+
+    '('  shift, and go to state 95
+
+    '('       [reduce using rule 103 (imm_value)]
+    $default  reduce using rule 103 (imm_value)
+
+
+State 46
+
+   99 imm_value: NUMBER .
+
+    $default  reduce using rule 99 (imm_value)
+
+
+State 47
+
+  101 imm_value: QUOTE .
+
+    $default  reduce using rule 101 (imm_value)
+
+
+State 48
+
+  102 imm_value: BSTRING .
+
+    $default  reduce using rule 102 (imm_value)
+
+
+State 49
+
+  100 imm_value: IPADDRESS .
+
+    $default  reduce using rule 100 (imm_value)
+
+
+State 50
+
+   89 expr: '+' . expr
+
+    GETOPT     shift, and go to state 41
+    ARGCOUNT   shift, and go to state 42
+    IDENT      shift, and go to state 43
+    PARM       shift, and go to state 44
+    NAME       shift, and go to state 45
+    NUMBER     shift, and go to state 46
+    QUOTE      shift, and go to state 47
+    BSTRING    shift, and go to state 48
+    IPADDRESS  shift, and go to state 49
+    '+'        shift, and go to state 50
+    '-'        shift, and go to state 51
+    '('        shift, and go to state 52
+
+    expr       go to state 96
+    value      go to state 54
+    imm_value  go to state 55
+
+
+State 51
+
+   88 expr: '-' . expr
+
+    GETOPT     shift, and go to state 41
+    ARGCOUNT   shift, and go to state 42
+    IDENT      shift, and go to state 43
+    PARM       shift, and go to state 44
+    NAME       shift, and go to state 45
+    NUMBER     shift, and go to state 46
+    QUOTE      shift, and go to state 47
+    BSTRING    shift, and go to state 48
+    IPADDRESS  shift, and go to state 49
+    '+'        shift, and go to state 50
+    '-'        shift, and go to state 51
+    '('        shift, and go to state 52
+
+    expr       go to state 97
+    value      go to state 54
+    imm_value  go to state 55
+
+
+State 52
+
+   81 expr: '(' . expr ')'
+  104 imm_value: '(' . maybe_pair_list ')'
+
+    GETOPT     shift, and go to state 41
+    ARGCOUNT   shift, and go to state 42
+    IDENT      shift, and go to state 43
+    PARM       shift, and go to state 44
+    NAME       shift, and go to state 84
+    NUMBER     shift, and go to state 46
+    QUOTE      shift, and go to state 47
+    BSTRING    shift, and go to state 48
+    IPADDRESS  shift, and go to state 49
+    '+'        shift, and go to state 50
+    '-'        shift, and go to state 51
+    '('        shift, and go to state 52
+
+    $default  reduce using rule 107 (maybe_pair_list)
+
+    expr             go to state 98
+    value            go to state 54
+    imm_value        go to state 55
+    maybe_pair_list  go to state 99
+    pair_list        go to state 100
+    pair             go to state 88
+
+
+State 53
+
+   30 stmt: INPUT expr . NAME
+   82 expr: expr . '[' NAME closure ']'
+   83     | expr . '+' expr
+   84     | expr . '-' expr
+   85     | expr . '*' expr
+   86     | expr . '/' expr
+   87     | expr . '%' expr
+
+    NAME  shift, and go to state 101
+    '+'   shift, and go to state 102
+    '-'   shift, and go to state 103
+    '*'   shift, and go to state 104
+    '/'   shift, and go to state 105
+    '%'   shift, and go to state 106
+    '['   shift, and go to state 107
+
+
+State 54
+
+   79 expr: value .
+
+    $default  reduce using rule 79 (expr)
+
+
+State 55
+
+   92 value: imm_value .
+
+    $default  reduce using rule 92 (value)
+
+
+State 56
+
+   82 expr: expr . '[' NAME closure ']'
+   83     | expr . '+' expr
+   84     | expr . '-' expr
+   85     | expr . '*' expr
+   86     | expr . '/' expr
+   87     | expr . '%' expr
+   91 maybe_expr: expr .
+
+    '+'  shift, and go to state 102
+    '-'  shift, and go to state 103
+    '*'  shift, and go to state 104
+    '/'  shift, and go to state 105
+    '%'  shift, and go to state 106
+    '['  shift, and go to state 107
+
+    $default  reduce using rule 91 (maybe_expr)
+
+
+State 57
+
+   32 stmt: SHIFT maybe_expr .
+
+    $default  reduce using rule 32 (stmt)
+
+
+State 58
+
+   34 stmt: T_RETURN maybe_expr .
+
+    $default  reduce using rule 34 (stmt)
+
+
+State 59
+
+   82 expr: expr . '[' NAME closure ']'
+   83     | expr . '+' expr
+   84     | expr . '-' expr
+   85     | expr . '*' expr
+   86     | expr . '/' expr
+   87     | expr . '%' expr
+  123 pritem: expr .
+
+    '+'  shift, and go to state 102
+    '-'  shift, and go to state 103
+    '*'  shift, and go to state 104
+    '/'  shift, and go to state 105
+    '%'  shift, and go to state 106
+    '['  shift, and go to state 107
+
+    $default  reduce using rule 123 (pritem)
+
+
+State 60
+
+   22 stmt: PRINT prlist .
+  121 prlist: prlist . ',' pritem
+  122       | prlist . pritem
+
+    GETOPT     shift, and go to state 41
+    ARGCOUNT   shift, and go to state 42
+    IDENT      shift, and go to state 43
+    PARM       shift, and go to state 44
+    NAME       shift, and go to state 45
+    NUMBER     shift, and go to state 46
+    QUOTE      shift, and go to state 47
+    BSTRING    shift, and go to state 48
+    IPADDRESS  shift, and go to state 49
+    '+'        shift, and go to state 50
+    '-'        shift, and go to state 51
+    '('        shift, and go to state 52
+    ','        shift, and go to state 108
+
+    $default  reduce using rule 22 (stmt)
+
+    expr       go to state 59
+    value      go to state 54
+    imm_value  go to state 55
+    pritem     go to state 109
+
+
+State 61
+
+  120 prlist: pritem .
+
+    $default  reduce using rule 120 (prlist)
+
+
+State 62
+
+   26 stmt: EXIT maybe_expr .
+
+    $default  reduce using rule 26 (stmt)
+
+
+State 63
+
+   36 function_def: NAME EOL . T_BEGIN EOL
+
+    T_BEGIN  shift, and go to state 110
+
+
+State 64
+
+   23 stmt: NAME EQ . expr
+
+    GETOPT     shift, and go to state 41
+    ARGCOUNT   shift, and go to state 42
+    IDENT      shift, and go to state 43
+    PARM       shift, and go to state 44
+    NAME       shift, and go to state 45
+    NUMBER     shift, and go to state 46
+    QUOTE      shift, and go to state 47
+    BSTRING    shift, and go to state 48
+    IPADDRESS  shift, and go to state 49
+    '+'        shift, and go to state 50
+    '-'        shift, and go to state 51
+    '('        shift, and go to state 52
+
+    expr       go to state 111
+    value      go to state 54
+    imm_value  go to state 55
+
+
+State 65
+
+   35 stmt: NAME '(' . maybe_prlist ')'
+
+    GETOPT     shift, and go to state 41
+    ARGCOUNT   shift, and go to state 42
+    IDENT      shift, and go to state 43
+    PARM       shift, and go to state 44
+    NAME       shift, and go to state 45
+    NUMBER     shift, and go to state 46
+    QUOTE      shift, and go to state 47
+    BSTRING    shift, and go to state 48
+    IPADDRESS  shift, and go to state 49
+    '+'        shift, and go to state 50
+    '-'        shift, and go to state 51
+    '('        shift, and go to state 52
+
+    $default  reduce using rule 105 (maybe_prlist)
+
+    expr          go to state 59
+    value         go to state 54
+    imm_value     go to state 55
+    maybe_prlist  go to state 112
+    prlist        go to state 113
+    pritem        go to state 61
+
+
+State 66
+
+    0 $accept: program $end .
+
+    $default  accept
+
+
+State 67
+
+    5 input: input lstmt .
+
+    $default  reduce using rule 5 (input)
+
+
+State 68
+
+    3 program: input stmt .
+    9 lstmt: stmt . EOL
+
+    EOL  shift, and go to state 69
+
+    $default  reduce using rule 3 (program)
+
+
+State 69
+
+    9 lstmt: stmt EOL .
+
+    $default  reduce using rule 9 (lstmt)
+
+
+State 70
+
+    7 list: list . lstmt
+   33 stmt: function_def list . T_END
+
+    error     shift, and go to state 1
+    EOL       shift, and go to state 2
+    SEND      shift, and go to state 3
+    EXPECT    shift, and go to state 4
+    T_BEGIN   shift, and go to state 5
+    T_END     shift, and go to state 114
+    IF        shift, and go to state 6
+    WHILE     shift, and go to state 7
+    DO        shift, and go to state 8
+    BREAK     shift, and go to state 9
+    CONTINUE  shift, and go to state 10
+    INPUT     shift, and go to state 11
+    SHIFT     shift, and go to state 12
+    CASE      shift, and go to state 13
+    T_RETURN  shift, and go to state 14
+    SET       shift, and go to state 15
+    PRINT     shift, and go to state 16
+    EXIT      shift, and go to state 17
+    NAME      shift, and go to state 18
+
+    lstmt         go to state 90
+    stmt          go to state 22
+    function_def  go to state 23
+    if            go to state 24
+    case          go to state 25
+    do            go to state 26
+    while         go to state 27
+
+
+State 71
+
+   68 cond: NOT . cond
+
+    GETOPT     shift, and go to state 41
+    ARGCOUNT   shift, and go to state 42
+    IDENT      shift, and go to state 43
+    PARM       shift, and go to state 44
+    NAME       shift, and go to state 45
+    NUMBER     shift, and go to state 46
+    QUOTE      shift, and go to state 47
+    BSTRING    shift, and go to state 48
+    IPADDRESS  shift, and go to state 49
+    '+'        shift, and go to state 50
+    '-'        shift, and go to state 51
+    NOT        shift, and go to state 71
+    '('        shift, and go to state 72
+
+    cond       go to state 115
+    bool       go to state 74
+    expr       go to state 75
+    value      go to state 54
+    imm_value  go to state 55
+
+
+State 72
+
+   69 cond: '(' . cond ')'
+   81 expr: '(' . expr ')'
+  104 imm_value: '(' . maybe_pair_list ')'
+
+    GETOPT     shift, and go to state 41
+    ARGCOUNT   shift, and go to state 42
+    IDENT      shift, and go to state 43
+    PARM       shift, and go to state 44
+    NAME       shift, and go to state 84
+    NUMBER     shift, and go to state 46
+    QUOTE      shift, and go to state 47
+    BSTRING    shift, and go to state 48
+    IPADDRESS  shift, and go to state 49
+    '+'        shift, and go to state 50
+    '-'        shift, and go to state 51
+    NOT        shift, and go to state 71
+    '('        shift, and go to state 72
+
+    $default  reduce using rule 107 (maybe_pair_list)
+
+    cond             go to state 116
+    bool             go to state 74
+    expr             go to state 117
+    value            go to state 54
+    imm_value        go to state 55
+    maybe_pair_list  go to state 99
+    pair_list        go to state 100
+    pair             go to state 88
+
+
+State 73
+
+   14 stmt: if cond . maybe_eol stmt
+   15     | if cond . maybe_eol stmt else stmt
+   70 cond: cond . AND cond
+   71     | cond . OR cond
+   72     | cond . EQ cond
+   73     | cond . LT cond
+   74     | cond . GT cond
+   75     | cond . NE cond
+   76     | cond . LE cond
+   77     | cond . GE cond
+
+    EOL  shift, and go to state 118
+    OR   shift, and go to state 119
+    AND  shift, and go to state 120
+    NE   shift, and go to state 121
+    EQ   shift, and go to state 122
+    GE   shift, and go to state 123
+    GT   shift, and go to state 124
+    LE   shift, and go to state 125
+    LT   shift, and go to state 126
+
+    $default  reduce using rule 11 (maybe_eol)
+
+    maybe_eol  go to state 127
+
+
+State 74
+
+   67 cond: bool .
+
+    $default  reduce using rule 67 (cond)
+
+
+State 75
+
+   78 bool: expr .
+   82 expr: expr . '[' NAME closure ']'
+   83     | expr . '+' expr
+   84     | expr . '-' expr
+   85     | expr . '*' expr
+   86     | expr . '/' expr
+   87     | expr . '%' expr
+
+    '+'  shift, and go to state 102
+    '-'  shift, and go to state 103
+    '*'  shift, and go to state 104
+    '/'  shift, and go to state 105
+    '%'  shift, and go to state 106
+    '['  shift, and go to state 107
+
+    $default  reduce using rule 78 (bool)
+
+
+State 76
+
+   16 stmt: case expr . in caselist T_END
+   82 expr: expr . '[' NAME closure ']'
+   83     | expr . '+' expr
+   84     | expr . '-' expr
+   85     | expr . '*' expr
+   86     | expr . '/' expr
+   87     | expr . '%' expr
+
+    IN   shift, and go to state 128
+    '+'  shift, and go to state 102
+    '-'  shift, and go to state 103
+    '*'  shift, and go to state 104
+    '/'  shift, and go to state 105
+    '%'  shift, and go to state 106
+    '['  shift, and go to state 107
+
+    in  go to state 129
+
+
+State 77
+
+   21 stmt: do EOL . $@2 stmt EOL WHILE $@3 cond
+
+    $default  reduce using rule 19 ($@2)
+
+    $@2  go to state 130
+
+
+State 78
+
+   18 stmt: while $@1 . cond EOL stmt
+
+    GETOPT     shift, and go to state 41
+    ARGCOUNT   shift, and go to state 42
+    IDENT      shift, and go to state 43
+    PARM       shift, and go to state 44
+    NAME       shift, and go to state 45
+    NUMBER     shift, and go to state 46
+    QUOTE      shift, and go to state 47
+    BSTRING    shift, and go to state 48
+    IPADDRESS  shift, and go to state 49
+    '+'        shift, and go to state 50
+    '-'        shift, and go to state 51
+    NOT        shift, and go to state 71
+    '('        shift, and go to state 72
+
+    cond       go to state 131
+    bool       go to state 74
+    expr       go to state 75
+    value      go to state 54
+    imm_value  go to state 55
+
+
+State 79
+
+   63 send_flag: NAME EQ . NUMBER
+
+    NUMBER  shift, and go to state 132
+
+
+State 80
+
+   55 port_type: AUTH .
+
+    $default  reduce using rule 55 (port_type)
+
+
+State 81
+
+   56 port_type: ACCT .
+
+    $default  reduce using rule 56 (port_type)
+
+
+State 82
+
+   24 stmt: SEND send_flags port_type . req_code expr_or_pair_list
+
+    NAME    shift, and go to state 33
+    NUMBER  shift, and go to state 34
+
+    req_code  go to state 133
+
+
+State 83
+
+   62 send_flag_list: send_flag_list send_flag .
+
+    $default  reduce using rule 62 (send_flag_list)
+
+
+State 84
+
+   96 value: NAME . '(' maybe_prlist ')'
+  103 imm_value: NAME .
+  113 pair: NAME . op expr
+
+    NE   shift, and go to state 134
+    EQ   shift, and go to state 135
+    GE   shift, and go to state 136
+    GT   shift, and go to state 137
+    LE   shift, and go to state 138
+    LT   shift, and go to state 139
+    '('  shift, and go to state 95
+
+    NE        [reduce using rule 103 (imm_value)]
+    EQ        [reduce using rule 103 (imm_value)]
+    GE        [reduce using rule 103 (imm_value)]
+    GT        [reduce using rule 103 (imm_value)]
+    LE        [reduce using rule 103 (imm_value)]
+    LT        [reduce using rule 103 (imm_value)]
+    $default  reduce using rule 103 (imm_value)
+
+    op  go to state 140
+
+
+State 85
+
+   25 stmt: EXPECT req_code expr_or_pair_list .
+
+    $default  reduce using rule 25 (stmt)
+
+
+State 86
+
+   66 expr_or_pair_list: expr .
+   82 expr: expr . '[' NAME closure ']'
+   83     | expr . '+' expr
+   84     | expr . '-' expr
+   85     | expr . '*' expr
+   86     | expr . '/' expr
+   87     | expr . '%' expr
+
+    '+'  shift, and go to state 102
+    '-'  shift, and go to state 103
+    '*'  shift, and go to state 104
+    '/'  shift, and go to state 105
+    '%'  shift, and go to state 106
+    '['  shift, and go to state 107
+
+    $default  reduce using rule 66 (expr_or_pair_list)
+
+
+State 87
+
+   65 expr_or_pair_list: pair_list .
+  110 pair_list: pair_list . pair
+  111          | pair_list . ',' pair
+  112          | pair_list . error
+
+    error  shift, and go to state 141
+    NAME   shift, and go to state 142
+    ','    shift, and go to state 143
+
+    $end  reduce using rule 65 (expr_or_pair_list)
+    EOL   reduce using rule 65 (expr_or_pair_list)
+    ELSE  reduce using rule 65 (expr_or_pair_list)
+
+    pair  go to state 144
+
+
+State 88
+
+  109 pair_list: pair .
+
+    $default  reduce using rule 109 (pair_list)
+
+
+State 89
+
+   13 stmt: T_BEGIN list T_END .
+
+    $default  reduce using rule 13 (stmt)
+
+
+State 90
+
+    7 list: list lstmt .
+
+    $default  reduce using rule 7 (list)
+
+
+State 91
+
+   50 string: NAME .
+
+    $default  reduce using rule 50 (string)
+
+
+State 92
+
+   51 string: QUOTE .
+
+    $default  reduce using rule 51 (string)
+
+
+State 93
+
+   52 string: BSTRING .
+
+    $default  reduce using rule 52 (string)
+
+
+State 94
+
+   80 expr: GETOPT string . name name
+
+    NAME  shift, and go to state 145
+
+    NAME      [reduce using rule 48 (name)]
+    $default  reduce using rule 48 (name)
+
+    name  go to state 146
+
+
+State 95
+
+   96 value: NAME '(' . maybe_prlist ')'
+
+    GETOPT     shift, and go to state 41
+    ARGCOUNT   shift, and go to state 42
+    IDENT      shift, and go to state 43
+    PARM       shift, and go to state 44
+    NAME       shift, and go to state 45
+    NUMBER     shift, and go to state 46
+    QUOTE      shift, and go to state 47
+    BSTRING    shift, and go to state 48
+    IPADDRESS  shift, and go to state 49
+    '+'        shift, and go to state 50
+    '-'        shift, and go to state 51
+    '('        shift, and go to state 52
+
+    $default  reduce using rule 105 (maybe_prlist)
+
+    expr          go to state 59
+    value         go to state 54
+    imm_value     go to state 55
+    maybe_prlist  go to state 147
+    prlist        go to state 113
+    pritem        go to state 61
+
+
+State 96
+
+   82 expr: expr . '[' NAME closure ']'
+   83     | expr . '+' expr
+   84     | expr . '-' expr
+   85     | expr . '*' expr
+   86     | expr . '/' expr
+   87     | expr . '%' expr
+   89     | '+' expr .
+
+    '['  shift, and go to state 107
+
+    $default  reduce using rule 89 (expr)
+
+
+State 97
+
+   82 expr: expr . '[' NAME closure ']'
+   83     | expr . '+' expr
+   84     | expr . '-' expr
+   85     | expr . '*' expr
+   86     | expr . '/' expr
+   87     | expr . '%' expr
+   88     | '-' expr .
+
+    '['  shift, and go to state 107
+
+    $default  reduce using rule 88 (expr)
+
+
+State 98
+
+   81 expr: '(' expr . ')'
+   82     | expr . '[' NAME closure ']'
+   83     | expr . '+' expr
+   84     | expr . '-' expr
+   85     | expr . '*' expr
+   86     | expr . '/' expr
+   87     | expr . '%' expr
+
+    '+'  shift, and go to state 102
+    '-'  shift, and go to state 103
+    '*'  shift, and go to state 104
+    '/'  shift, and go to state 105
+    '%'  shift, and go to state 106
+    '['  shift, and go to state 107
+    ')'  shift, and go to state 148
+
+
+State 99
+
+  104 imm_value: '(' maybe_pair_list . ')'
+
+    ')'  shift, and go to state 149
+
+
+State 100
+
+  108 maybe_pair_list: pair_list .
+  110 pair_list: pair_list . pair
+  111          | pair_list . ',' pair
+  112          | pair_list . error
+
+    error  shift, and go to state 141
+    NAME   shift, and go to state 142
+    ','    shift, and go to state 143
+
+    ')'  reduce using rule 108 (maybe_pair_list)
+
+    pair  go to state 144
+
+
+State 101
+
+   30 stmt: INPUT expr NAME .
+
+    $default  reduce using rule 30 (stmt)
+
+
+State 102
+
+   83 expr: expr '+' . expr
+
+    GETOPT     shift, and go to state 41
+    ARGCOUNT   shift, and go to state 42
+    IDENT      shift, and go to state 43
+    PARM       shift, and go to state 44
+    NAME       shift, and go to state 45
+    NUMBER     shift, and go to state 46
+    QUOTE      shift, and go to state 47
+    BSTRING    shift, and go to state 48
+    IPADDRESS  shift, and go to state 49
+    '+'        shift, and go to state 50
+    '-'        shift, and go to state 51
+    '('        shift, and go to state 52
+
+    expr       go to state 150
+    value      go to state 54
+    imm_value  go to state 55
+
+
+State 103
+
+   84 expr: expr '-' . expr
+
+    GETOPT     shift, and go to state 41
+    ARGCOUNT   shift, and go to state 42
+    IDENT      shift, and go to state 43
+    PARM       shift, and go to state 44
+    NAME       shift, and go to state 45
+    NUMBER     shift, and go to state 46
+    QUOTE      shift, and go to state 47
+    BSTRING    shift, and go to state 48
+    IPADDRESS  shift, and go to state 49
+    '+'        shift, and go to state 50
+    '-'        shift, and go to state 51
+    '('        shift, and go to state 52
+
+    expr       go to state 151
+    value      go to state 54
+    imm_value  go to state 55
+
+
+State 104
+
+   85 expr: expr '*' . expr
+
+    GETOPT     shift, and go to state 41
+    ARGCOUNT   shift, and go to state 42
+    IDENT      shift, and go to state 43
+    PARM       shift, and go to state 44
+    NAME       shift, and go to state 45
+    NUMBER     shift, and go to state 46
+    QUOTE      shift, and go to state 47
+    BSTRING    shift, and go to state 48
+    IPADDRESS  shift, and go to state 49
+    '+'        shift, and go to state 50
+    '-'        shift, and go to state 51
+    '('        shift, and go to state 52
+
+    expr       go to state 152
+    value      go to state 54
+    imm_value  go to state 55
+
+
+State 105
+
+   86 expr: expr '/' . expr
+
+    GETOPT     shift, and go to state 41
+    ARGCOUNT   shift, and go to state 42
+    IDENT      shift, and go to state 43
+    PARM       shift, and go to state 44
+    NAME       shift, and go to state 45
+    NUMBER     shift, and go to state 46
+    QUOTE      shift, and go to state 47
+    BSTRING    shift, and go to state 48
+    IPADDRESS  shift, and go to state 49
+    '+'        shift, and go to state 50
+    '-'        shift, and go to state 51
+    '('        shift, and go to state 52
+
+    expr       go to state 153
+    value      go to state 54
+    imm_value  go to state 55
+
+
+State 106
+
+   87 expr: expr '%' . expr
+
+    GETOPT     shift, and go to state 41
+    ARGCOUNT   shift, and go to state 42
+    IDENT      shift, and go to state 43
+    PARM       shift, and go to state 44
+    NAME       shift, and go to state 45
+    NUMBER     shift, and go to state 46
+    QUOTE      shift, and go to state 47
+    BSTRING    shift, and go to state 48
+    IPADDRESS  shift, and go to state 49
+    '+'        shift, and go to state 50
+    '-'        shift, and go to state 51
+    '('        shift, and go to state 52
+
+    expr       go to state 154
+    value      go to state 54
+    imm_value  go to state 55
+
+
+State 107
+
+   82 expr: expr '[' . NAME closure ']'
+
+    NAME  shift, and go to state 155
+
+
+State 108
+
+  121 prlist: prlist ',' . pritem
+
+    GETOPT     shift, and go to state 41
+    ARGCOUNT   shift, and go to state 42
+    IDENT      shift, and go to state 43
+    PARM       shift, and go to state 44
+    NAME       shift, and go to state 45
+    NUMBER     shift, and go to state 46
+    QUOTE      shift, and go to state 47
+    BSTRING    shift, and go to state 48
+    IPADDRESS  shift, and go to state 49
+    '+'        shift, and go to state 50
+    '-'        shift, and go to state 51
+    '('        shift, and go to state 52
+
+    expr       go to state 59
+    value      go to state 54
+    imm_value  go to state 55
+    pritem     go to state 156
+
+
+State 109
+
+  122 prlist: prlist pritem .
+
+    $default  reduce using rule 122 (prlist)
+
+
+State 110
+
+   36 function_def: NAME EOL T_BEGIN . EOL
+
+    EOL  shift, and go to state 157
+
+
+State 111
+
+   23 stmt: NAME EQ expr .
+   82 expr: expr . '[' NAME closure ']'
+   83     | expr . '+' expr
+   84     | expr . '-' expr
+   85     | expr . '*' expr
+   86     | expr . '/' expr
+   87     | expr . '%' expr
+
+    '+'  shift, and go to state 102
+    '-'  shift, and go to state 103
+    '*'  shift, and go to state 104
+    '/'  shift, and go to state 105
+    '%'  shift, and go to state 106
+    '['  shift, and go to state 107
+
+    $default  reduce using rule 23 (stmt)
+
+
+State 112
+
+   35 stmt: NAME '(' maybe_prlist . ')'
+
+    ')'  shift, and go to state 158
+
+
+State 113
+
+  106 maybe_prlist: prlist .
+  121 prlist: prlist . ',' pritem
+  122       | prlist . pritem
+
+    GETOPT     shift, and go to state 41
+    ARGCOUNT   shift, and go to state 42
+    IDENT      shift, and go to state 43
+    PARM       shift, and go to state 44
+    NAME       shift, and go to state 45
+    NUMBER     shift, and go to state 46
+    QUOTE      shift, and go to state 47
+    BSTRING    shift, and go to state 48
+    IPADDRESS  shift, and go to state 49
+    '+'        shift, and go to state 50
+    '-'        shift, and go to state 51
+    '('        shift, and go to state 52
+    ','        shift, and go to state 108
+
+    $default  reduce using rule 106 (maybe_prlist)
+
+    expr       go to state 59
+    value      go to state 54
+    imm_value  go to state 55
+    pritem     go to state 109
+
+
+State 114
+
+   33 stmt: function_def list T_END .
+
+    $default  reduce using rule 33 (stmt)
+
+
+State 115
+
+   68 cond: NOT cond .
+   70     | cond . AND cond
+   71     | cond . OR cond
+   72     | cond . EQ cond
+   73     | cond . LT cond
+   74     | cond . GT cond
+   75     | cond . NE cond
+   76     | cond . LE cond
+   77     | cond . GE cond
+
+    $default  reduce using rule 68 (cond)
+
+
+State 116
+
+   69 cond: '(' cond . ')'
+   70     | cond . AND cond
+   71     | cond . OR cond
+   72     | cond . EQ cond
+   73     | cond . LT cond
+   74     | cond . GT cond
+   75     | cond . NE cond
+   76     | cond . LE cond
+   77     | cond . GE cond
+
+    OR   shift, and go to state 119
+    AND  shift, and go to state 120
+    NE   shift, and go to state 121
+    EQ   shift, and go to state 122
+    GE   shift, and go to state 123
+    GT   shift, and go to state 124
+    LE   shift, and go to state 125
+    LT   shift, and go to state 126
+    ')'  shift, and go to state 159
+
+
+State 117
+
+   78 bool: expr .
+   81 expr: '(' expr . ')'
+   82     | expr . '[' NAME closure ']'
+   83     | expr . '+' expr
+   84     | expr . '-' expr
+   85     | expr . '*' expr
+   86     | expr . '/' expr
+   87     | expr . '%' expr
+
+    '+'  shift, and go to state 102
+    '-'  shift, and go to state 103
+    '*'  shift, and go to state 104
+    '/'  shift, and go to state 105
+    '%'  shift, and go to state 106
+    '['  shift, and go to state 107
+    ')'  shift, and go to state 148
+
+    ')'       [reduce using rule 78 (bool)]
+    $default  reduce using rule 78 (bool)
+
+
+State 118
+
+   12 maybe_eol: EOL .
+
+    $default  reduce using rule 12 (maybe_eol)
+
+
+State 119
+
+   71 cond: cond OR . cond
+
+    GETOPT     shift, and go to state 41
+    ARGCOUNT   shift, and go to state 42
+    IDENT      shift, and go to state 43
+    PARM       shift, and go to state 44
+    NAME       shift, and go to state 45
+    NUMBER     shift, and go to state 46
+    QUOTE      shift, and go to state 47
+    BSTRING    shift, and go to state 48
+    IPADDRESS  shift, and go to state 49
+    '+'        shift, and go to state 50
+    '-'        shift, and go to state 51
+    NOT        shift, and go to state 71
+    '('        shift, and go to state 72
+
+    cond       go to state 160
+    bool       go to state 74
+    expr       go to state 75
+    value      go to state 54
+    imm_value  go to state 55
+
+
+State 120
+
+   70 cond: cond AND . cond
+
+    GETOPT     shift, and go to state 41
+    ARGCOUNT   shift, and go to state 42
+    IDENT      shift, and go to state 43
+    PARM       shift, and go to state 44
+    NAME       shift, and go to state 45
+    NUMBER     shift, and go to state 46
+    QUOTE      shift, and go to state 47
+    BSTRING    shift, and go to state 48
+    IPADDRESS  shift, and go to state 49
+    '+'        shift, and go to state 50
+    '-'        shift, and go to state 51
+    NOT        shift, and go to state 71
+    '('        shift, and go to state 72
+
+    cond       go to state 161
+    bool       go to state 74
+    expr       go to state 75
+    value      go to state 54
+    imm_value  go to state 55
+
+
+State 121
+
+   75 cond: cond NE . cond
+
+    GETOPT     shift, and go to state 41
+    ARGCOUNT   shift, and go to state 42
+    IDENT      shift, and go to state 43
+    PARM       shift, and go to state 44
+    NAME       shift, and go to state 45
+    NUMBER     shift, and go to state 46
+    QUOTE      shift, and go to state 47
+    BSTRING    shift, and go to state 48
+    IPADDRESS  shift, and go to state 49
+    '+'        shift, and go to state 50
+    '-'        shift, and go to state 51
+    NOT        shift, and go to state 71
+    '('        shift, and go to state 72
+
+    cond       go to state 162
+    bool       go to state 74
+    expr       go to state 75
+    value      go to state 54
+    imm_value  go to state 55
+
+
+State 122
+
+   72 cond: cond EQ . cond
+
+    GETOPT     shift, and go to state 41
+    ARGCOUNT   shift, and go to state 42
+    IDENT      shift, and go to state 43
+    PARM       shift, and go to state 44
+    NAME       shift, and go to state 45
+    NUMBER     shift, and go to state 46
+    QUOTE      shift, and go to state 47
+    BSTRING    shift, and go to state 48
+    IPADDRESS  shift, and go to state 49
+    '+'        shift, and go to state 50
+    '-'        shift, and go to state 51
+    NOT        shift, and go to state 71
+    '('        shift, and go to state 72
+
+    cond       go to state 163
+    bool       go to state 74
+    expr       go to state 75
+    value      go to state 54
+    imm_value  go to state 55
+
+
+State 123
+
+   77 cond: cond GE . cond
+
+    GETOPT     shift, and go to state 41
+    ARGCOUNT   shift, and go to state 42
+    IDENT      shift, and go to state 43
+    PARM       shift, and go to state 44
+    NAME       shift, and go to state 45
+    NUMBER     shift, and go to state 46
+    QUOTE      shift, and go to state 47
+    BSTRING    shift, and go to state 48
+    IPADDRESS  shift, and go to state 49
+    '+'        shift, and go to state 50
+    '-'        shift, and go to state 51
+    NOT        shift, and go to state 71
+    '('        shift, and go to state 72
+
+    cond       go to state 164
+    bool       go to state 74
+    expr       go to state 75
+    value      go to state 54
+    imm_value  go to state 55
+
+
+State 124
+
+   74 cond: cond GT . cond
+
+    GETOPT     shift, and go to state 41
+    ARGCOUNT   shift, and go to state 42
+    IDENT      shift, and go to state 43
+    PARM       shift, and go to state 44
+    NAME       shift, and go to state 45
+    NUMBER     shift, and go to state 46
+    QUOTE      shift, and go to state 47
+    BSTRING    shift, and go to state 48
+    IPADDRESS  shift, and go to state 49
+    '+'        shift, and go to state 50
+    '-'        shift, and go to state 51
+    NOT        shift, and go to state 71
+    '('        shift, and go to state 72
+
+    cond       go to state 165
+    bool       go to state 74
+    expr       go to state 75
+    value      go to state 54
+    imm_value  go to state 55
+
+
+State 125
+
+   76 cond: cond LE . cond
+
+    GETOPT     shift, and go to state 41
+    ARGCOUNT   shift, and go to state 42
+    IDENT      shift, and go to state 43
+    PARM       shift, and go to state 44
+    NAME       shift, and go to state 45
+    NUMBER     shift, and go to state 46
+    QUOTE      shift, and go to state 47
+    BSTRING    shift, and go to state 48
+    IPADDRESS  shift, and go to state 49
+    '+'        shift, and go to state 50
+    '-'        shift, and go to state 51
+    NOT        shift, and go to state 71
+    '('        shift, and go to state 72
+
+    cond       go to state 166
+    bool       go to state 74
+    expr       go to state 75
+    value      go to state 54
+    imm_value  go to state 55
+
+
+State 126
+
+   73 cond: cond LT . cond
+
+    GETOPT     shift, and go to state 41
+    ARGCOUNT   shift, and go to state 42
+    IDENT      shift, and go to state 43
+    PARM       shift, and go to state 44
+    NAME       shift, and go to state 45
+    NUMBER     shift, and go to state 46
+    QUOTE      shift, and go to state 47
+    BSTRING    shift, and go to state 48
+    IPADDRESS  shift, and go to state 49
+    '+'        shift, and go to state 50
+    '-'        shift, and go to state 51
+    NOT        shift, and go to state 71
+    '('        shift, and go to state 72
+
+    cond       go to state 167
+    bool       go to state 74
+    expr       go to state 75
+    value      go to state 54
+    imm_value  go to state 55
+
+
+State 127
+
+   14 stmt: if cond maybe_eol . stmt
+   15     | if cond maybe_eol . stmt else stmt
+
+    SEND      shift, and go to state 3
+    EXPECT    shift, and go to state 4
+    T_BEGIN   shift, and go to state 5
+    IF        shift, and go to state 6
+    WHILE     shift, and go to state 7
+    DO        shift, and go to state 8
+    BREAK     shift, and go to state 9
+    CONTINUE  shift, and go to state 10
+    INPUT     shift, and go to state 11
+    SHIFT     shift, and go to state 12
+    CASE      shift, and go to state 13
+    T_RETURN  shift, and go to state 14
+    SET       shift, and go to state 15
+    PRINT     shift, and go to state 16
+    EXIT      shift, and go to state 17
+    NAME      shift, and go to state 18
+
+    stmt          go to state 168
+    function_def  go to state 23
+    if            go to state 24
+    case          go to state 25
+    do            go to state 26
+    while         go to state 27
+
+
+State 128
+
+   42 in: IN . maybe_eol
+
+    EOL  shift, and go to state 118
+
+    $default  reduce using rule 11 (maybe_eol)
+
+    maybe_eol  go to state 169
+
+
+State 129
+
+   16 stmt: case expr in . caselist T_END
+
+    GETOPT     shift, and go to state 41
+    ARGCOUNT   shift, and go to state 42
+    IDENT      shift, and go to state 43
+    PARM       shift, and go to state 44
+    NAME       shift, and go to state 45
+    NUMBER     shift, and go to state 46
+    QUOTE      shift, and go to state 47
+    BSTRING    shift, and go to state 48
+    IPADDRESS  shift, and go to state 49
+    '+'        shift, and go to state 50
+    '-'        shift, and go to state 51
+    '('        shift, and go to state 52
+
+    caselist   go to state 170
+    casecond   go to state 171
+    expr       go to state 172
+    value      go to state 54
+    imm_value  go to state 55
+
+
+State 130
+
+   21 stmt: do EOL $@2 . stmt EOL WHILE $@3 cond
+
+    SEND      shift, and go to state 3
+    EXPECT    shift, and go to state 4
+    T_BEGIN   shift, and go to state 5
+    IF        shift, and go to state 6
+    WHILE     shift, and go to state 7
+    DO        shift, and go to state 8
+    BREAK     shift, and go to state 9
+    CONTINUE  shift, and go to state 10
+    INPUT     shift, and go to state 11
+    SHIFT     shift, and go to state 12
+    CASE      shift, and go to state 13
+    T_RETURN  shift, and go to state 14
+    SET       shift, and go to state 15
+    PRINT     shift, and go to state 16
+    EXIT      shift, and go to state 17
+    NAME      shift, and go to state 18
+
+    stmt          go to state 173
+    function_def  go to state 23
+    if            go to state 24
+    case          go to state 25
+    do            go to state 26
+    while         go to state 27
+
+
+State 131
+
+   18 stmt: while $@1 cond . EOL stmt
+   70 cond: cond . AND cond
+   71     | cond . OR cond
+   72     | cond . EQ cond
+   73     | cond . LT cond
+   74     | cond . GT cond
+   75     | cond . NE cond
+   76     | cond . LE cond
+   77     | cond . GE cond
+
+    EOL  shift, and go to state 174
+    OR   shift, and go to state 119
+    AND  shift, and go to state 120
+    NE   shift, and go to state 121
+    EQ   shift, and go to state 122
+    GE   shift, and go to state 123
+    GT   shift, and go to state 124
+    LE   shift, and go to state 125
+    LT   shift, and go to state 126
+
+
+State 132
+
+   63 send_flag: NAME EQ NUMBER .
+
+    $default  reduce using rule 63 (send_flag)
+
+
+State 133
+
+   24 stmt: SEND send_flags port_type req_code . expr_or_pair_list
+
+    GETOPT     shift, and go to state 41
+    ARGCOUNT   shift, and go to state 42
+    IDENT      shift, and go to state 43
+    PARM       shift, and go to state 44
+    NAME       shift, and go to state 84
+    NUMBER     shift, and go to state 46
+    QUOTE      shift, and go to state 47
+    BSTRING    shift, and go to state 48
+    IPADDRESS  shift, and go to state 49
+    '+'        shift, and go to state 50
+    '-'        shift, and go to state 51
+    '('        shift, and go to state 52
+
+    $default  reduce using rule 64 (expr_or_pair_list)
+
+    expr_or_pair_list  go to state 175
+    expr               go to state 86
+    value              go to state 54
+    imm_value          go to state 55
+    pair_list          go to state 87
+    pair               go to state 88
+
+
+State 134
+
+  117 op: NE .
+
+    $default  reduce using rule 117 (op)
+
+
+State 135
+
+  114 op: EQ .
+
+    $default  reduce using rule 114 (op)
+
+
+State 136
+
+  119 op: GE .
+
+    $default  reduce using rule 119 (op)
+
+
+State 137
+
+  116 op: GT .
+
+    $default  reduce using rule 116 (op)
+
+
+State 138
+
+  118 op: LE .
+
+    $default  reduce using rule 118 (op)
+
+
+State 139
+
+  115 op: LT .
+
+    $default  reduce using rule 115 (op)
+
+
+State 140
+
+  113 pair: NAME op . expr
+
+    GETOPT     shift, and go to state 41
+    ARGCOUNT   shift, and go to state 42
+    IDENT      shift, and go to state 43
+    PARM       shift, and go to state 44
+    NAME       shift, and go to state 45
+    NUMBER     shift, and go to state 46
+    QUOTE      shift, and go to state 47
+    BSTRING    shift, and go to state 48
+    IPADDRESS  shift, and go to state 49
+    '+'        shift, and go to state 50
+    '-'        shift, and go to state 51
+    '('        shift, and go to state 52
+
+    expr       go to state 176
+    value      go to state 54
+    imm_value  go to state 55
+
+
+State 141
+
+  112 pair_list: pair_list error .
+
+    $default  reduce using rule 112 (pair_list)
+
+
+State 142
+
+  113 pair: NAME . op expr
+
+    NE  shift, and go to state 134
+    EQ  shift, and go to state 135
+    GE  shift, and go to state 136
+    GT  shift, and go to state 137
+    LE  shift, and go to state 138
+    LT  shift, and go to state 139
+
+    op  go to state 140
+
+
+State 143
+
+  111 pair_list: pair_list ',' . pair
+
+    NAME  shift, and go to state 142
+
+    pair  go to state 177
+
+
+State 144
+
+  110 pair_list: pair_list pair .
+
+    $default  reduce using rule 110 (pair_list)
+
+
+State 145
+
+   49 name: NAME .
+
+    $default  reduce using rule 49 (name)
+
+
+State 146
+
+   80 expr: GETOPT string name . name
+
+    NAME  shift, and go to state 145
+
+    NAME      [reduce using rule 48 (name)]
+    $default  reduce using rule 48 (name)
+
+    name  go to state 178
+
+
+State 147
+
+   96 value: NAME '(' maybe_prlist . ')'
+
+    ')'  shift, and go to state 179
+
+
+State 148
+
+   81 expr: '(' expr ')' .
+
+    $default  reduce using rule 81 (expr)
+
+
+State 149
+
+  104 imm_value: '(' maybe_pair_list ')' .
+
+    $default  reduce using rule 104 (imm_value)
+
+
+State 150
+
+   82 expr: expr . '[' NAME closure ']'
+   83     | expr . '+' expr
+   83     | expr '+' expr .
+   84     | expr . '-' expr
+   85     | expr . '*' expr
+   86     | expr . '/' expr
+   87     | expr . '%' expr
+
+    '*'  shift, and go to state 104
+    '/'  shift, and go to state 105
+    '%'  shift, and go to state 106
+    '['  shift, and go to state 107
+
+    $default  reduce using rule 83 (expr)
+
+
+State 151
+
+   82 expr: expr . '[' NAME closure ']'
+   83     | expr . '+' expr
+   84     | expr . '-' expr
+   84     | expr '-' expr .
+   85     | expr . '*' expr
+   86     | expr . '/' expr
+   87     | expr . '%' expr
+
+    '*'  shift, and go to state 104
+    '/'  shift, and go to state 105
+    '%'  shift, and go to state 106
+    '['  shift, and go to state 107
+
+    $default  reduce using rule 84 (expr)
+
+
+State 152
+
+   82 expr: expr . '[' NAME closure ']'
+   83     | expr . '+' expr
+   84     | expr . '-' expr
+   85     | expr . '*' expr
+   85     | expr '*' expr .
+   86     | expr . '/' expr
+   87     | expr . '%' expr
+
+    '['  shift, and go to state 107
+
+    $default  reduce using rule 85 (expr)
+
+
+State 153
+
+   82 expr: expr . '[' NAME closure ']'
+   83     | expr . '+' expr
+   84     | expr . '-' expr
+   85     | expr . '*' expr
+   86     | expr . '/' expr
+   86     | expr '/' expr .
+   87     | expr . '%' expr
+
+    '['  shift, and go to state 107
+
+    $default  reduce using rule 86 (expr)
+
+
+State 154
+
+   82 expr: expr . '[' NAME closure ']'
+   83     | expr . '+' expr
+   84     | expr . '-' expr
+   85     | expr . '*' expr
+   86     | expr . '/' expr
+   87     | expr . '%' expr
+   87     | expr '%' expr .
+
+    '['  shift, and go to state 107
+
+    $default  reduce using rule 87 (expr)
+
+
+State 155
+
+   82 expr: expr '[' NAME . closure ']'
+
+    '*'  shift, and go to state 180
+
+    $default  reduce using rule 97 (closure)
+
+    closure  go to state 181
+
+
+State 156
+
+  121 prlist: prlist ',' pritem .
+
+    $default  reduce using rule 121 (prlist)
+
+
+State 157
+
+   36 function_def: NAME EOL T_BEGIN EOL .
+
+    $default  reduce using rule 36 (function_def)
+
+
+State 158
+
+   35 stmt: NAME '(' maybe_prlist ')' .
+
+    $default  reduce using rule 35 (stmt)
+
+
+State 159
+
+   69 cond: '(' cond ')' .
+
+    $default  reduce using rule 69 (cond)
+
+
+State 160
+
+   70 cond: cond . AND cond
+   71     | cond . OR cond
+   71     | cond OR cond .
+   72     | cond . EQ cond
+   73     | cond . LT cond
+   74     | cond . GT cond
+   75     | cond . NE cond
+   76     | cond . LE cond
+   77     | cond . GE cond
+
+    AND  shift, and go to state 120
+    NE   shift, and go to state 121
+    EQ   shift, and go to state 122
+    GE   shift, and go to state 123
+    GT   shift, and go to state 124
+    LE   shift, and go to state 125
+    LT   shift, and go to state 126
+
+    $default  reduce using rule 71 (cond)
+
+
+State 161
+
+   70 cond: cond . AND cond
+   70     | cond AND cond .
+   71     | cond . OR cond
+   72     | cond . EQ cond
+   73     | cond . LT cond
+   74     | cond . GT cond
+   75     | cond . NE cond
+   76     | cond . LE cond
+   77     | cond . GE cond
+
+    NE  shift, and go to state 121
+    EQ  shift, and go to state 122
+    GE  shift, and go to state 123
+    GT  shift, and go to state 124
+    LE  shift, and go to state 125
+    LT  shift, and go to state 126
+
+    $default  reduce using rule 70 (cond)
+
+
+State 162
+
+   70 cond: cond . AND cond
+   71     | cond . OR cond
+   72     | cond . EQ cond
+   73     | cond . LT cond
+   74     | cond . GT cond
+   75     | cond . NE cond
+   75     | cond NE cond .
+   76     | cond . LE cond
+   77     | cond . GE cond
+
+    GE  shift, and go to state 123
+    GT  shift, and go to state 124
+    LE  shift, and go to state 125
+    LT  shift, and go to state 126
+
+    NE  error (nonassociative)
+    EQ  error (nonassociative)
+
+    $default  reduce using rule 75 (cond)
+
+
+State 163
+
+   70 cond: cond . AND cond
+   71     | cond . OR cond
+   72     | cond . EQ cond
+   72     | cond EQ cond .
+   73     | cond . LT cond
+   74     | cond . GT cond
+   75     | cond . NE cond
+   76     | cond . LE cond
+   77     | cond . GE cond
+
+    GE  shift, and go to state 123
+    GT  shift, and go to state 124
+    LE  shift, and go to state 125
+    LT  shift, and go to state 126
+
+    NE  error (nonassociative)
+    EQ  error (nonassociative)
+
+    $default  reduce using rule 72 (cond)
+
+
+State 164
+
+   70 cond: cond . AND cond
+   71     | cond . OR cond
+   72     | cond . EQ cond
+   73     | cond . LT cond
+   74     | cond . GT cond
+   75     | cond . NE cond
+   76     | cond . LE cond
+   77     | cond . GE cond
+   77     | cond GE cond .
+
+    GE  error (nonassociative)
+    GT  error (nonassociative)
+    LE  error (nonassociative)
+    LT  error (nonassociative)
+
+    $default  reduce using rule 77 (cond)
+
+
+State 165
+
+   70 cond: cond . AND cond
+   71     | cond . OR cond
+   72     | cond . EQ cond
+   73     | cond . LT cond
+   74     | cond . GT cond
+   74     | cond GT cond .
+   75     | cond . NE cond
+   76     | cond . LE cond
+   77     | cond . GE cond
+
+    GE  error (nonassociative)
+    GT  error (nonassociative)
+    LE  error (nonassociative)
+    LT  error (nonassociative)
+
+    $default  reduce using rule 74 (cond)
+
+
+State 166
+
+   70 cond: cond . AND cond
+   71     | cond . OR cond
+   72     | cond . EQ cond
+   73     | cond . LT cond
+   74     | cond . GT cond
+   75     | cond . NE cond
+   76     | cond . LE cond
+   76     | cond LE cond .
+   77     | cond . GE cond
+
+    GE  error (nonassociative)
+    GT  error (nonassociative)
+    LE  error (nonassociative)
+    LT  error (nonassociative)
+
+    $default  reduce using rule 76 (cond)
+
+
+State 167
+
+   70 cond: cond . AND cond
+   71     | cond . OR cond
+   72     | cond . EQ cond
+   73     | cond . LT cond
+   73     | cond LT cond .
+   74     | cond . GT cond
+   75     | cond . NE cond
+   76     | cond . LE cond
+   77     | cond . GE cond
+
+    GE  error (nonassociative)
+    GT  error (nonassociative)
+    LE  error (nonassociative)
+    LT  error (nonassociative)
+
+    $default  reduce using rule 73 (cond)
+
+
+State 168
+
+   14 stmt: if cond maybe_eol stmt .
+   15     | if cond maybe_eol stmt . else stmt
+
+    ELSE  shift, and go to state 182
+
+    ELSE      [reduce using rule 14 (stmt)]
+    $default  reduce using rule 14 (stmt)
+
+    else  go to state 183
+
+
+State 169
+
+   42 in: IN maybe_eol .
+
+    $default  reduce using rule 42 (in)
+
+
+State 170
+
+   16 stmt: case expr in caselist . T_END
+   44 caselist: caselist . casecond
+
+    T_END      shift, and go to state 184
+    GETOPT     shift, and go to state 41
+    ARGCOUNT   shift, and go to state 42
+    IDENT      shift, and go to state 43
+    PARM       shift, and go to state 44
+    NAME       shift, and go to state 45
+    NUMBER     shift, and go to state 46
+    QUOTE      shift, and go to state 47
+    BSTRING    shift, and go to state 48
+    IPADDRESS  shift, and go to state 49
+    '+'        shift, and go to state 50
+    '-'        shift, and go to state 51
+    '('        shift, and go to state 52
+
+    casecond   go to state 185
+    expr       go to state 172
+    value      go to state 54
+    imm_value  go to state 55
+
+
+State 171
+
+   43 caselist: casecond .
+
+    $default  reduce using rule 43 (caselist)
+
+
+State 172
+
+   45 casecond: expr . ')' stmt nls
+   82 expr: expr . '[' NAME closure ']'
+   83     | expr . '+' expr
+   84     | expr . '-' expr
+   85     | expr . '*' expr
+   86     | expr . '/' expr
+   87     | expr . '%' expr
+
+    '+'  shift, and go to state 102
+    '-'  shift, and go to state 103
+    '*'  shift, and go to state 104
+    '/'  shift, and go to state 105
+    '%'  shift, and go to state 106
+    '['  shift, and go to state 107
+    ')'  shift, and go to state 186
+
+
+State 173
+
+   21 stmt: do EOL $@2 stmt . EOL WHILE $@3 cond
+
+    EOL  shift, and go to state 187
+
+
+State 174
+
+   18 stmt: while $@1 cond EOL . stmt
+
+    SEND      shift, and go to state 3
+    EXPECT    shift, and go to state 4
+    T_BEGIN   shift, and go to state 5
+    IF        shift, and go to state 6
+    WHILE     shift, and go to state 7
+    DO        shift, and go to state 8
+    BREAK     shift, and go to state 9
+    CONTINUE  shift, and go to state 10
+    INPUT     shift, and go to state 11
+    SHIFT     shift, and go to state 12
+    CASE      shift, and go to state 13
+    T_RETURN  shift, and go to state 14
+    SET       shift, and go to state 15
+    PRINT     shift, and go to state 16
+    EXIT      shift, and go to state 17
+    NAME      shift, and go to state 18
+
+    stmt          go to state 188
+    function_def  go to state 23
+    if            go to state 24
+    case          go to state 25
+    do            go to state 26
+    while         go to state 27
+
+
+State 175
+
+   24 stmt: SEND send_flags port_type req_code expr_or_pair_list .
+
+    $default  reduce using rule 24 (stmt)
+
+
+State 176
+
+   82 expr: expr . '[' NAME closure ']'
+   83     | expr . '+' expr
+   84     | expr . '-' expr
+   85     | expr . '*' expr
+   86     | expr . '/' expr
+   87     | expr . '%' expr
+  113 pair: NAME op expr .
+
+    '+'  shift, and go to state 102
+    '-'  shift, and go to state 103
+    '*'  shift, and go to state 104
+    '/'  shift, and go to state 105
+    '%'  shift, and go to state 106
+    '['  shift, and go to state 107
+
+    $default  reduce using rule 113 (pair)
+
+
+State 177
+
+  111 pair_list: pair_list ',' pair .
+
+    $default  reduce using rule 111 (pair_list)
+
+
+State 178
+
+   80 expr: GETOPT string name name .
+
+    $default  reduce using rule 80 (expr)
+
+
+State 179
+
+   96 value: NAME '(' maybe_prlist ')' .
+
+    $default  reduce using rule 96 (value)
+
+
+State 180
+
+   98 closure: '*' .
+
+    $default  reduce using rule 98 (closure)
+
+
+State 181
+
+   82 expr: expr '[' NAME closure . ']'
+
+    ']'  shift, and go to state 189
+
+
+State 182
+
+   41 else: ELSE . maybe_eol
+
+    EOL  shift, and go to state 118
+
+    $default  reduce using rule 11 (maybe_eol)
+
+    maybe_eol  go to state 190
+
+
+State 183
+
+   15 stmt: if cond maybe_eol stmt else . stmt
+
+    SEND      shift, and go to state 3
+    EXPECT    shift, and go to state 4
+    T_BEGIN   shift, and go to state 5
+    IF        shift, and go to state 6
+    WHILE     shift, and go to state 7
+    DO        shift, and go to state 8
+    BREAK     shift, and go to state 9
+    CONTINUE  shift, and go to state 10
+    INPUT     shift, and go to state 11
+    SHIFT     shift, and go to state 12
+    CASE      shift, and go to state 13
+    T_RETURN  shift, and go to state 14
+    SET       shift, and go to state 15
+    PRINT     shift, and go to state 16
+    EXIT      shift, and go to state 17
+    NAME      shift, and go to state 18
+
+    stmt          go to state 191
+    function_def  go to state 23
+    if            go to state 24
+    case          go to state 25
+    do            go to state 26
+    while         go to state 27
+
+
+State 184
+
+   16 stmt: case expr in caselist T_END .
+
+    $default  reduce using rule 16 (stmt)
+
+
+State 185
+
+   44 caselist: caselist casecond .
+
+    $default  reduce using rule 44 (caselist)
+
+
+State 186
+
+   45 casecond: expr ')' . stmt nls
+
+    SEND      shift, and go to state 3
+    EXPECT    shift, and go to state 4
+    T_BEGIN   shift, and go to state 5
+    IF        shift, and go to state 6
+    WHILE     shift, and go to state 7
+    DO        shift, and go to state 8
+    BREAK     shift, and go to state 9
+    CONTINUE  shift, and go to state 10
+    INPUT     shift, and go to state 11
+    SHIFT     shift, and go to state 12
+    CASE      shift, and go to state 13
+    T_RETURN  shift, and go to state 14
+    SET       shift, and go to state 15
+    PRINT     shift, and go to state 16
+    EXIT      shift, and go to state 17
+    NAME      shift, and go to state 18
+
+    stmt          go to state 192
+    function_def  go to state 23
+    if            go to state 24
+    case          go to state 25
+    do            go to state 26
+    while         go to state 27
+
+
+State 187
+
+   21 stmt: do EOL $@2 stmt EOL . WHILE $@3 cond
+
+    WHILE  shift, and go to state 193
+
+
+State 188
+
+   18 stmt: while $@1 cond EOL stmt .
+
+    $default  reduce using rule 18 (stmt)
+
+
+State 189
+
+   82 expr: expr '[' NAME closure ']' .
+
+    $default  reduce using rule 82 (expr)
+
+
+State 190
+
+   41 else: ELSE maybe_eol .
+
+    $default  reduce using rule 41 (else)
+
+
+State 191
+
+   15 stmt: if cond maybe_eol stmt else stmt .
+
+    $default  reduce using rule 15 (stmt)
+
+
+State 192
+
+   45 casecond: expr ')' stmt . nls
+
+    EOL  shift, and go to state 194
+
+    nls  go to state 195
+
+
+State 193
+
+   21 stmt: do EOL $@2 stmt EOL WHILE . $@3 cond
+
+    $default  reduce using rule 20 ($@3)
+
+    $@3  go to state 196
+
+
+State 194
+
+   46 nls: EOL .
+
+    $default  reduce using rule 46 (nls)
+
+
+State 195
+
+   45 casecond: expr ')' stmt nls .
+   47 nls: nls . EOL
+
+    EOL  shift, and go to state 197
+
+    $default  reduce using rule 45 (casecond)
+
+
+State 196
+
+   21 stmt: do EOL $@2 stmt EOL WHILE $@3 . cond
+
+    GETOPT     shift, and go to state 41
+    ARGCOUNT   shift, and go to state 42
+    IDENT      shift, and go to state 43
+    PARM       shift, and go to state 44
+    NAME       shift, and go to state 45
+    NUMBER     shift, and go to state 46
+    QUOTE      shift, and go to state 47
+    BSTRING    shift, and go to state 48
+    IPADDRESS  shift, and go to state 49
+    '+'        shift, and go to state 50
+    '-'        shift, and go to state 51
+    NOT        shift, and go to state 71
+    '('        shift, and go to state 72
+
+    cond       go to state 198
+    bool       go to state 74
+    expr       go to state 75
+    value      go to state 54
+    imm_value  go to state 55
+
+
+State 197
+
+   47 nls: nls EOL .
+
+    $default  reduce using rule 47 (nls)
+
+
+State 198
+
+   21 stmt: do EOL $@2 stmt EOL WHILE $@3 cond .
+   70 cond: cond . AND cond
+   71     | cond . OR cond
+   72     | cond . EQ cond
+   73     | cond . LT cond
+   74     | cond . GT cond
+   75     | cond . NE cond
+   76     | cond . LE cond
+   77     | cond . GE cond
+
+    OR   shift, and go to state 119
+    AND  shift, and go to state 120
+    NE   shift, and go to state 121
+    EQ   shift, and go to state 122
+    GE   shift, and go to state 123
+    GT   shift, and go to state 124
+    LE   shift, and go to state 125
+    LT   shift, and go to state 126
+
+    $default  reduce using rule 21 (stmt)

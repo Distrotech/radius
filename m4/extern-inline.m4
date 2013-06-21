@@ -1,0 +1,1 @@
+../gnulib/m4/extern-inline.m4

@@ -1,0 +1,500 @@
+State 22 conflicts: 1 shift/reduce
+
+
+Grammar
+
+    0 $accept: input $end
+
+    1 input: list
+
+    2 list: line
+    3     | list line
+
+    4 opt_list: /* empty */
+    5         | list
+
+    6 line: T_EOL
+    7     | stmt
+    8     | error T_EOL
+
+    9 stmt: simple_stmt
+   10     | block_stmt
+
+   11 block_stmt: block_open opt_list block_close T_EOL
+
+   12 block_open: keyword tag '{'
+
+   13 block_close: '}'
+
+   14 tag: /* empty */
+   15    | value_list
+
+   16 simple_stmt: keyword value_list T_EOL
+
+   17 value_list: value
+   18           | value_list value
+   19           | value_list ',' value
+
+   20 keyword: T_WORD
+
+   21 value: T_WORD
+   22      | T_STRING
+   23      | T_NUMBER
+   24      | T_BOOL
+   25      | T_PUNCT
+   26      | network
+   27      | T_IPADDR ':' T_NUMBER
+
+   28 network: T_IPADDR
+   29        | T_IPADDR slash netmask
+
+   30 slash: T_PUNCT
+
+   31 netmask: T_IPADDR
+   32        | T_NUMBER
+
+
+Terminals, with rules where they appear
+
+$end (0) 0
+',' (44) 19
+':' (58) 27
+'{' (123) 12
+'}' (125) 13
+error (256) 8
+T_EOL (258) 6 8 11 16
+T_WORD (259) 20 21
+T_STRING (260) 22
+T_NUMBER (261) 23 27 32
+T_PUNCT (262) 25 30
+T_BOOL (263) 24
+T_IPADDR (264) 27 28 29 31
+
+
+Nonterminals, with rules where they appear
+
+$accept (14)
+    on left: 0
+input (15)
+    on left: 1, on right: 0
+list (16)
+    on left: 2 3, on right: 1 3 5
+opt_list (17)
+    on left: 4 5, on right: 11
+line (18)
+    on left: 6 7 8, on right: 2 3
+stmt (19)
+    on left: 9 10, on right: 7
+block_stmt (20)
+    on left: 11, on right: 10
+block_open (21)
+    on left: 12, on right: 11
+block_close (22)
+    on left: 13, on right: 11
+tag (23)
+    on left: 14 15, on right: 12
+simple_stmt (24)
+    on left: 16, on right: 9
+value_list (25)
+    on left: 17 18 19, on right: 15 16 18 19
+keyword (26)
+    on left: 20, on right: 12 16
+value (27)
+    on left: 21 22 23 24 25 26 27, on right: 17 18 19
+network (28)
+    on left: 28 29, on right: 26
+slash (29)
+    on left: 30, on right: 29
+netmask (30)
+    on left: 31 32, on right: 29
+
+
+State 0
+
+    0 $accept: . input $end
+
+    error   shift, and go to state 1
+    T_EOL   shift, and go to state 2
+    T_WORD  shift, and go to state 3
+
+    input        go to state 4
+    list         go to state 5
+    line         go to state 6
+    stmt         go to state 7
+    block_stmt   go to state 8
+    block_open   go to state 9
+    simple_stmt  go to state 10
+    keyword      go to state 11
+
+
+State 1
+
+    8 line: error . T_EOL
+
+    T_EOL  shift, and go to state 12
+
+
+State 2
+
+    6 line: T_EOL .
+
+    $default  reduce using rule 6 (line)
+
+
+State 3
+
+   20 keyword: T_WORD .
+
+    $default  reduce using rule 20 (keyword)
+
+
+State 4
+
+    0 $accept: input . $end
+
+    $end  shift, and go to state 13
+
+
+State 5
+
+    1 input: list .
+    3 list: list . line
+
+    error   shift, and go to state 1
+    T_EOL   shift, and go to state 2
+    T_WORD  shift, and go to state 3
+
+    $end  reduce using rule 1 (input)
+
+    line         go to state 14
+    stmt         go to state 7
+    block_stmt   go to state 8
+    block_open   go to state 9
+    simple_stmt  go to state 10
+    keyword      go to state 11
+
+
+State 6
+
+    2 list: line .
+
+    $default  reduce using rule 2 (list)
+
+
+State 7
+
+    7 line: stmt .
+
+    $default  reduce using rule 7 (line)
+
+
+State 8
+
+   10 stmt: block_stmt .
+
+    $default  reduce using rule 10 (stmt)
+
+
+State 9
+
+   11 block_stmt: block_open . opt_list block_close T_EOL
+
+    error   shift, and go to state 1
+    T_EOL   shift, and go to state 2
+    T_WORD  shift, and go to state 3
+
+    '}'  reduce using rule 4 (opt_list)
+
+    list         go to state 15
+    opt_list     go to state 16
+    line         go to state 6
+    stmt         go to state 7
+    block_stmt   go to state 8
+    block_open   go to state 9
+    simple_stmt  go to state 10
+    keyword      go to state 11
+
+
+State 10
+
+    9 stmt: simple_stmt .
+
+    $default  reduce using rule 9 (stmt)
+
+
+State 11
+
+   12 block_open: keyword . tag '{'
+   16 simple_stmt: keyword . value_list T_EOL
+
+    T_WORD    shift, and go to state 17
+    T_STRING  shift, and go to state 18
+    T_NUMBER  shift, and go to state 19
+    T_PUNCT   shift, and go to state 20
+    T_BOOL    shift, and go to state 21
+    T_IPADDR  shift, and go to state 22
+
+    $default  reduce using rule 14 (tag)
+
+    tag         go to state 23
+    value_list  go to state 24
+    value       go to state 25
+    network     go to state 26
+
+
+State 12
+
+    8 line: error T_EOL .
+
+    $default  reduce using rule 8 (line)
+
+
+State 13
+
+    0 $accept: input $end .
+
+    $default  accept
+
+
+State 14
+
+    3 list: list line .
+
+    $default  reduce using rule 3 (list)
+
+
+State 15
+
+    3 list: list . line
+    5 opt_list: list .
+
+    error   shift, and go to state 1
+    T_EOL   shift, and go to state 2
+    T_WORD  shift, and go to state 3
+
+    '}'  reduce using rule 5 (opt_list)
+
+    line         go to state 14
+    stmt         go to state 7
+    block_stmt   go to state 8
+    block_open   go to state 9
+    simple_stmt  go to state 10
+    keyword      go to state 11
+
+
+State 16
+
+   11 block_stmt: block_open opt_list . block_close T_EOL
+
+    '}'  shift, and go to state 27
+
+    block_close  go to state 28
+
+
+State 17
+
+   21 value: T_WORD .
+
+    $default  reduce using rule 21 (value)
+
+
+State 18
+
+   22 value: T_STRING .
+
+    $default  reduce using rule 22 (value)
+
+
+State 19
+
+   23 value: T_NUMBER .
+
+    $default  reduce using rule 23 (value)
+
+
+State 20
+
+   25 value: T_PUNCT .
+
+    $default  reduce using rule 25 (value)
+
+
+State 21
+
+   24 value: T_BOOL .
+
+    $default  reduce using rule 24 (value)
+
+
+State 22
+
+   27 value: T_IPADDR . ':' T_NUMBER
+   28 network: T_IPADDR .
+   29        | T_IPADDR . slash netmask
+
+    T_PUNCT  shift, and go to state 29
+    ':'      shift, and go to state 30
+
+    T_PUNCT   [reduce using rule 28 (network)]
+    $default  reduce using rule 28 (network)
+
+    slash  go to state 31
+
+
+State 23
+
+   12 block_open: keyword tag . '{'
+
+    '{'  shift, and go to state 32
+
+
+State 24
+
+   15 tag: value_list .
+   16 simple_stmt: keyword value_list . T_EOL
+   18 value_list: value_list . value
+   19           | value_list . ',' value
+
+    T_EOL     shift, and go to state 33
+    T_WORD    shift, and go to state 17
+    T_STRING  shift, and go to state 18
+    T_NUMBER  shift, and go to state 19
+    T_PUNCT   shift, and go to state 20
+    T_BOOL    shift, and go to state 21
+    T_IPADDR  shift, and go to state 22
+    ','       shift, and go to state 34
+
+    $default  reduce using rule 15 (tag)
+
+    value    go to state 35
+    network  go to state 26
+
+
+State 25
+
+   17 value_list: value .
+
+    $default  reduce using rule 17 (value_list)
+
+
+State 26
+
+   26 value: network .
+
+    $default  reduce using rule 26 (value)
+
+
+State 27
+
+   13 block_close: '}' .
+
+    $default  reduce using rule 13 (block_close)
+
+
+State 28
+
+   11 block_stmt: block_open opt_list block_close . T_EOL
+
+    T_EOL  shift, and go to state 36
+
+
+State 29
+
+   30 slash: T_PUNCT .
+
+    $default  reduce using rule 30 (slash)
+
+
+State 30
+
+   27 value: T_IPADDR ':' . T_NUMBER
+
+    T_NUMBER  shift, and go to state 37
+
+
+State 31
+
+   29 network: T_IPADDR slash . netmask
+
+    T_NUMBER  shift, and go to state 38
+    T_IPADDR  shift, and go to state 39
+
+    netmask  go to state 40
+
+
+State 32
+
+   12 block_open: keyword tag '{' .
+
+    $default  reduce using rule 12 (block_open)
+
+
+State 33
+
+   16 simple_stmt: keyword value_list T_EOL .
+
+    $default  reduce using rule 16 (simple_stmt)
+
+
+State 34
+
+   19 value_list: value_list ',' . value
+
+    T_WORD    shift, and go to state 17
+    T_STRING  shift, and go to state 18
+    T_NUMBER  shift, and go to state 19
+    T_PUNCT   shift, and go to state 20
+    T_BOOL    shift, and go to state 21
+    T_IPADDR  shift, and go to state 22
+
+    value    go to state 41
+    network  go to state 26
+
+
+State 35
+
+   18 value_list: value_list value .
+
+    $default  reduce using rule 18 (value_list)
+
+
+State 36
+
+   11 block_stmt: block_open opt_list block_close T_EOL .
+
+    $default  reduce using rule 11 (block_stmt)
+
+
+State 37
+
+   27 value: T_IPADDR ':' T_NUMBER .
+
+    $default  reduce using rule 27 (value)
+
+
+State 38
+
+   32 netmask: T_NUMBER .
+
+    $default  reduce using rule 32 (netmask)
+
+
+State 39
+
+   31 netmask: T_IPADDR .
+
+    $default  reduce using rule 31 (netmask)
+
+
+State 40
+
+   29 network: T_IPADDR slash netmask .
+
+    $default  reduce using rule 29 (network)
+
+
+State 41
+
+   19 value_list: value_list ',' value .
+
+    $default  reduce using rule 19 (value_list)

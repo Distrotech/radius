@@ -1,0 +1,1 @@
+../gnulib/m4/memchr.m4

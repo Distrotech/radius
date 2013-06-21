@@ -1,0 +1,2988 @@
+# Vietnamese translation for Radius.
+# Copyright © 2008 Free Software Foundation, Inc.
+# This file is distributed under the same license as the radius package.
+# Clytie Siddall <clytie@riverland.net.au>, 2006-2008.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: radius 1.6.1\n"
+"Report-Msgid-Bugs-To: bug-radius@gnu.org\n"
+"POT-Creation-Date: 2008-12-16 14:18+0200\n"
+"PO-Revision-Date: 2008-12-22 18:55+1030\n"
+"Last-Translator: Clytie Siddall <clytie@riverland.net.au>\n"
+"Language-Team: Vietnamese <vi-VN@googlegroups.com>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+"X-Generator: LocFactoryEditor 1.8\n"
+
+#: gnu/getopt.c:528 gnu/getopt.c:544
+#, c-format
+msgid "%s: option `%s' is ambiguous\n"
+msgstr "%s: tùy chọn « %s » là mơ hồ\n"
+
+#: gnu/getopt.c:577 gnu/getopt.c:581
+#, c-format
+msgid "%s: option `--%s' doesn't allow an argument\n"
+msgstr "%s: tùy chọn « --%s » không cho phép đối số\n"
+
+#: gnu/getopt.c:590 gnu/getopt.c:595
+#, c-format
+msgid "%s: option `%c%s' doesn't allow an argument\n"
+msgstr "%s: tùy chọn « %c%s » không cho phép đối số\n"
+
+#: gnu/getopt.c:638 gnu/getopt.c:657 gnu/getopt.c:973 gnu/getopt.c:992
+#, c-format
+msgid "%s: option `%s' requires an argument\n"
+msgstr "%s: tùy chọn « %s » cần đến đối số\n"
+
+#: gnu/getopt.c:695 gnu/getopt.c:698
+#, c-format
+msgid "%s: unrecognized option `--%s'\n"
+msgstr "%s: không nhận ra tùy chọn « --%s »\n"
+
+#: gnu/getopt.c:706 gnu/getopt.c:709
+#, c-format
+msgid "%s: unrecognized option `%c%s'\n"
+msgstr "%s: không nhận ra tùy chọn « %c%s »\n"
+
+#: gnu/getopt.c:761 gnu/getopt.c:764
+#, c-format
+msgid "%s: illegal option -- %c\n"
+msgstr "%s: không cho phép tùy chọn « -- %c »\n"
+
+#: gnu/getopt.c:770 gnu/getopt.c:773
+#, c-format
+msgid "%s: invalid option -- %c\n"
+msgstr "%s: tùy chọn không hợp lệ « -- %c »\n"
+
+#: gnu/getopt.c:825 gnu/getopt.c:841 gnu/getopt.c:1045 gnu/getopt.c:1063
+#, c-format
+msgid "%s: option requires an argument -- %c\n"
+msgstr "%s: tùy chọn cần đến đối số « -- %c »\n"
+
+#: gnu/getopt.c:894 gnu/getopt.c:910
+#, c-format
+msgid "%s: option `-W %s' is ambiguous\n"
+msgstr "%s: tùy chọn « -W %s » là mơ hồ\n"
+
+#: gnu/getopt.c:934 gnu/getopt.c:952
+#, c-format
+msgid "%s: option `-W %s' doesn't allow an argument\n"
+msgstr "%s: tùy chọn « -W %s » không cho phép đối số\n"
+
+#: gnu/argp-help.c:149
+#, c-format
+msgid "ARGP_HELP_FMT: %s value is less than or equal to %s"
+msgstr "ARGP_HELP_FMT: giá trị %s nhỏ hơn hoặc bằng %s"
+
+#: gnu/argp-help.c:222
+#, c-format
+msgid "%.*s: ARGP_HELP_FMT parameter requires a value"
+msgstr "%.*s: tham số « ARGP_HELP_FMT » cần thiết giá trị"
+
+#: gnu/argp-help.c:228
+#, c-format
+msgid "%.*s: ARGP_HELP_FMT parameter must be positive"
+msgstr "%.*s: tham số « ARGP_HELP_FMT » phải là số dương"
+
+#: gnu/argp-help.c:237
+#, c-format
+msgid "%.*s: Unknown ARGP_HELP_FMT parameter"
+msgstr "%.*s: không biết tham số « ARGP_HELP_FMT »"
+
+#: gnu/argp-help.c:249
+#, c-format
+msgid "Garbage in ARGP_HELP_FMT: %s"
+msgstr "Rác trong « ARGP_HELP_FMT »: %s"
+
+#: gnu/argp-help.c:1248
+msgid "Mandatory or optional arguments to long options are also mandatory or optional for any corresponding short options."
+msgstr "Tất cả đối số bắt buộc phải sử dụng với tùy chọn dài cũng bắt buộc với tùy chọn ngắn tương ứng."
+
+#: gnu/argp-help.c:1641
+msgid "Usage:"
+msgstr "Cách sử dụng:"
+
+#: gnu/argp-help.c:1645
+msgid "  or: "
+msgstr "  hoặc: "
+
+#: gnu/argp-help.c:1657
+msgid " [OPTION...]"
+msgstr " [TÙY_CHỌN...]"
+
+#: gnu/argp-help.c:1684
+#, c-format
+msgid "Try `%s --help' or `%s --usage' for more information.\n"
+msgstr "Hãy thử lệnh « %s --help » (trợ giúp) hoặc lệnh « %s --usage » (cách sử dụng) để xem thông tin thêm.\n"
+
+#: gnu/argp-help.c:1712
+#, c-format
+msgid "Report bugs to %s.\n"
+msgstr "Hãy thông báo lỗi nào cho %s.\n"
+
+#: gnu/argp-help.c:1931
+msgid "Unknown system error"
+msgstr "Gặp lỗi hệ thống không rõ"
+
+#: gnu/argp-parse.c:83
+msgid "give this help list"
+msgstr "hiển thị trợ giúp này"
+
+#: gnu/argp-parse.c:84
+msgid "give a short usage message"
+msgstr "hiển thị thông điệp cách sử dụng ngắn"
+
+#: gnu/argp-parse.c:85
+msgid "NAME"
+msgstr "TÊN"
+
+#: gnu/argp-parse.c:85
+msgid "set the program name"
+msgstr "đặt tên chương trình"
+
+#: gnu/argp-parse.c:86
+msgid "SECS"
+msgstr "GIÂY"
+
+#: gnu/argp-parse.c:87
+msgid "hang for SECS seconds (default 3600)"
+msgstr "treo trong GIÂY giây (mặc định là 3600)"
+
+#: gnu/argp-parse.c:144
+msgid "print program version"
+msgstr "in ra phiên bản chương trình"
+
+#: gnu/argp-parse.c:160
+#, c-format
+msgid "(PROGRAM ERROR) No version known!?"
+msgstr "(LỖI CHƯƠNG TRÌNH) Không biết phiên bản không?"
+
+#: gnu/argp-parse.c:613
+#, c-format
+msgid "%s: Too many arguments\n"
+msgstr "%s: Quá nhiều đối số\n"
+
+#: gnu/argp-parse.c:756
+msgid "(PROGRAM ERROR) Option should have been recognized!?"
+msgstr "(LỖI CHƯƠNG TRÌNH) Nên nhận diện tùy chọn mà chưa?"
+
+#: lib/avl.c:93
+#, c-format
+msgid "make_pair(): attribute %d not found in dictionary"
+msgstr "make_pair(): thuộc tính %d không tìm thấy trong từ điển"
+
+#: lib/client.c:128
+#, c-format
+msgid "Actual request length does not match reported length (%d, %d)"
+msgstr "Độ dài yêu cầu thật không khớp độ dài đã thông báo (%d, %d)"
+
+#: lib/client.c:142
+#, c-format
+msgid "Received invalid reply digest from server"
+msgstr "Nhận bó ứng đáp không hợp lệ từ máy phục vụ"
+
+#: lib/client.c:222
+#, c-format
+msgid "select() interrupted"
+msgstr "select() bị ngắt"
+
+#: lib/client.c:251
+#, c-format
+msgid "invalid port type"
+msgstr "kiểu cổng không hợp lệ"
+
+#: lib/client.c:356
+#, c-format
+msgid "error receiving data from %s:%d"
+msgstr "gặp lỗi khi nhận dữ liệu từ %s:%d"
+
+#: lib/client.c:416 lib/dict.c:812 radiusd/config.y:214
+#, c-format
+msgid "unknown keyword"
+msgstr "không biết từ khoá"
+
+#: lib/client.c:425 radiusd/files.c:939 radiusd/files.c:1134
+#, c-format
+msgid "wrong number of fields"
+msgstr "số trường không đúng"
+
+#: lib/client.c:434
+#, c-format
+msgid "bad IP address or host name"
+msgstr "địa chỉ IP hay tên máy không đúng"
+
+#: lib/client.c:442 lib/client.c:449 radtest/main.c:277 radtest/main.c:287
+#, c-format
+msgid "bad port number %s"
+msgstr "số hiệu cổng sai %s"
+
+#: lib/client.c:461
+#, c-format
+msgid "bad timeout value"
+msgstr "giá trị thời hạn sai"
+
+#: lib/client.c:467
+#, c-format
+msgid "bad retry value"
+msgstr "giá trị thử lại sai"
+
+#: lib/debug.c:211 lib/debug.c:218
+#, c-format
+msgid "compiled without debugging support"
+msgstr "được biên dịch không hỗ trợ khả năng gỡ lỗi"
+
+#: lib/dict.c:123 lib/nas.c:55 radiusd/files.c:1042
+msgid "too few fields"
+msgstr "quá ít trường"
+
+#: lib/dict.c:126
+msgid "too many fields"
+msgstr "quá nhiều trường"
+
+#: lib/dict.c:257
+#, c-format
+msgid "missing ]"
+msgstr "thiếu ]"
+
+#: lib/dict.c:273 lib/dict.c:286
+#, c-format
+msgid "invalid syntax flag %c"
+msgstr "cờ cụ pháp không hợp lệ %c"
+
+#: lib/dict.c:364
+#, c-format
+msgid "invalid flag %c"
+msgstr "cờ không hợp lệ %c"
+
+#: lib/dict.c:420 lib/dict.c:609 lib/dict.c:653
+#, c-format
+msgid "value not a number (near %s)"
+msgstr "giá trị không phải là con số (gần %s)"
+
+#: lib/dict.c:431
+#, c-format
+msgid "no parser registered for this attribute"
+msgstr "không có bộ phân tách được đăng ký cho thuộc tính này"
+
+#: lib/dict.c:440
+msgid "invalid type"
+msgstr "kiểu không hợp lệ"
+
+#: lib/dict.c:447 lib/dict.c:696
+#, c-format
+msgid "unknown vendor"
+msgstr "không biết nhà sản xuất"
+
+#: lib/dict.c:475
+#, c-format
+msgid "Redefining attribute %s"
+msgstr "Đang xác định lại thuộc tính %s"
+
+#: lib/dict.c:482
+#, c-format
+msgid "Redefining alias %s"
+msgstr "Đang xác định lại bí danh %s"
+
+#: lib/dict.c:512 lib/dict.c:548 lib/dict.c:618
+#, c-format
+msgid "Attribute %s is not defined"
+msgstr "Chua xác định thuộc tính %s"
+
+#: lib/dict.c:520
+#, c-format
+msgid "Symbol %s already declared"
+msgstr "Ký hiệu %s đã được tuyên bố"
+
+#: lib/dict.c:578
+#, c-format
+msgid "PROPERTY syntax error"
+msgstr "Lỗi cú pháp PROPERTY (tài sản)"
+
+#: lib/dict.c:672
+#, c-format
+msgid "blocks cannot be nested"
+msgstr "không thể lồng với nhau các khối"
+
+#: lib/dict.c:674
+#, c-format
+msgid "block opened here"
+msgstr "khối được mở ở đây"
+
+#: lib/dict.c:686
+#, c-format
+msgid "block syntax: expected `VENDOR' but found `%s'"
+msgstr "cú pháp khối (ngờ « VENDOR » (nhà sản xuất) còn tìm « %s »)"
+
+#: lib/dict.c:709
+#, c-format
+msgid "unexpected END"
+msgstr "gặp END (kết thúc) bất thường"
+
+#: lib/dict.c:835
+#, c-format
+msgid "BEGIN without END"
+msgstr "BEGIN (bắt đầu) không có END (kết thúc)"
+
+#: lib/dict.c:842
+#, c-format
+msgid "%s: %d error"
+msgid_plural "%s: %d errors"
+msgstr[0] "%s: lỗi %d"
+
+#: lib/leakdetect.c:72 lib/users.l:136
+#, c-format
+msgid "not enough memory"
+msgstr "không đủ bộ nhớ"
+
+#: lib/leakdetect.c:251 lib/leakdetect.c:262
+#, c-format
+msgid "low core: aborting"
+msgstr "lõi thấp nên hủy bỏ"
+
+#: lib/raddb.c:77 lib/users.l:233 radiusd/config.y:912 radiusd/stat.c:79
+#, c-format
+msgid "can't stat `%s'"
+msgstr "không thể lấy các thông tin (stat) về « %s »"
+
+#: lib/raddb.c:84 lib/raddb.c:89 radiusd/rewrite.y:1293 radiusd/rewrite.y:2880
+#: radiusd/scheme.c:204 radiusd/stat.c:73
+#, c-format
+msgid "can't open file `%s'"
+msgstr "không thể mở tập tin « %s »"
+
+#: lib/raddb.c:101
+#, c-format
+msgid "%s: read error"
+msgstr "%s: lỗi đọc"
+
+#: lib/raddb.c:104
+#, c-format
+msgid "%s: short read"
+msgstr "%s: đọc ngắn"
+
+#: lib/radutmp.c:54
+#, c-format
+msgid "grad_ut_setent(): cannot open `%s'"
+msgstr "grad_ut_setent(): không thể mở « %s »"
+
+#: lib/radutmp.c:192
+#, c-format
+msgid "login: entry for NAS %s port %d duplicate"
+msgstr "login: (đăng nhập) mục nhập cho NAS %s cổng %d là trùng"
+
+#: lib/radutmp.c:198
+#, c-format
+msgid "login: entry for NAS %s port %d wrong order"
+msgstr "login: (đăng nhập) mục nhập cho NAS %s cổng %d có thứ tự không đúng"
+
+#: lib/radutmp.c:210
+#, c-format
+msgid "logout: entry for NAS %s port %d has wrong ID (expected %s found %s)"
+msgstr "logout: (đăng xuất) mục nhập cho NAS %s cổng %d có mã nhận diện không đúng (ngờ %s còn tìm %s)"
+
+#: lib/radutmp.c:234
+#, c-format
+msgid "logout: login entry for NAS %s port %d not found"
+msgstr "logout: (đăng xuất) mục nhập đăng nhập cho NAS %s cổng %d không tìm thấy"
+
+#: lib/radutmp.c:253 radiusd/acct.c:674
+#, c-format
+msgid "can't open %s"
+msgstr "không thể mở %s"
+
+#: lib/users.l:246
+#, c-format
+msgid "`%s' already included here"
+msgstr "« %s » đã được gồm ở đây"
+
+#: lib/users.l:250
+#, c-format
+msgid "`%s' already included at top level"
+msgstr "« %s » đã được gồm ở cấp đầu"
+
+#: lib/users.l:258 radiusd/builddbm.c:143
+#, c-format
+msgid "can't open `%s'"
+msgstr "không thể mở « %s »"
+
+#: lib/users.y:102 radiusd/files.c:184
+#, c-format
+msgid "discarding user `%s'"
+msgstr "đang hủy người dung « %s »"
+
+#: lib/users.y:212 radiusd/rewrite.y:1866 gram.y:661 gram.y:841
+#: radtest/gram.y:661 radtest/gram.y:841
+#, c-format
+msgid "unknown attribute `%s'"
+msgstr "không biết thuộc tính « %s »"
+
+#: lib/users.y:241
+#, c-format
+msgid "%s: not an absolute pathname"
+msgstr "%s: không phải là tên đường dẫn tuyệt đối"
+
+#: lib/users.y:254
+msgid "attribute"
+msgstr "thuộc tính"
+
+#: lib/users.y:286
+#, c-format
+msgid "value %s is not declared for attribute %s"
+msgstr "giá trị %s chưa được tuyên bố cho thuộc tính %s"
+
+#: lib/users.y:333
+#, c-format
+msgid "%s: can't parse date"
+msgstr "%s: không thể phân tách ngày tháng"
+
+#: lib/users.y:347
+#, c-format
+msgid "%s: unknown attribute type %d"
+msgstr "%s: không biết kiểu thuộc tính %d"
+
+#: lib/users.y:379
+#, c-format
+msgid "enabled userfile parser debugging"
+msgstr "đã bật khả năng gỡ lỗi bộ phân tách tập tin người dùng"
+
+#: lib/users.y:380
+#, c-format
+msgid "disabled userfile parser debugging"
+msgstr "đã tắt khả năng gỡ lỗi bộ phân tách tập tin người dùng"
+
+#: lib/util.c:217
+#, c-format
+msgid "string too long: %s"
+msgstr "chuỗi quá dài: %s"
+
+#: lib/printutmp.c:491
+#, c-format
+msgid "missing closing quote in string started near `%s'"
+msgstr "thiếu dấu trích dẫn đóng trong chuỗi đã bắt đầu gần « %s »"
+
+#: lib/printutmp.c:567
+#, c-format
+msgid "error in format spec: unknown format %s"
+msgstr "gặp lỗi trong đặc tả định dạng: không biết định dạng %s"
+
+#: lib/printutmp.c:589
+#, c-format
+msgid "wrong number of arguments to form %s"
+msgstr "số đối số không đúng với biểu mẫu %s"
+
+#: lib/printutmp.c:617
+#, c-format
+msgid "form `%s' not closed"
+msgstr "biểu mẫu « %s » chưa được đóng"
+
+#: lib/radargp.c:41 radiusd/radiusd.c:59 radiusd/radiusd.c:75
+#: radiusd/radiusd.c:81
+msgid "DIR"
+msgstr "TMỤC"
+
+#: lib/radargp.c:42
+msgid "Set path to the configuration directory"
+msgstr "Đặt đường dẫn đến thư mục cấu hình"
+
+#: lib/radargp.c:43
+msgid "print license and exit"
+msgstr "in ra giấy phép rồi thoát"
+
+#: lib/radargp.c:61
+msgid "Common options"
+msgstr "Tùy chọn dùng chung"
+
+#: lib/radargp.c:77
+msgid ""
+"   This program is free software; you can redistribute it and/or modify\n"
+"   it under the terms of the GNU General Public License as published by\n"
+"   the Free Software Foundation; either version 3, or (at your option)\n"
+"   any later version.\n"
+"\n"
+"   This program is distributed in the hope that it will be useful,\n"
+"   but WITHOUT ANY WARRANTY; without even the implied warranty of\n"
+"   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the\n"
+"   GNU General Public License for more details.\n"
+"\n"
+"   You should have received a copy of the GNU General Public License\n"
+"   along with GNU Radius; if not, write to the Free Software Foundation,\n"
+"   Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.\n"
+"\n"
+msgstr ""
+"Chương trình này là phần mềm tự do; bạn có thể phát hành lại nó và/hoặc sửa đổi nó với điều kiện của Giấy Phép Công Cộng GNU như được xuất bản bởi Tổ Chức Phần Mềm Tự Do; hoặc phiên bản 3 của Giấy Phép này, hoặc (tùy chọn) bất kỳ phiên bản sau nào.\n"
+"\n"
+"Chương trình này được phát hành vì mong muốn nó có ích, nhưng KHÔNG CÓ BẢO HÀNH GÌ CẢ, THẬM CHÍ KHÔNG CÓ BẢO ĐẢM ĐƯỢC NGỤ Ý KHẢ NĂNG BÁN HAY KHẢ NĂNG LÀM ĐƯỢC VIỆC DỨT KHOÁT. Xem Giấy Phép Công Cộng GNU để biết thêm chi tiết.\n"
+"\n"
+"Bạn đã nhận một bản sao của Giấy Phép Công Cộng GNU cùng với chương trình này; nếu không, hãy viết thư cho Tổ Chức Phần Mềm Tự Do,\n"
+"Free Software Foundation, Inc.,\n"
+"51 Franklin Street, Fifth Floor,\n"
+"Boston, MA  02110-1301, USA (Mỹ)\n"
+"\n"
+
+#: radiusd/acct.c:199
+#, c-format
+msgid "no Acct-Status-Type attribute"
+msgstr "không có thuộc tính « Acct-Status-Type » (kiểu trạng thái kế toán)"
+
+#: radiusd/acct.c:300
+#, c-format
+msgid "NAS %s started (Accounting-On packet seen)"
+msgstr "NAS %s đã khởi chạy (gói tin Accounting-On [kế toán đã bật] được xem)"
+
+#: radiusd/acct.c:308
+#, c-format
+msgid "NAS %s shut down (Accounting-Off packet seen)"
+msgstr "NAS %s đã tắt (gói tin Accounting-Off [kế toán đã tắt] được xem)"
+
+#: radiusd/acct.c:320
+#, c-format
+msgid "unknown packet type (%d)"
+msgstr "không biết kiểu gói tin (%d)"
+
+#: radiusd/acct.c:374
+#, c-format
+msgid "NOT writing wtmp record"
+msgstr "KHÔNG PHẢI đang ghi mục wtmp"
+
+#: radiusd/acct.c:422
+#, c-format
+msgid "System accounting is disabled"
+msgstr "Khả năng kế toán hệ thống bị tắt"
+
+#: radiusd/acct.c:465
+#, c-format
+msgid "Cannot stat path component: %s"
+msgstr "Không thể lấy các thông tin về thành phần đường dẫn: %s"
+
+#: radiusd/acct.c:482
+#, c-format
+msgid "Cannot create directory %s"
+msgstr "Không thể tạo thư mục %s"
+
+#: radiusd/acct.c:488
+#, c-format
+msgid "Path component is not a directory: %s"
+msgstr "Thành phần đường dẫn không phải là thư mục: %s"
+
+#: radiusd/acct.c:504
+#, c-format
+msgid "%s: directory not writable"
+msgstr "%s: thư mục không có khả năng ghi"
+
+#: radiusd/acct.c:510
+#, c-format
+msgid "%s: not a directory"
+msgstr "%s: không phải là thư mục"
+
+#: radiusd/acct.c:530
+#, c-format
+msgid "Detailed accounting is disabled"
+msgstr "Khả năng kế toán chi tiết bị tắt"
+
+#: radiusd/acct.c:594 radiusd/radutil.c:488
+msgid "wrong return type"
+msgstr "kiểu trở về không đúng"
+
+#: radiusd/auth.c:200
+#, c-format
+msgid "Invalid password aging information for user '%s'"
+msgstr "Thông tin không hợp lệ về thời gian còn hoạt động của mật khẩu cho người dùng « %s »"
+
+#: radiusd/auth.c:235
+msgid "account locked"
+msgstr "tài khoản bị khoá"
+
+#: radiusd/auth.c:286
+#, c-format
+msgid "No username"
+msgstr "Không có tên người dùng"
+
+#: radiusd/auth.c:288
+#, c-format
+msgid "Malformed username"
+msgstr "Tên người dùng dạng sai"
+
+#: radiusd/auth.c:319
+#, c-format
+msgid "Access denied by huntgroup %s:%d"
+msgstr "Truy cập bị từ chối bởi huntgroup %s:%d"
+
+#: radiusd/auth.c:591
+#, c-format
+msgid "unknown Password-Location value: %ld"
+msgstr "không biết giá trị « Password-Location » (vị trí mật khẩu): %ld"
+
+#: radiusd/auth.c:626
+#, c-format
+msgid "PAM authentication not available"
+msgstr "Không có sẵn khả năng xác thực PAM"
+
+#: radiusd/auth.c:880 radiusd/auth.c:990
+msgid "No such user"
+msgstr "Không có người dùng như vậy"
+
+#: radiusd/auth.c:898
+msgid "Login rejected"
+msgstr "Đăng nhập từ chối"
+
+#: radiusd/auth.c:900
+msgid "denied by Scheme procedure "
+msgstr "từ chối bởi thủ tục Scheme "
+
+#: radiusd/auth.c:934
+#, c-format
+msgid "Invalid Auth-Failure-Trigger value: %s"
+msgstr "Giá trị « Auth-Failure-Trigger » (điều gây ra sự thất bại xác thực) không hợp lệ giá trị: %s"
+
+#: radiusd/auth.c:937
+#, c-format
+msgid "The value of Auth-Failure-Trigger attribute must begin with '/' or '('."
+msgstr "Giá trị của thuộc tính « Auth-Failure-Trigger » (điều gây ra sự thất bại xác thực) phải bắt đầu với dấu xuyệc « / » hoặc dấu ngoặc mở « ( »."
+
+#: radiusd/auth.c:975
+msgid "Rejected"
+msgstr "Bị từ chối"
+
+#: radiusd/auth.c:983
+msgid "Ignored"
+msgstr "Bị bỏ qua"
+
+#: radiusd/auth.c:999 radiusd/auth.c:1012 radiusd/auth.c:1023
+#: radiusd/auth.c:1161
+msgid "Login incorrect"
+msgstr "Đăng nhập không đúng"
+
+#: radiusd/auth.c:1014
+msgid "Account expired"
+msgstr "Tài khoản đã hết hạn"
+
+#: radiusd/auth.c:1025
+msgid "Password expired"
+msgstr "Mật khẩu đã hết hạn"
+
+#: radiusd/auth.c:1040
+msgid "Account disabled"
+msgstr "Tài khoản bị tắt"
+
+#: radiusd/auth.c:1054
+msgid "Login failed"
+msgstr "Lỗi đăng nhập"
+
+#: radiusd/auth.c:1055
+msgid "realm quota exceeded for "
+msgstr "chỉ tiêu đại hạt bị vượt quá cho "
+
+#: radiusd/auth.c:1080
+#, c-format
+msgid "Multiple logins: [%s] max. %ld%s"
+msgstr "Nhiều việc đăng nhập: [%s] tối đa %ld%s"
+
+#: radiusd/auth.c:1083
+msgid " [MPP attempt]"
+msgstr " [Sự thử MPP]"
+
+#: radiusd/auth.c:1116
+#, c-format
+msgid "Outside allowed timespan (%s)"
+msgstr "Ở ngoại thời hạn (%s)"
+
+#: radiusd/auth.c:1163
+msgid "external check failed: "
+msgstr "việc kiểm tra bên ngoài đã thất bại: "
+
+#: radiusd/auth.c:1244
+msgid "Login OK"
+msgstr "Đăng nhập được"
+
+#: radiusd/builddbm.c:62
+msgid "too many attributes"
+msgstr "quá nhiều thuộc tính"
+
+#: radiusd/builddbm.c:102
+#, c-format
+msgid "can't store datum for %s"
+msgstr "không thể cất giữ dữ liệu cho %s"
+
+#: radiusd/builddbm.c:358
+#, c-format
+msgid "cannot open dbm file %s"
+msgstr "không thể mở tập tin bộ quản lý co sở dữ liệu %s"
+
+#: radiusd/checkrad.c:92
+#, c-format
+msgid "unknown NAS type: %s (nas %s)"
+msgstr "không biết kiểu NAS: %s (nas %s)"
+
+#: radiusd/checkrad.c:247
+#, c-format
+msgid "timed out in waiting SNMP response from NAS %s"
+msgstr "quá thời trong khi đợi đáp ứng SNMP từ NAS %s"
+
+#: radiusd/checkrad.c:297
+#, c-format
+msgid "no snmp_oid"
+msgstr "không có « snmp_oid »"
+
+#: radiusd/checkrad.c:306
+#, c-format
+msgid "invalid OID: %s"
+msgstr "OID không hợp lệ: %s"
+
+#: radiusd/checkrad.c:323
+#, c-format
+msgid "can't create snmp session: %s"
+msgstr "không thể tạo phiên chạy snmp: %s"
+
+#: radiusd/checkrad.c:331
+#, c-format
+msgid "can't open snmp session: %s"
+msgstr "không thể mở phiên chạy snmp: %s"
+
+#: radiusd/checkrad.c:339 radiusd/checkrad.c:348 radiusd/snmpserv.c:2684
+#, c-format
+msgid "can't create SNMP PDU: %s"
+msgstr "không thể tạo PDU SNMP: %s"
+
+#: radiusd/checkrad.c:420
+#, c-format
+msgid "unknown host: %s"
+msgstr "không biết máy: %s"
+
+#: radiusd/checkrad.c:484
+#, c-format
+msgid "timed out in waiting for finger response from NAS %s"
+msgstr "quá giờ trong khi đợi đáp ứng finger từ NAS %s"
+
+#: radiusd/checkrad.c:573
+#, c-format
+msgid "path variable not set"
+msgstr "chưa đặt biến đường dẫn"
+
+#: radiusd/checkrad.c:599
+#, c-format
+msgid "expr variable not set"
+msgstr "chưa đặt biến expr"
+
+#: radiusd/config.y:173
+msgid "unknown block statement"
+msgstr "gặp khai báo khối không rõ"
+
+#: radiusd/config.y:302
+#, c-format
+msgid "invalid netmask length: %d"
+msgstr "độ dài mặt nạ mạng không hợp lệ: %d"
+
+#: radiusd/config.y:429
+#, c-format
+msgid "%s:%d: unexpected EOF in comment started at line %d"
+msgstr "%s:%d: gặp kết thúc tập tin bất thường trong chú thích bắt đù ở dòng %d"
+
+#: radiusd/config.y:647
+#, c-format
+msgid "%s:%d: no such service: %s"
+msgstr "%s:%d: không có dịch vụ như vậy: %s"
+
+#: radiusd/config.y:673 radiusd/sql.c:347
+#, c-format
+msgid "%s:%d: unknown host: %s"
+msgstr "%s:%d: không biết máy: %s"
+
+#: radiusd/config.y:741
+#, c-format
+msgid "INTERNAL ERROR at %s:%d: unknown datatype %d"
+msgstr "LỖI NỘI BỘ ở %s:%d: không biết kiểu dữ liệu %d"
+
+#: radiusd/config.y:767
+#, c-format
+msgid "%s:%d: wrong datatype (should be %s)"
+msgstr "%s:%d: kiểu dữ liệu không đúng (nên là %s)"
+
+#: radiusd/config.y:777
+msgid "too few arguments"
+msgstr "quá ít đối số"
+
+#: radiusd/config.y:777 radiusd/config.y:783
+msgid "too many arguments"
+msgstr "quá nhiều đối số"
+
+#: radiusd/config.y:798
+#, c-format
+msgid "%s:%d: obsolete statement"
+msgstr "%s:%d: đối số cũ"
+
+#: radiusd/config.y:919
+#, c-format
+msgid "can't open config file `%s'"
+msgstr "không thể mở tập tin cấu hình « %s »"
+
+#: radiusd/config.y:929
+#, c-format
+msgid "reading %s"
+msgstr "đang đọc %s"
+
+#: radiusd/exec.c:54
+#, c-format
+msgid "no such user: %s"
+msgstr "không có người dùng như vậy: %s"
+
+#: radiusd/exec.c:76
+#, c-format
+msgid "setgroups(1, %lu) failed"
+msgstr "setgroups(1, %lu) không thành công"
+
+#: radiusd/exec.c:87
+#, c-format
+msgid "setegid(%lu) failed"
+msgstr "setegid(%lu) không thành công"
+
+#: radiusd/exec.c:91
+#, c-format
+msgid "setregid(%lu,%lu) failed"
+msgstr "setregid(%lu,%lu) không thành công"
+
+#: radiusd/exec.c:96
+#, c-format
+msgid "setresgid(%lu,%lu,%lu) failed"
+msgstr "setresgid(%lu,%lu,%lu) không thành công"
+
+#: radiusd/exec.c:105
+#, c-format
+msgid "setgid(%lu) failed"
+msgstr "setgid(%lu) không thành công"
+
+#: radiusd/exec.c:108
+#, c-format
+msgid "cannot set effective gid to %lu"
+msgstr "không thể lập GID hữu ích cho %lu"
+
+#: radiusd/exec.c:127
+#, c-format
+msgid "setreuid(%lu,-1) failed"
+msgstr "setreuid(%lu,-1) không thành công"
+
+#: radiusd/exec.c:133
+#, c-format
+msgid "second setuid(%lu) failed"
+msgstr "second setuid(%lu) không thành công"
+
+#: radiusd/exec.c:141
+#, c-format
+msgid "setuid(%lu) failed"
+msgstr "setuid(%lu) không thành công"
+
+#: radiusd/exec.c:151
+#, c-format
+msgid "seteuid(0) succeeded when it should not"
+msgstr "seteuid(0) thành công khi không nên"
+
+#: radiusd/exec.c:155
+#, c-format
+msgid "cannot drop non-root setuid privileges"
+msgstr "không thể bỏ quyền truy cập setuid không phải của người chủ"
+
+#: radiusd/exec.c:175
+#, c-format
+msgid "radius_exec_command(): won't execute, not an absolute pathname: %s"
+msgstr "radius_exec_command(): (radius thực hiện lệnh) sẽ không thực hiện, không phải là tên đường dẫn tuyệt đối: %s"
+
+#: radiusd/exec.c:181 radiusd/exec.c:277
+#, c-format
+msgid "can't reset SIGCHLD"
+msgstr "không thể đặt lại « SIGCHLD » (tín hiệu con)"
+
+#: radiusd/exec.c:222 radiusd/exec.c:352
+#, c-format
+msgid "can't restore SIGCHLD"
+msgstr "không thể phục hồi « SIGCHLD » (tín hiệu con)"
+
+#: radiusd/exec.c:229 radiusd/exec.c:359
+#, c-format
+msgid "can't run external program `%s' (reason reported via syslog channel user.err)"
+msgstr "không thể chạy chương trình bên ngoài « %s » (lý do được thông báo qua kênh bản ghi hệ thống [syslog] user.err)"
+
+#: radiusd/exec.c:240 radiusd/exec.c:368
+#, c-format
+msgid "external program `%s' %s"
+msgstr "chương trình bên ngoài « %s » %s"
+
+#: radiusd/exec.c:266
+#, c-format
+msgid "radius_exec_program(): won't execute, not an absolute pathname: %s"
+msgstr "radius_exec_program(): (radius thực hiện chương trình) sẽ không thực hiện, không phải là tên đường dẫn tuyệt đối: %s"
+
+#: radiusd/exec.c:273
+#, c-format
+msgid "couldn't open pipe"
+msgstr "không thể mở ống dẫn"
+
+#: radiusd/exec.c:293 radiusd/exec.c:328
+#, c-format
+msgid "can't close pipe"
+msgstr "không thể đóng ống dẫn"
+
+#: radiusd/exec.c:296
+#, c-format
+msgid "can't dup stdout"
+msgstr "không thể nhân đôi (dup) thiết bị xuất chuẩn"
+
+#: radiusd/exec.c:340 radiusd/exec.c:706
+#, c-format
+msgid "<stdout of %s>:%d: %s"
+msgstr "<thiết bị xuất chuẩn của %s>:%d: %s"
+
+#: radiusd/exec.c:501
+#, c-format
+msgid "filter %s (pid %d) %s (in: %u, out: %u)"
+msgstr "lọc %s (pid %d) %s (vào : %u, ra : %u)"
+
+#: radiusd/exec.c:555
+#, c-format
+msgid "filter %s is not declared"
+msgstr "chưa tuyên bố bộ lọc %s"
+
+#: radiusd/exec.c:572
+#, c-format
+msgid "cannot run filter %s"
+msgstr "không thể chạy bộ lọc %s"
+
+#: radiusd/exec.c:590
+#, c-format
+msgid "filter %s"
+msgstr "lọc %s"
+
+#: radiusd/exec.c:693 radiusd/exec.c:748
+#, c-format
+msgid "reading from filter %s"
+msgstr "đang đọc từ bộ lọc %s"
+
+#: radiusd/exec.c:715
+#, c-format
+msgid "filter %s (auth): bad output: %s"
+msgstr "lọc %s (xác thực): kết xuất sai: %s"
+
+#: radiusd/exec.c:759 radiusd/exec.c:765
+#, c-format
+msgid "filter %s (acct): bad output: %s"
+msgstr "lọc %s (kế toán): kết xuất sai: %s"
+
+#: radiusd/exec.c:836
+#, c-format
+msgid "%s:%d: filter already declared at %s:%d"
+msgstr "%s:%d: bộ lọc đã được tuyên bố ở %s:%d"
+
+#: radiusd/files.c:223
+#, c-format
+msgid "discarding entry `%s'"
+msgstr "đang hủy mục nhập « %s »"
+
+#: radiusd/files.c:420
+#, c-format
+msgid "zero length username not permitted"
+msgstr "không cho phép tên người dùng có độ dài bằng không"
+
+#: radiusd/files.c:555
+#, c-format
+msgid "unknown attribute `%s/%s'"
+msgstr "không biết thuộc tính « %s/%s »"
+
+#: radiusd/files.c:567 radiusd/files.c:593
+#, c-format
+msgid "expected %s, but found %s"
+msgstr "ngờ %s, còn tìm %s"
+
+#. TRANSLATORS: This is used in place of the first %s in the message
+#. "expected %s, but found %s", i.e. it acts as a direct object to
+#. the verb 'expect'. Please bear this in mind when translating
+#: radiusd/files.c:571
+msgid "opcode"
+msgstr "mã thao tác"
+
+#: radiusd/files.c:582
+#, c-format
+msgid "grad_create_pair failed on %s"
+msgstr "grad_create_pair (grad tạo cặp) bị lỗi trên %s"
+
+#: radiusd/files.c:614
+msgid "not defined"
+msgstr "chưa xác định"
+
+#: radiusd/files.c:652
+#, c-format
+msgid "cannot execute `%s'"
+msgstr "không thể thực hiện « %s »"
+
+#: radiusd/files.c:1055
+msgid "unknown method"
+msgstr "phương pháp không rõ"
+
+#: radiusd/files.c:1139
+#, c-format
+msgid "user `%s' already found in %s"
+msgstr "người dùng « %s » đã được tìm trong %s"
+
+#: radiusd/files.c:1165
+#, c-format
+msgid "%d user disabled"
+msgid_plural "%d users disabled"
+msgstr[0] "%d người dùng bị tắt"
+
+#: radiusd/files.c:1720
+#, c-format
+msgid "using only dbm: USERS NOT LOADED"
+msgstr "đang dùng chỉ bộ quản lý co sở dữ liệu : CHƯA NẠP CÁC NGƯỜI DÙNG"
+
+#: radiusd/files.c:1728
+#, c-format
+msgid "DBM files found but no -b flag given - NOT using DBM"
+msgstr "Tìm thấy các tập tin bộ quản lý co sở dữ liệu nhưng chưa đưa ra cờ « -b » nên KHÔNG PHẢI dùng bộ quản lý co sở dữ liệu"
+
+#: radiusd/files.c:1732
+#, c-format
+msgid "can't load %s: exited"
+msgstr "không thể nạp %s nên thoát"
+
+#: radiusd/files.c:1735
+#, c-format
+msgid "%s reloaded."
+msgstr "%s đã được nạp lại."
+
+#: radiusd/files.c:1806
+#, c-format
+msgid "SQL Error: SQL client could not be initialized"
+msgstr "Lỗi SQL: ứng dụng khách SQL không thể được sở khởi"
+
+#: radiusd/files.c:1822
+#, c-format
+msgid "INTERNAL ERROR: unknown reload code: %d"
+msgstr "LỖI NỘI BỘ : không biết mã nạp lại: %d"
+
+#: radiusd/files.c:1893
+#, c-format
+msgid "can't create parser output file `%s'"
+msgstr "không thể tạo tập tin dữ liệu xuất bộ phân tách « %s »"
+
+#: radiusd/files.c:1907
+#, c-format
+msgid "dumped users database to %s"
+msgstr "đã đổ co sở dữ liệu người dùng ra %s"
+
+#: radiusd/forward.c:110
+#, c-format
+msgid "Can't forward to %s:%d"
+msgstr "Không thể chuyển tiếp tới %s:%d"
+
+#: radiusd/forward.c:180
+#, c-format
+msgid "Forwarding host %s not listed in clients"
+msgstr "Máy chuyển tiếp %s không được liệt kê trong các ứng dụng khách (clients)"
+
+#: radiusd/forward.c:199
+#, c-format
+msgid "Can't open forwarding socket"
+msgstr "Không thể mở ổ cắm chuyển tiếp"
+
+#: radiusd/forward.c:209
+#, c-format
+msgid "Can't bind forwarding socket"
+msgstr "Không thể đóng kết ổ cắm chuyển tiếp"
+
+#: radiusd/log.c:154
+msgid "none"
+msgstr "không có"
+
+#: radiusd/log.c:155
+msgid "Main"
+msgstr "Chính"
+
+#: radiusd/log.c:156
+msgid "Auth"
+msgstr "Xác thực"
+
+#: radiusd/log.c:157
+msgid "Acct"
+msgstr "Kế toán"
+
+#: radiusd/log.c:158
+msgid "Proxy"
+msgstr "Ủy nhiệm"
+
+#: radiusd/log.c:159
+msgid "SNMP"
+msgstr "SNMP"
+
+# Name: don't translate / Tên: đừng dịch
+#: radiusd/log.c:163
+msgid "emerg"
+msgstr "khẩn cấp"
+
+#: radiusd/log.c:164
+msgid "alert"
+msgstr "cảnh giác"
+
+#: radiusd/log.c:165
+msgid "crit"
+msgstr "tới hạn"
+
+#: radiusd/log.c:166
+msgid "error"
+msgstr "lỗi"
+
+#: radiusd/log.c:167
+msgid "warning"
+msgstr "cảnh báo"
+
+#: radiusd/log.c:168
+msgid "notice"
+msgstr "thông báo"
+
+#: radiusd/log.c:169
+msgid "info"
+msgstr "thông tin"
+
+#: radiusd/log.c:170
+msgid "debug"
+msgstr "gỡ lỗi"
+
+#: radiusd/log.c:415
+#, c-format
+msgid "could not append to file %s"
+msgstr "không thể phụ thêm vào tập tin %s"
+
+#: radiusd/log.c:494
+#, c-format
+msgid "%s: cannot change owner to %d:%d"
+msgstr "%s: không thể thay đổi người sở hữu thành %d:%d"
+
+#: radiusd/log.c:534
+#, c-format
+msgid "can't access log file `%s'"
+msgstr "không thể truy cập tập tin ghi lưu « %s »"
+
+#. TRANSLATORS: the subject will always be printed before this msgid.
+#. for example: "child 222 exited with status 0"
+#.
+#: radiusd/log.c:643
+#, c-format
+msgid "exited with status %d"
+msgstr "đã thoát với trạng thái %d"
+
+#. TRANSLATORS: the subject will always be printed before this msgid.
+#: radiusd/log.c:648
+#, c-format
+msgid "terminated on signal %d"
+msgstr "bị kết thúc tại tín hiệu %d"
+
+#. TRANSLATORS: the subject will always be printed before this msgid.
+#: radiusd/log.c:652
+#, c-format
+msgid "terminated"
+msgstr "bị kết thúc"
+
+#: radiusd/log.c:767
+#, c-format
+msgid "%s:%d: no channel mode for `%s'"
+msgstr "%s:%d: không có chế độ kênh cho « %s »"
+
+#: radiusd/log.c:930
+msgid "no levels applicable for this category"
+msgstr "không có cấp thích hợp với loại này"
+
+#: radiusd/log.c:956
+#, c-format
+msgid "%s:%d: channel `%s' not defined"
+msgstr "%s:%d: chưa xác định kênh « %s »"
+
+#: radiusd/log.c:1000 radiusd/snmpserv.c:346
+#, c-format
+msgid "%s:%d: list item %d has wrong datatype"
+msgstr "%s:%d: mục danh sách %d có kiểu dữ liệu không đúng"
+
+#: radiusd/log.c:1016
+#, c-format
+msgid "%s:%d: no such module name: %s"
+msgstr "%s:%d: không có tên mô-đun như vậy: %s"
+
+#: radiusd/menu.c:45 radiusd/menu.c:204
+#, c-format
+msgid "can't open menu `%s'"
+msgstr "không thể mở trình đơn « %s »"
+
+#: radiusd/menu.c:96
+#, c-format
+msgid "menu %s:%d: %s"
+msgstr "trình đơn %s:%d: %s"
+
+#: radiusd/menu.c:207
+msgid ""
+"\n"
+"*** User Menu is Not Available ***\n"
+msgstr ""
+"\n"
+"••• Trình đơn người dùng không sẵn sàng •••\n"
+
+#: radiusd/mlc.c:103
+#, c-format
+msgid "check_ts(): unknown NAS"
+msgstr "check_ts(): NAS không rõ"
+
+#: radiusd/mlc.c:135
+#, c-format
+msgid "assuming `%s' is logged in"
+msgstr "giả sử « %s » đã đăng nhập"
+
+#: radiusd/mlc.c:138
+#, c-format
+msgid "assuming `%s' is NOT logged in"
+msgstr "giả sử « %s » KHÔNG được đăng nhập"
+
+#: radiusd/pam.c:63
+#, c-format
+msgid "rad_pam_conv(): no application-specific data passed"
+msgstr "rad_pam_conv(): không có dữ liệu đặc trưng cho ứng dụng đã được gởi qua"
+
+#: radiusd/proxy.c:198
+#, c-format
+msgid "couldn't send request to realm %s"
+msgstr "không thể gởi yêu cầu cho địa hạt %s"
+
+#: radiusd/radck.c:82
+#, c-format
+msgid "Match-Profile refers to non-existing profile (%s)"
+msgstr "« Match-Profile » (khớp hồ sơ) chỉ đến hồ sơ không tồn tại (%s)"
+
+#: radiusd/radck.c:126
+#, c-format
+msgid "circular dependency for %s"
+msgstr "điều kiện phụ thuộc vòng tròn cho %s"
+
+#: radiusd/radck.c:153
+#, c-format
+msgid "not enough memory for transitivity check"
+msgstr "không đủ bộ nhớ để kiểm tra khả năng truyền"
+
+#: radiusd/radck.c:178
+#, c-format
+msgid "USER LIST IS EMPTY"
+msgstr "DANH SÁCH NGƯỜI DÙNG RỖNG"
+
+#: radiusd/radck.c:186
+#, c-format
+msgid "duplicate %s attribute"
+msgstr "thuộc tính %s trùng"
+
+#: radiusd/radck.c:227
+#, c-format
+msgid "attribute %s not allowed in LHS"
+msgstr "thuộc tính %s không được phép ở bên trái"
+
+#: radiusd/radck.c:276
+msgid "Match-Profile refers to a DEFAULT entry"
+msgstr "« Match-Profile » (khớp hồ sơ) chỉ đến một mục nhập MẶC ĐỊNH"
+
+#: radiusd/radck.c:285
+msgid "Simultaneous-Use is used, but multiple login checking is not enabled"
+msgstr "« Simultanous-Use » (dùng đồng thời) được dùng còn chưa bật khả năng kiểm tra nhiều việc đăng nhập"
+
+#: radiusd/radck.c:325 radiusd/radck.c:356
+msgid "No User-Password attribute in LHS"
+msgstr "Không có thuộc tính « User-Password » (người dùng-mật khẩu) ở bên trái"
+
+#: radiusd/radck.c:333
+#, c-format
+msgid "Auth-Type = System can only be used when running with root privileges"
+msgstr "« Auth-Type = System » (kiểu xác thực=hệ thống) có thể được dùng chỉ khi chạy với quyền người chủ"
+
+#: radiusd/radck.c:343 radiusd/radck.c:380
+msgid "User-Password attribute ignored for this Auth-Type"
+msgstr "Thuộc tính « User-Password » (người dùng-mật khẩu) bị bỏ qua cho « Auth-Type » (kiểu xác thực) này"
+
+#: radiusd/radck.c:348
+msgid "Password-Location attribute ignored for this Auth-Type"
+msgstr "Thuộc tính « Password-Location » (vị trí mật khẩu) bị bỏ qua cho « Auth-Type » (kiểu xác thực) này"
+
+#: radiusd/radck.c:364
+msgid "Authentication type not supported"
+msgstr "Kiểu xác thực không được hỗ trợ"
+
+#: radiusd/radck.c:399
+msgid "Both Auth-Data and PAM-Auth attributes present"
+msgstr "Có cả hai thuộc tính « Auth-Data » (dữ liệu xác thực) và « PAM-Auth » (xác thực PAM) với nhau"
+
+#: radiusd/radck.c:422
+#, c-format
+msgid "attribute %s not allowed in RHS"
+msgstr "thuộc tính %s không được phép ở bên phải"
+
+#: radiusd/radck.c:437
+#, c-format
+msgid "Use of Add-Port-To-IP-Address is deprecated"
+msgstr "Sử dụng « Add-Port-To-IP-Address » (thêm cổng vào địa chỉ IP) bị phản đối"
+
+#: radiusd/radck.c:446
+msgid "BEGIN without Fall-Through"
+msgstr "« BEGIN » (bắt đầu) không có « Fall-Through » (không đi đến kết quả nào)"
+
+#: radiusd/radius.c:108
+#, c-format
+msgid "request from unknown client"
+msgstr "yêu cầu từ ứng dụng khách lạ"
+
+#: radiusd/radius.c:429
+msgid "Dropping packet"
+msgstr "Đang bỏ gói tin"
+
+#: radiusd/radius.c:452
+#, c-format
+msgid "Retransmitting %s reply"
+msgstr "Đang truyền lại trả lời %s"
+
+#: radiusd/radius.c:457
+msgid "request failed"
+msgstr "yêu cầu thất bại"
+
+#: radiusd/radius.c:525
+#, c-format
+msgid "Unrecognized proxy reply from server %s, proxy ID %d"
+msgstr "Trả lời ủy nhiệm không nhận ra từ máy phục vụ %s, mã nhận diện ủy nhiệm %d"
+
+#: radiusd/radius.c:559
+#, c-format
+msgid "unknown request code %d"
+msgstr "mã yêu cầu không rõ %d"
+
+#: radiusd/radius.c:659
+#, c-format
+msgid "rule trace: %s"
+msgstr "vết quy tắc: %s"
+
+#: radiusd/radiusd.c:44
+msgid "GNU radius daemon"
+msgstr "Tình nền radius của GNU"
+
+#: radiusd/radiusd.c:52
+msgid "radiusd specific switches:"
+msgstr "các cái chuyển đặc trưng cho radiusd:"
+
+#: radiusd/radiusd.c:54
+msgid "Stay in foreground"
+msgstr "Còn lại ở cảnh gần"
+
+#: radiusd/radiusd.c:56
+msgid "Select operation mode: test, checkconf, builddbm."
+msgstr ""
+"Chọn chế độ thao tác:\n"
+" • test\t\t\tthử tra\n"
+" • checkconf\t\tkiểm tra cấu hình\n"
+" • builddbm\t\txây dựng bộ quản lý co sở dữ liệu."
+
+#: radiusd/radiusd.c:58
+msgid "Run in single process mode"
+msgstr "Chạy trong chế độ tiến trình đơn"
+
+#: radiusd/radiusd.c:60
+msgid "Store pidfile in DIR"
+msgstr "Cất giữ tập tin PID trong TMỤC"
+
+#: radiusd/radiusd.c:62
+msgid "Show compilation defaults"
+msgstr "Hiện các giá trị mặc định biên dịch"
+
+#: radiusd/radiusd.c:64
+msgid "Quiet mode (valid only with --mode)"
+msgstr "Chế độ không xuất chi tiết (hợp lệ chỉ với « --mode » [chế độ])"
+
+#: radiusd/radiusd.c:65 radiusd/tsh.c:85 radlast/radlast.c:125
+#: radtest/main.c:50 radwho/radwho.c:138 radzap/radzap.c:58
+msgid "FILE"
+msgstr "TẬP TIN"
+
+#: radiusd/radiusd.c:66
+msgid "Select port numbers from available UDP ports"
+msgstr "Chọn các số thứ tự cổng từ những cổng UDP sẵn sàng"
+
+#: radiusd/radiusd.c:70
+msgid "Daemon configuration options. Please use raddb/config instead."
+msgstr "Các tùy chọn cấu hình trình nền. Hãy dùng « raddb/config » thay thế."
+
+#: radiusd/radiusd.c:74
+msgid "Do detailed authentication logging"
+msgstr "Ghi lưu xác thực một cách chi tiết"
+
+#: radiusd/radiusd.c:76
+msgid "Set accounting directory"
+msgstr "Đặt thư mục kế toán"
+
+#: radiusd/radiusd.c:79
+msgid "Enable DBM support"
+msgstr "Bật hỗ trợ bộ quản lý co sở dữ liệu"
+
+#: radiusd/radiusd.c:82
+msgid "Set logging directory name"
+msgstr "Đặt tên thư mục ghi lưu"
+
+#: radiusd/radiusd.c:84
+msgid "Do not resolve IP addresses"
+msgstr "Không tháo gỡ các địa chỉ IP"
+
+#: radiusd/radiusd.c:85 radlast/radlast.c:127
+msgid "IPADDR"
+msgstr "ĐỊA CHỈ IP"
+
+#: radiusd/radiusd.c:86
+msgid "Listen on IPADDR"
+msgstr "Lắng nghe trên ĐỊA CHỈ IP"
+
+#: radiusd/radiusd.c:88
+msgid "Set authentication port number"
+msgstr "Đặt số hiệu cổng xác thực"
+
+#: radiusd/radiusd.c:90
+msgid "Strip prefixes/suffixes off user names before logging"
+msgstr "Tước các tiền/hậu tố ra tên người dùng trong khi ghi lưu"
+
+#: radiusd/radiusd.c:91
+msgid "DEBUGSPEC"
+msgstr "ĐẶC TẢ GỠ LỖI"
+
+#: radiusd/radiusd.c:92 radiusd/tsh.c:89
+msgid "Set debugging level"
+msgstr "Đặt cấp gỡ lỗi"
+
+#: radiusd/radiusd.c:94
+msgid "Log authentications"
+msgstr "Ghi lưu các việc xác thực"
+
+#: radiusd/radiusd.c:96
+msgid "Log users' passwords"
+msgstr "Ghi lưu các mật khẩu của người dùng"
+
+#: radiusd/radiusd.c:228
+#, c-format
+msgid "radiusd compiled without DBM support"
+msgstr "Trình nền radiusd đã được biên dịch không có hỗ trợ bộ quản lý co sở dữ liệu"
+
+#: radiusd/radiusd.c:238
+#, c-format
+msgid "unknown mode: %s"
+msgstr "không biết chế độ : %s"
+
+#: radiusd/radiusd.c:250
+#, c-format
+msgid "invalid IP address: %s"
+msgstr "địa chỉ IP không hợp lệ: %s"
+
+#: radiusd/radiusd.c:318
+msgid "Sorry, your account is currently closed\n"
+msgstr "Tiếc là tài khoản của bạn hiện thời được đóng\n"
+
+#: radiusd/radiusd.c:320
+msgid "Password has expired\n"
+msgstr "Mật khẩu đã hết hạn\n"
+
+#: radiusd/radiusd.c:322
+msgid "Password will expire in %R{Password-Expire-Days} Days\n"
+msgstr "Mật khẩu sẽ hết hạn sau %R{Password-Expire-Days} ngày\n"
+
+#: radiusd/radiusd.c:324
+msgid ""
+"\n"
+"Access denied\n"
+msgstr ""
+"\n"
+"Truy cập bị từ chối\n"
+
+#: radiusd/radiusd.c:326
+msgid ""
+"\n"
+"Realm quota exceeded - access denied\n"
+msgstr ""
+"\n"
+"Chỉ tiêu bị vượt quá nên truy cập bị từ chối\n"
+
+#: radiusd/radiusd.c:328
+msgid ""
+"\n"
+"You are already logged in %R{Simultaneous-Use} times - access denied\n"
+msgstr ""
+"\n"
+"Bạn đã đăng nhập đồng thời %R{Simultaneous-Use} lần nên truy cập bị từ chối\n"
+
+#: radiusd/radiusd.c:330
+msgid ""
+"\n"
+"You are already logged in - access denied\n"
+msgstr ""
+"\n"
+"Bạn đã đăng nhập nên truy cập bị từ chối\n"
+
+#: radiusd/radiusd.c:332
+msgid "You are calling outside your allowed timespan\n"
+msgstr "Bạn đang gọi ở ngoại thời hạn\n"
+
+#: radiusd/radiusd.c:370
+#, c-format
+msgid "Terminating the subprocesses"
+msgstr "Đang kết thúc các tiến trình con"
+
+#: radiusd/radiusd.c:382
+#, c-format
+msgid "%d process left!"
+msgid_plural "%d processes left!"
+msgstr[0] "%d tiến trình còn lại."
+
+#: radiusd/radiusd.c:408
+#, c-format
+msgid "Radiusd is not listening on any port."
+msgstr "Trình nền radiusd không đang lắng nghe trên cổng nào."
+
+#: radiusd/radiusd.c:412
+#, c-format
+msgid "Radiusd is not listening on any port. Trying to continue anyway..."
+msgstr "Trình nền radiusd không đang lắng nghe trên cổng nào. Vẫn còn đang thử tiếp tục..."
+
+#: radiusd/radiusd.c:468
+#, c-format
+msgid "Starting"
+msgstr "Đang khởi chạy"
+
+#: radiusd/radiusd.c:493
+#, c-format
+msgid "Cannot open output file %s"
+msgstr "Không thể mở tập tin kết xuất %s"
+
+#: radiusd/radiusd.c:507
+#, c-format
+msgid "Ready"
+msgstr "Sẵn sàng"
+
+#: radiusd/radiusd.c:600
+#, c-format
+msgid "can't find out my own IP address"
+msgstr "không tìm thấy địa chỉ IP của mình"
+
+#: radiusd/radiusd.c:707
+#, c-format
+msgid "RADIUSD SUSPENDED"
+msgstr "TRÌNH NỀN RADIUSD BỊ NGƯNG"
+
+#: radiusd/radiusd.c:737
+#, c-format
+msgid "Reloading configuration now"
+msgstr "Đang nạp lại cấu hình bây giờ"
+
+#: radiusd/radiusd.c:749
+#, c-format
+msgid "Dumping users db to `%s'"
+msgstr "Đang đổ các người dùng vào « %s »"
+
+#: radiusd/radiusd.c:806
+#, c-format
+msgid "restart initiated"
+msgstr "việc khởi chạy lại đã được bắt đầu"
+
+#: radiusd/radiusd.c:809
+#, c-format
+msgid "can't restart: not started as absolute pathname"
+msgstr "không thể khởi chạy lại: không bắt đầu như là tên đường dẫn tuyệt đối"
+
+#: radiusd/radiusd.c:821
+#, c-format
+msgid "radiusd_restart: cannot fork"
+msgstr "radiusd_restart: (khởi chạy lại trình nền radius) không thể tạo tiến trình con"
+
+#: radiusd/radiusd.c:836
+#, c-format
+msgid "restarting radius"
+msgstr "đang khởi chay radius"
+
+#: radiusd/radiusd.c:839
+#, c-format
+msgid "RADIUS NOT RESTARTED: exec failed"
+msgstr "RADIUS KHÔNG ĐƯỢC KHỞI CHẠY LẠI: lỗi thực hiện"
+
+#: radiusd/radiusd.c:876
+#, c-format
+msgid "Normal shutdown."
+msgstr "Tắt máy một cách chuẩn."
+
+#: radiusd/radiusd.c:892
+#, c-format
+msgid "Ready to process requests."
+msgstr "Sẵn sàng xử lý các yêu cầu."
+
+#: radiusd/radiusd.c:981
+#, c-format
+msgid "Loading configuration files."
+msgstr "Đang nạp các tập tin cấu hình."
+
+#: radiusd/radiusd.c:991
+#, c-format
+msgid "Errors reading config file - EXITING"
+msgstr "Gặp lỗi khi đọc tập tin cấu hình nên THOÁT"
+
+#: radiusd/radiusd.c:1166
+#, c-format
+msgid "socket %s:%d is already assigned for %s"
+msgstr "ổ cắm %s:%d đã được gán cho %s"
+
+#: radiusd/radiusd.c:1374
+#, c-format
+msgid "Ignoring exec-program-user"
+msgstr "Đang bỏ qua « exec-program-user » (thực hiện-chương trình-người dùng)"
+
+#: radiusd/radutil.c:206
+#, c-format
+msgid "INTERNAL ERROR (%s:%d): attribute %d has bad type (%d)"
+msgstr "LỖI NỘI BỘ (%s:%d): thuộc tính %d có kiểu sai (%d)"
+
+#: radiusd/radutil.c:537
+#, c-format
+msgid "cannot convert \"%s\" to integer"
+msgstr "không thể chuyển đổi « %s » sang số nguyên"
+
+#: radiusd/request.c:226
+#, c-format
+msgid "Proxy %s request expired in queue"
+msgstr "Yêu cầu ủy nhiệm %s đã hết hạn trong hàng đợi"
+
+#: radiusd/request.c:245
+#, c-format
+msgid "Killing unresponsive %s child %lu"
+msgstr "Đang buộc kết thúc tiến trình con %s không đáp ứng %lu"
+
+#: radiusd/request.c:250
+#, c-format
+msgid "Cannot terminate child %lu. Attempting to kill inexisting process?"
+msgstr "Không thể kết thúc tiến trình con %lu. Đang thử buộc kết thúc tiến trình không tồn tại không?"
+
+#: radiusd/request.c:260
+#, c-format
+msgid "Terminating unresponsive %s child %lu, status: %s"
+msgstr "Đang kết thúc tiến trình con %s không đáp ứng %lu, trạng thái: %s"
+
+#: radiusd/request.c:263
+msgid "OK"
+msgstr "Được"
+
+#: radiusd/request.c:263
+msgid "FAILURE"
+msgstr "THẤT BẠI"
+
+#: radiusd/request.c:291
+msgid "duplicate request"
+msgstr "yêu cầu trùng"
+
+#: radiusd/request.c:366
+msgid "too many requests in queue"
+msgstr "quá nhiều yêu cầu trong hàng đợi"
+
+#: radiusd/request.c:373
+msgid "too many requests of this type"
+msgstr "quá nhiều yêu cầu kiểu này"
+
+#: radiusd/request.c:382
+msgid "Maximum number of children active"
+msgstr "Số tối đa các tiến trình con hoạt động"
+
+#: radiusd/rewrite.y:841 gram.y:397 radtest/gram.y:397
+#, c-format
+msgid "redefinition of function `%s'"
+msgstr "xác định lại hàm « %s »"
+
+#: radiusd/rewrite.y:843 radiusd/rewrite.y:5713
+#, c-format
+msgid "previously defined here"
+msgstr "đã được xác định trước ở đây"
+
+#: radiusd/rewrite.y:1029
+msgid "nothing to break from"
+msgstr "không có gì từ đó cần ngắt"
+
+#: radiusd/rewrite.y:1043
+msgid "nothing to continue"
+msgstr "không có gì cần tiếp tục"
+
+#: radiusd/rewrite.y:1119
+#, c-format
+msgid "undefined variable: %s"
+msgstr "biến chưa xác định: %s"
+
+#: radiusd/rewrite.y:1610
+#, c-format
+msgid "unexpected EOF in comment started at line %lu"
+msgstr "gặp kết thúc tập tin bất thường trong chú thích bắt đầu ở dòng %lupr"
+
+#: radiusd/rewrite.y:1671
+#, c-format
+msgid "Malformed pragma"
+msgstr "Pragma (lệnh mã nguồn điều khiển trình biên dịch) dạng sai"
+
+#: radiusd/rewrite.y:1685
+#, c-format
+msgid "Unknown regexp flag: %s"
+msgstr "Không biết cờ biểu thức chính quy: %s"
+
+#: radiusd/rewrite.y:1822
+msgid "unterminated character constant"
+msgstr "hằng ký tự chưa chấm dứt"
+
+#: radiusd/rewrite.y:2554
+#, c-format
+msgid "%s implicit coercion %s %s"
+msgstr "%s sự ép buộc ngầm %s %s"
+
+#: radiusd/rewrite.y:2619
+msgid "operation not applicable to strings"
+msgstr "thao tác không thể áp dụng cho chuỗi"
+
+#: radiusd/rewrite.y:2723 radiusd/rewrite.y:2789
+#, c-format
+msgid "(argument %d)"
+msgstr "(đối số %d)"
+
+#: radiusd/rewrite.y:2738 radiusd/rewrite.y:2800
+#, c-format
+msgid "too many arguments in call to %s"
+msgstr "quá nhiều đối số trong cuộc gọi cho %s"
+
+#: radiusd/rewrite.y:2743 radiusd/rewrite.y:2805
+#, c-format
+msgid "too few arguments in call to %s"
+msgstr "quá ít đối số trong cuộc gọi cho %s"
+
+#: radiusd/rewrite.y:2831 radiusd/tsh.c:247
+#, c-format
+msgid "Undefined"
+msgstr "Chưa xác định"
+
+#: radiusd/rewrite.y:2833 radtest/runtime.c:757
+msgid "integer"
+msgstr "số nguyên"
+
+#: radiusd/rewrite.y:2835 radtest/runtime.c:759
+msgid "string"
+msgstr "chuỗi"
+
+#: radiusd/rewrite.y:2837
+msgid "UNKNOWN"
+msgstr "KHÔNG RÕ"
+
+#: radiusd/rewrite.y:2846
+msgid "from Undefined"
+msgstr "từ Chưa xác định"
+
+#: radiusd/rewrite.y:2848
+msgid "from integer"
+msgstr "từ số nguyên"
+
+#: radiusd/rewrite.y:2850
+msgid "from string"
+msgstr "từ chuỗi"
+
+#: radiusd/rewrite.y:2852
+msgid "from UNKNOWN"
+msgstr "từ KHÔNG RÕ"
+
+#: radiusd/rewrite.y:2861
+msgid "to Undefined"
+msgstr "đến Chưa xác định"
+
+#: radiusd/rewrite.y:2863 radtest/runtime.c:770
+msgid "to integer"
+msgstr "đến số nguyên"
+
+#: radiusd/rewrite.y:2865 radtest/runtime.c:772
+msgid "to string"
+msgstr "đến chuỗi"
+
+#: radiusd/rewrite.y:2867
+msgid "to UNKNOWN"
+msgstr "đến KHÔNG RÕ"
+
+#: radiusd/rewrite.y:3189
+#, c-format
+msgid "missing return statement"
+msgstr "thiếu khai báo trở về"
+
+#: radiusd/rewrite.y:3340 radiusd/rewrite.y:3350
+#, c-format
+msgid "divide by zero"
+msgstr "chia cho không"
+
+#: radiusd/rewrite.y:3974
+#, c-format
+msgid "regexp error: %s"
+msgstr "lỗi biểu thức chính quy: %s"
+
+#: radiusd/rewrite.y:4022
+msgid "out of pushdown space"
+msgstr "hết chỗ đẩy xuống (pushdown)"
+
+#: radiusd/rewrite.y:4037 radiusd/rewrite.y:4068
+msgid "heap overrun"
+msgstr "tràn qua miền nhớ"
+
+#: radiusd/rewrite.y:4093
+msgid "out of heap space"
+msgstr "hết chỗ miền nhớ"
+
+#: radiusd/rewrite.y:4121 radiusd/rewrite.y:4163
+msgid "out of popup"
+msgstr "hết bật lên"
+
+#: radiusd/rewrite.y:4219 radiusd/rewrite.y:4229
+msgid "rewrite runtime error"
+msgstr "ghi lại lỗi khi chạy"
+
+#: radiusd/rewrite.y:4326
+msgid "no request supplied"
+msgstr "chưa cung cấp yêu cầu"
+
+#: radiusd/rewrite.y:4361
+msgid "can't create A/V pair"
+msgstr "không thể tạo cặp A/V"
+
+#: radiusd/rewrite.y:4658 radiusd/rewrite.y:4674
+msgid "division by zero!"
+msgstr "chia cho không !"
+
+#: radiusd/rewrite.y:4881
+#, c-format
+msgid "rewrite regex failure: %s. Input: %s"
+msgstr "ghi lại lỗi biểu thức chính quy: %s. Kết nhập: %s"
+
+#: radiusd/rewrite.y:4932
+msgid "pc out of range"
+msgstr "pc ở ngoại phạm vị"
+
+#: radiusd/rewrite.y:5387
+msgid "Invalid backreference"
+msgstr "Tham chiếu ngược không hợp lệ"
+
+#: radiusd/rewrite.y:5423 radiusd/rewrite.y:5465
+msgid "regexp compile error: "
+msgstr "lỗi biên dịch biểu thức chính quy: "
+
+#: radiusd/rewrite.y:5429
+msgid "gsub: not enough memory"
+msgstr "gsub: không đủ bộ nhớ"
+
+#: radiusd/rewrite.y:5471
+msgid "sub: not enough memory"
+msgstr "sub: không đủ bộ nhớ"
+
+#: radiusd/rewrite.y:5711
+#, c-format
+msgid "redefinition of function %s"
+msgstr "xác định lại hàm %s"
+
+#: radiusd/rewrite.y:5767
+#, c-format
+msgid "function %s not defined"
+msgstr "chưa định nghĩa hàm %s"
+
+#: radiusd/rewrite.y:5771
+#, c-format
+msgid "function %s returns wrong data type"
+msgstr "hàm %s trả về kiểu dữ liệu không đúng"
+
+#: radiusd/rewrite.y:5779
+#, c-format
+msgid "function %s takes too many arguments"
+msgstr "hàm %s lấy quá nhiều đối số"
+
+#: radiusd/rewrite.y:5786
+#, c-format
+msgid "function %s: argument %d must be integer"
+msgstr "hàm %s: đối số %d phải là số nguyên"
+
+#: radiusd/rewrite.y:5795
+#, c-format
+msgid "function %s: argument %d must be string"
+msgstr "hàm %s: đối số %d phải là chuỗi"
+
+#: radiusd/rewrite.y:5808
+#, c-format
+msgid "function %s takes too few arguments"
+msgstr "hàm %s lấy quá ít đối số"
+
+#: radiusd/rewrite.y:5995
+#, c-format
+msgid "function %s() requires %d parameter"
+msgid_plural "function %s() requires %d parameters"
+msgstr[0] "function %s() cần đến %d tham số"
+
+#: radiusd/rewrite.y:6152
+#, c-format
+msgid "file not found: %s"
+msgstr "Không tìm thấy tập tin: %s"
+
+#: radiusd/rewrite.y:6288
+msgid "function ~S not defined"
+msgstr "chưa xác định hàm « ~S »"
+
+#: radiusd/rewrite.y:6304
+msgid "too many arguments for ~S"
+msgstr "quá nhiều đối số cho « ~S »"
+
+#: radiusd/rewrite.y:6331
+msgid "type mismatch in argument ~S(~S) in call to ~S"
+msgstr "kiểu khớp sai trong đối số « ~S(~S) » trong cuộc gọi cho « ~S »"
+
+#: radiusd/rewrite.y:6341
+msgid "too few arguments for ~S"
+msgstr "quá ít đối số cho « ~S »"
+
+#: radiusd/scheme.c:231
+#, c-format
+msgid "%s is not a procedure object"
+msgstr "%s không phải là một đối tượng thủ tục"
+
+#: radiusd/scheme.c:236
+#, c-format
+msgid "Procedure `%s' failed: see error output for details"
+msgstr "Thủ tục « %s » đã thất bại: xem kết xuất lỗi để tìm chi tiết"
+
+#: radiusd/scheme.c:351 radiusd/scheme.c:389
+#, c-format
+msgid "Unexpected return value from Guile authentication function `%s'"
+msgstr "Giá trị trả về bất thường từ hàm xác thực Guile « %s »"
+
+#: radiusd/scheme.c:409
+#, c-format
+msgid "Unexpected return value from Guile accounting function `%s'"
+msgstr "Giá trị trả về bất thường từ hàm kế toán Guile « %s »"
+
+#: radiusd/scheme.c:502
+#, c-format
+msgid "Invalid hex number: %s"
+msgstr "Sổ thập lục không hợp lệ: %s"
+
+#: radiusd/scheme.c:689
+#, c-format
+msgid "Guile authentication disabled in config"
+msgstr "Khả năng xác thực Guile bị tắt trong cấu hình"
+
+#: radiusd/scheme.c:708
+#, c-format
+msgid "Guile authentication not available"
+msgstr "Khả năng xác thực Guile không sẵn sàng"
+
+#: radiusd/snmpserv.c:281
+#, c-format
+msgid "%s:%d: community %s already declared"
+msgstr "%s:%d: công đồng %s đã được tuyện bộ"
+
+#: radiusd/snmpserv.c:377 radiusd/snmpserv.c:411
+#, c-format
+msgid "%s:%d: no such network: %s"
+msgstr "%s:%d: không có mạng như vậy: %s"
+
+#: radiusd/snmpserv.c:385
+#, c-format
+msgid "%s:%d: undefined community %s"
+msgstr "%s:%d: công đồng chưa được xác định %s"
+
+#: radiusd/snmpserv.c:1331
+#, c-format
+msgid "acct server re-initializing on SNMP request"
+msgstr "máy phục vụ kế toán đang khởi tạo lại khi nhận yêu cầu SNMP"
+
+#: radiusd/snmpserv.c:1683
+#, c-format
+msgid "auth server re-initializing on SNMP request"
+msgstr "máy phục vụ xác thực đang khởi tạo lại khi nhận yêu cầu SNMP"
+
+#: radiusd/snmpserv.c:1963
+#, c-format
+msgid "server re-initializing on SNMP request"
+msgstr "máy phục vụ đang khởi tạo lại khi nhận yêu cầu SNMP"
+
+#: radiusd/snmpserv.c:1967
+#, c-format
+msgid "server restart on SNMP request"
+msgstr "máy phục vụ đang khởi chạy lại khi nhận yêu cầu SNMP"
+
+#: radiusd/snmpserv.c:1971
+#, c-format
+msgid "server continuing on SNMP request"
+msgstr "máy phục vụ đang tiếp tục khi nhận yêu cầu SNMP"
+
+#: radiusd/snmpserv.c:1975
+#, c-format
+msgid "server suspending on SNMP request"
+msgstr "máy phục vụ đang ngưng chạy khi nhận yêu cầu SNMP"
+
+#: radiusd/snmpserv.c:1979
+#, c-format
+msgid "server shutting down on SNMP request"
+msgstr "máy phục vụ đang tắt khi nhận yêu cầu SNMP"
+
+#: radiusd/snmpserv.c:2691
+#, c-format
+msgid "can't decode SNMP packet from %s: %s"
+msgstr "không thể giải mã gói tin SNMP từ %s: %s"
+
+#: radiusd/snmpserv.c:2701
+#, c-format
+msgid "DENIED attempt to access community %s from %s"
+msgstr "ĐÃ TỪ CHỐI sự thử truy cập công đồng %s từ %s"
+
+#: radiusd/snmpserv.c:2756
+#, c-format
+msgid "Dropping SNMP request from client %s: %s"
+msgstr "Đang bỏ yêu cầu SNMP từ ứng dụng khách %s: %s"
+
+#: radiusd/sql.c:318
+#, c-format
+msgid "could not read sqlserver file %s"
+msgstr "không thể đọc tập tin máy phục vụ SQL %s"
+
+#: radiusd/sql.c:330
+msgid "unrecognized keyword"
+msgstr "từ khoá không được nhận ra"
+
+#: radiusd/sql.c:338
+msgid "required argument missing"
+msgstr "đối số cần thiết còn thiếu"
+
+#: radiusd/sql.c:363 radiusd/sql.c:390
+msgid "number parse error"
+msgstr "lỗi phân tách số"
+
+#: radiusd/sql.c:382 radiusd/sql.c:400 radiusd/sql.c:408
+msgid "expected boolean value"
+msgstr "ngờ giá trị luận lý"
+
+#: radiusd/sql.c:423
+msgid "auth_max_connections is obsolete"
+msgstr "auth_max_connections (số tối đa kết nối xác thực) quá cũ"
+
+#: radiusd/sql.c:430
+msgid "acct_max_connections is obsolete"
+msgstr "acct_max_connections (số tối đa kết nối kế toán) quá cũ"
+
+#: radiusd/sql.c:437
+msgid "query_buffer_size is obsolete"
+msgstr "query_buffer_size (kích cỡ bộ đệm truy vấn) quá cũ"
+
+#: radiusd/sql.c:445
+msgid "Unsupported SQL interface"
+msgstr "Giao diện SQL không được hỗ trợ"
+
+#: radiusd/sql.c:500
+#, c-format
+msgid "%s: missing `%s' statement"
+msgstr "%s: thiếu câu lệnh « %s »"
+
+#: radiusd/sql.c:518
+#, c-format
+msgid "%s: SQL interface not specified"
+msgstr "%s: chưa xác định giao diện SQL"
+
+#: radiusd/sql.c:587
+#, c-format
+msgid "disabling SQL authentication"
+msgstr "đang tắt khả năng xác thực SQL"
+
+#: radiusd/sql.c:589
+#, c-format
+msgid "disabling SQL accounting"
+msgstr "đang tắt khả năng kế toán SQL"
+
+#: radiusd/sql.c:596
+#, c-format
+msgid "SQL configuration changed: closing existing connections"
+msgstr "Cấu hình SQL đã thay đổi nên đang đóng các kết nối đã có"
+
+#: radiusd/sql.c:817
+#, c-format
+msgid "no Acct-Status-Type attribute in rad_sql_acct()"
+msgstr "không có thuộc tính « Acct-Status-Type » (kiểu trạng thái kế toán) trong rad_sql_acct()"
+
+#: radiusd/sql.c:894 radiusd/sql.c:1236
+#, c-format
+msgid "%s updated %d record"
+msgid_plural "%s updated %d records"
+msgstr[0] "%s đã cập nhật %d mục ghi"
+
+#: radiusd/sql.c:915
+#, c-format
+msgid "SQL Auth specified in users file, but not in sqlserver file"
+msgstr "Khả năng xác thực SQL đã được ghi rõ trong tập tin các người dùng (users), nhưng không phải trong tập tin máy phục vụ SQL (sqlserver)"
+
+#: radiusd/sql.c:1014
+#, c-format
+msgid "SQL: invalid operator: %s"
+msgstr "SQL: toán tử không hợp lệ: %s"
+
+#: radiusd/sql.c:1085
+msgid "SQL authentication is not enabled in raddb/sqlserver"
+msgstr "Khả năng xác thực SQL không được bật trong raddb/sqlserver"
+
+#: radiusd/sql.c:1326
+msgid "Radiusd is compiled without SQL support"
+msgstr "Trình nền radiusd đã được biên dịch không có khả năng hỗ trợ SQL"
+
+#: radiusd/stat.c:86
+#, c-format
+msgid "SNMP system disabled: file `%s' has incorrect permissions"
+msgstr "Hệ thống SNMP bị tắt: tập tin « %s » có quyền hạn không đúng"
+
+#: radiusd/stat.c:105
+#, c-format
+msgid "mmap failed"
+msgstr "lỗi mmap"
+
+#: radiusd/stat.c:133
+#, c-format
+msgid "shmem_get(): can't allocate %d byte"
+msgid_plural "shmem_get(): can't allocate %d bytes"
+msgstr[0] "shmem_get(): không thể cấp phát %d byte"
+
+#: radiusd/stat.c:169
+#, c-format
+msgid "stat_init failed"
+msgstr "stat_init bị lỗi"
+
+#: radiusd/stat.c:232
+#, c-format
+msgid "reached SNMP storage limit for the number of monitored ports: increase max-port-count"
+msgstr "đã tới hạn chế cất giữ SNMP cho số cổng đã theo dõi: tăng « max-port-count » (số tối đa cổng)"
+
+#: radiusd/stat.c:292
+#, c-format
+msgid "stat_update(): portno %d: can't find nas for IP %s"
+msgstr "stat_update(): số hiệu cổng %d: không tìm thấy nas cho địa chỉ IP %s"
+
+#: radiusd/stat.c:303
+#, c-format
+msgid "stat_update(): port %d not found on NAS %s"
+msgstr "stat_update(): cổng %d không tìm thấy trên NAS %s"
+
+#: radiusd/stat.c:317
+msgid "negative port idle time"
+msgstr "thời gian nghỉ cổng âm"
+
+#: radiusd/stat.c:341
+msgid "negative port session time"
+msgstr "thời gian phiên chạy cổng âm"
+
+#: radiusd/stat.c:473
+#, c-format
+msgid "reached SNMP storage limit for the number of monitored NASes: increase max-nas-count"
+msgstr "đã tới hạn chế cất giữ SNMP cho số NAS đã theo dõi: tăng « max-nas-count » (số tối đa nas)"
+
+#: radiusd/version.c:141
+msgid "GNU RADIUS server version "
+msgstr "Phiên bản máy phục vụ RADIUS của GNU "
+
+#: radiusd/version.c:157
+#, c-format
+msgid "%s: GNU Radius version %s"
+msgstr "%s: Radius của GNU phiên bản %s"
+
+#: radiusd/version.c:164
+#, c-format
+msgid "Compilation platform: "
+msgstr "Nền tảng biên dịch: "
+
+#: radiusd/version.c:168
+#, c-format
+msgid ""
+"\n"
+"Debugging flags: "
+msgstr ""
+"\n"
+"Các cờ gỡ lỗi: "
+
+#: radiusd/version.c:173
+#, c-format
+msgid ""
+"\n"
+"Compilation flags: "
+msgstr ""
+"\n"
+"Các cờ biên dịch: "
+
+#: radiusd/version.c:178
+#, c-format
+msgid "Compilation defaults:\n"
+msgstr "Các mặc định biên dịch:\n"
+
+#: radiusd/version.c:179
+#, c-format
+msgid "Ports in use:\n"
+msgstr "Cổng đang được dùng:\n"
+
+#: radiusd/version.c:182
+#, c-format
+msgid "Paths:\n"
+msgstr "Đường dẫn:\n"
+
+#: radiusd/version.c:183
+#, c-format
+msgid " configuration directory: %s\n"
+msgstr " thư mục cấu hình: %s\n"
+
+#: radiusd/version.c:184
+#, c-format
+msgid " logging directory:       %s\n"
+msgstr " thư mục ghi lưu :       %s\n"
+
+#: radiusd/version.c:185
+#, c-format
+msgid " accounting directory:    %s\n"
+msgstr " thư mục kế toán:    %s\n"
+
+#: radiusd/version.c:186
+#, c-format
+msgid " pidfile directory:       %s\n"
+msgstr " thư mục tập tin PID:       %s\n"
+
+#: radiusd/version.c:187
+#, c-format
+msgid ""
+"\n"
+"Report bugs to <%s>\n"
+msgstr ""
+"\n"
+"Hãy thông báo lỗi cho <%s>.\n"
+
+#: radiusd/rpp.c:355
+#, c-format
+msgid "child %lu %s"
+msgstr "tiến trình con %lu %s"
+
+#: radiusd/rpp.c:498
+#, c-format
+msgid "Killing process %lu: %s"
+msgstr "Đang buộc kết thúc tiến trình %lu: %s"
+
+#: radiusd/rpp.c:565
+msgid "error writing header"
+msgstr "gặp lỗi khi ghi phần đầu"
+
+#: radiusd/rpp.c:569
+msgid "error writing data"
+msgstr "gặp lỗi khi ghi dữ liệu"
+
+#: radiusd/rpp.c:600
+#, c-format
+msgid "Child exiting on timeout."
+msgstr "Tiến trình con đang thoát khi quá giờ."
+
+#: radiusd/rpp.c:647
+#, c-format
+msgid "Child received malformed header (len = %d, error = %s)"
+msgstr "Tiến trình con đã nhận phần đầu dạng sai (dài = %d, lỗi = %s)"
+
+#: radiusd/rpp.c:659
+#, c-format
+msgid "Child received malformed data"
+msgstr "Tiến trình con đã nhận dữ liệu dạng sai"
+
+#: radiusd/rpp.c:707
+msgid "error reading data"
+msgstr "gặp lỗi khi đọc dữ liệu"
+
+#: radiusd/rpp.c:720
+msgid "error reading data; wrong data size returned"
+msgstr "gặp lỗi khi đọc dữ liệu : kích cỡ dữ liệu không đúng đã được trả về"
+
+#: radiusd/tsh.c:74
+msgid "Print this help screen"
+msgstr "Hiển thị trợ giúp này"
+
+#: radiusd/tsh.c:75
+msgid "NAS LOGIN SID PORT [IP]"
+msgstr "NAS ĐĂNG_NHẬP SID CỔNG [IP]"
+
+#: radiusd/tsh.c:76
+msgid "Query the given NAS"
+msgstr "Truy vấn NAS đã cho"
+
+#: radiusd/tsh.c:78
+msgid "Enter Guile"
+msgstr "Vào Guile"
+
+#: radiusd/tsh.c:80
+msgid "[NUMBER]"
+msgstr "[SỐ]"
+
+#: radiusd/tsh.c:81
+msgid "Print or set the Rewrite stack size"
+msgstr "In ra hoặc đặt kích cỡ đống Ghi lại"
+
+#: radiusd/tsh.c:83
+msgid "FUNCTION(args..)"
+msgstr "HÀM(đối số..)"
+
+#: radiusd/tsh.c:84
+msgid "Run given Rewrite function"
+msgstr "Chạy hàm Ghi lại đã cho"
+
+#: radiusd/tsh.c:86
+msgid "Source the given Rewrite file"
+msgstr "Tìm (source) tập tin Ghi lại đã cho"
+
+#: radiusd/tsh.c:87
+msgid "TIMESPAN [DOW [HH [MM]]]"
+msgstr "THỜI_HẠN [HÔM [GG [PP]]]"
+
+#: radiusd/tsh.c:88
+msgid "Check the timespan interval"
+msgstr "Kiểm tra khoảng thời hạn"
+
+#: radiusd/tsh.c:89
+msgid "LEVEL"
+msgstr "CẤP"
+
+#: radiusd/tsh.c:90
+msgid "[PAIR [,PAIR]]"
+msgstr "[CẶP [,CẶP]]"
+
+#: radiusd/tsh.c:90
+msgid "Define a request"
+msgstr "Xác định yêu cầu"
+
+#: radiusd/tsh.c:92
+msgid "Print the request"
+msgstr "In ra yêu cầu"
+
+#: radiusd/tsh.c:94
+msgid "Quit the shell"
+msgstr "Thoát khỏi trình bao"
+
+#: radiusd/tsh.c:162 radiusd/tsh.c:201 radiusd/tsh.c:224 radiusd/tsh.c:263
+#: radiusd/tsh.c:283 radiusd/tsh.c:328
+#, c-format
+msgid "%s: wrong number of arguments\n"
+msgstr "%s: số đối số không đúng\n"
+
+#: radiusd/tsh.c:168
+#, c-format
+msgid "%s is a network name\n"
+msgstr "%s là một tên mạng\n"
+
+#: radiusd/tsh.c:175
+#, c-format
+msgid "%s: unknown nas\n"
+msgstr "%s: không biết nas\n"
+
+#: radiusd/tsh.c:211
+#, c-format
+msgid "%s: argument is not a number\n"
+msgstr "%s: đối số không phải là con số\n"
+
+#: radiusd/tsh.c:353
+#, c-format
+msgid "Enter the pair list. End with end of file\n"
+msgstr "Nhập danh sách cặp. Kết thúc với kết thúc tập tin\n"
+
+#: radiusd/tsh.c:465
+#, c-format
+msgid "Bad command\n"
+msgstr "Lệnh sai\n"
+
+#: radlast/radlast.c:108
+msgid "report last logins from Radius database."
+msgstr "thông báo các việc đăng nhập cuối cùng từ co sở dữ liệu Radius."
+
+#: radlast/radlast.c:112
+msgid "radlast specific switches:"
+msgstr "các cái chuyển đặc trưng cho radlast:"
+
+#: radlast/radlast.c:123 radlast/radlast.c:135 radtest/main.c:54
+#: radtest/main.c:58 radzap/radzap.c:62
+msgid "NUMBER"
+msgstr "SỐ"
+
+#: radlast/radlast.c:124
+msgid "show at most NUMBER records"
+msgstr "hiển thị nhiều nhất SỐ mục ghi"
+
+#: radlast/radlast.c:126
+msgid "use FILE as radwtmp"
+msgstr "dùng TẬP TIN là radwtmp"
+
+#: radlast/radlast.c:128
+msgid "show logins with IPADDR"
+msgstr "hiển thị các việc đăng nhập với ĐỊA CHỈ IP"
+
+#: radlast/radlast.c:130
+msgid "mark records with missed stops with bump (!)"
+msgstr "nhãn các mục ghi chứa điều dừng còn thiếu, dùng mụn (!)"
+
+#: radlast/radlast.c:131 radzap/radzap.c:60
+msgid "NASNAME"
+msgstr "TÊN NAS"
+
+#: radlast/radlast.c:132
+msgid "show logins from given NAS"
+msgstr "hiển thị các việc đăng nhập từ NAS đã cho"
+
+#: radlast/radlast.c:134
+msgid "use long output format"
+msgstr "dùng định dạng xuất dài"
+
+#: radlast/radlast.c:136
+msgid "show logins from given port"
+msgstr "hiển thị các việc đăng nhập từ cổng đã cho"
+
+#: radlast/radlast.c:138
+msgid "show the login session duration in seconds"
+msgstr "hiển thị thời gian phiên chạy đăng nhập theo giây"
+
+#: radlast/radlast.c:140
+msgid "widen the duration field to show seconds"
+msgstr "làm cho rộng ra trường thời gian để hiển thị giây"
+
+#: radlast/radlast.c:209
+#, c-format
+msgid "--width is incompatible with --show-seconds"
+msgstr "« --width » (độ rộng) không tương thích với « --show-seconds » (hiển thị giây)"
+
+#: radlast/radlast.c:286 radlast/radlast.c:350 radzap/radzap.c:136
+#, c-format
+msgid "can't open file %s"
+msgstr "không thể mở tập tin %s"
+
+#: radlast/radlast.c:421 radwho/radwho.c:372
+#, c-format
+msgid "System accounting is disabled\n"
+msgstr "Khả năng kế toán hệ thống bị tắt\n"
+
+#: radlast/radlast.c:438
+#, c-format
+msgid ""
+"\n"
+"radwtmp begins %s\n"
+msgstr ""
+"\n"
+"radwtmp bắt đầu %s\n"
+
+#: radlast/radlast.c:754
+#, c-format
+msgid "still logged in"
+msgstr "vẫn còn được đăng nhập"
+
+#: radlast/radlast.c:793
+msgid "shutdown"
+msgstr "tắt máy"
+
+#: radlast/radlast.c:795
+msgid "reboot"
+msgstr "khởi động lại"
+
+#: radlast/radlast.c:816
+msgid "acct_off"
+msgstr "acct_off"
+
+#: radlast/radlast.c:818
+msgid "acct_on"
+msgstr "acct_on"
+
+#: radscm/radscm.c:315 radtest/main.c:225
+#, c-format
+msgid "error reading dictionary file"
+msgstr "gặp lỗi khi đọc tập tin từ điển"
+
+#: gram.y:308 radtest/gram.y:308
+msgid "not enough 'while's to break from"
+msgstr "không đủ « while » (trong khi) từ chúng cần ngắt"
+
+#: gram.y:316 radtest/gram.y:316
+msgid "not enough 'while's to continue"
+msgstr "không đủ « while » (trong khi) để tiếp tục"
+
+#: gram.y:360 radtest/gram.y:360
+msgid "return outside of a function definition"
+msgstr "« return » (trở về) ở ngoại lời xác định hàm"
+
+#: gram.y:372 gram.y:753 radtest/gram.y:372 radtest/gram.y:753
+#, c-format
+msgid "undefined function `%s'"
+msgstr "hàm chưa xác định « %s »"
+
+#: gram.y:385 radtest/gram.y:385
+msgid "nested function definitions are not allowed"
+msgstr "không cho phép lời xác định hàm lồng nhau"
+
+#: gram.y:388 radtest/gram.y:388
+msgid "the current function definition begins here"
+msgstr "lời xác định hàm hiện thời bắt đầu ở đây"
+
+#: gram.y:399 radtest/gram.y:399
+#, c-format
+msgid "`%s' previously defined here"
+msgstr "« %s » đã được xác định trước ở đây"
+
+#: gram.y:478 radtest/gram.y:478
+msgid "warning: truncating binary string"
+msgstr "cảnh báo : đang cắt ngắn chuỗi nhị phân"
+
+#: gram.y:511 radtest/gram.y:511
+msgid "expected integer value or request code name"
+msgstr "ngờ giá trị số nguyên hoặc tên mã yêu cầu"
+
+#: gram.y:670 radtest/gram.y:670
+msgid "warning: '*' is meaningless for this attribute type"
+msgstr "cảnh báo : « * » vô nghĩa cho kiểu thuộc tính này"
+
+#: gram.y:904 radtest/gram.y:904
+msgid "Misplaced `end'"
+msgstr "« end » (kết thúc) được định vị sai"
+
+#: gram.y:908 radtest/gram.y:908
+msgid "Unexpected end of line"
+msgstr "Gặp kết thúc dòng bất thường"
+
+#: gram.y:936 radtest/gram.y:936
+#, c-format
+msgid "In function `%s':\n"
+msgstr "Trong hàm « %s »:\n"
+
+#: gram.y:939 radtest/gram.y:939
+#, c-format
+msgid "At top level:\n"
+msgstr "Ở cấp đầu :\n"
+
+#: radtest/main.c:41
+msgid "Radius client shell"
+msgstr "Trình bao ứng dụng khách Radius"
+
+#: radtest/main.c:45
+msgid "radtest specific switches:"
+msgstr "các cái chuyển đặc trưng cho radtest:"
+
+#: radtest/main.c:46
+msgid "VARIABLE=VALUE"
+msgstr "BIẾN=GIÁ_TRỊ"
+
+#: radtest/main.c:47
+msgid "assign a VALUE to VARIABLE"
+msgstr "gán một GIÁ_TRỊ cho BIẾN"
+
+#: radtest/main.c:49
+msgid "set debugging level"
+msgstr "đặt cấp gỡ lỗi"
+
+#: radtest/main.c:51
+msgid "Read input from FILE. Stops further processing of the command line."
+msgstr "Đọc dữ liệu nhập từ TẬP TIN. Ngăn cản xử lý nữa dòng lệnh."
+
+#: radtest/main.c:55
+msgid "set number of retries"
+msgstr "đặt số lần thử lại"
+
+#: radtest/main.c:56
+msgid "SERVER"
+msgstr "MÁY PHỤC VỤ"
+
+#: radtest/main.c:57
+msgid "set radius server parameters"
+msgstr "đặt các tham số máy phục vụ radius"
+
+#: radtest/main.c:59
+msgid "set timeout"
+msgstr "đặt thời hạn"
+
+#: radtest/main.c:61
+msgid "verbose mode"
+msgstr "chế độ chi tiết"
+
+#: radtest/main.c:63
+msgid "disable interactive mode"
+msgstr "tắt chế độ tương tác"
+
+#: radtest/main.c:65
+msgid "Check the input file syntax and exit"
+msgstr "Kiểm tra cú pháp tập tin nhập rồi thoát"
+
+#: radtest/main.c:91
+#, c-format
+msgid "assign: expected `='\n"
+msgstr "assign: (gán) ngờ « = »\n"
+
+#: radtest/main.c:246
+#, c-format
+msgid "can't parse server definition"
+msgstr "không thể phân tách lời xác định máy phục vụ"
+
+#: radtest/main.c:251
+#, c-format
+msgid "no shared secret for the server"
+msgstr "không có điều bí mật chia sẻ cho máy phục vụ"
+
+#: radtest/main.c:263
+#, c-format
+msgid "bad IP address or host name: %s"
+msgstr "địa chỉ IP hay tên máy sai: %s"
+
+#: radtest/main.c:296
+#, c-format
+msgid "bad separator near %s"
+msgstr "phân cách sai ở gần %s"
+
+#: radtest/main.c:315
+#, c-format
+msgid "No servers specfied. Use -s option.\n"
+msgstr "Chưa ghi rõ máy phục vụ. Dùng tùy chọn « -s ».\n"
+
+#: radtest/main.c:344
+#, c-format
+msgid "assign: missing closing quote\n"
+msgstr "assign: (gán) thiếu dấu trích dẫn đóng\n"
+
+#: radtest/main.c:363 radtest/main.c:372
+#, c-format
+msgid "assign: invalid IP address: %s\n"
+msgstr "assign: (gán) địa chỉ IP không hợp lệ: %s\n"
+
+#: radtest/runtime.c:153 radtest/runtime.c:159
+msgid "out of memory"
+msgstr "hết bộ nhớ"
+
+#: radtest/runtime.c:200 radtest/runtime.c:206
+msgid "division by zero"
+msgstr "chia cho không"
+
+#. TRANSLATORS: The following operation names are used as complements,
+#. e.g.: "incompatible types in addition"
+#.
+#: radtest/runtime.c:264
+msgid "addition"
+msgstr "phép cộng"
+
+#: radtest/runtime.c:265
+msgid "subtraction"
+msgstr "phép trừ"
+
+#: radtest/runtime.c:266
+msgid "multiplication"
+msgstr "phép nhân"
+
+#: radtest/runtime.c:267 radtest/runtime.c:268
+msgid "division"
+msgstr "phép chia"
+
+#: radtest/runtime.c:269
+msgid "boolean conjunction"
+msgstr "sự tiếp hợp luận lý"
+
+#: radtest/runtime.c:270
+msgid "boolean disjunction"
+msgstr "sự làm rời ra luận lý"
+
+#: radtest/runtime.c:271 radtest/runtime.c:272 radtest/runtime.c:273
+#: radtest/runtime.c:274 radtest/runtime.c:275 radtest/runtime.c:276
+msgid "comparison"
+msgstr "sự so sánh"
+
+#: radtest/runtime.c:282
+#, c-format
+msgid "incompatible types in %s"
+msgstr "có các kiểu không tương thích với nhau trong %s"
+
+#: radtest/runtime.c:290
+msgid "binary negation"
+msgstr "phụ định nhị phân"
+
+#: radtest/runtime.c:291
+msgid "numeric negation"
+msgstr "phụ định thuộc số"
+
+#: radtest/runtime.c:298
+#, c-format
+msgid "incompatible data type in %s"
+msgstr "có kiểu dữ liệu không tương thích với nhau trong %s"
+
+#: radtest/runtime.c:441 radtest/runtime.c:499
+#, c-format
+msgid "variable `%s' used before definition"
+msgstr "biến « %s » được dùng trước khi xác định"
+
+#: radtest/runtime.c:453
+#, c-format
+msgid "%s:%d: unknown data type"
+msgstr "%s:%d: kiểu dữ liệu không rõ"
+
+#: radtest/runtime.c:602 radtest/runtime.c:651
+msgid "invalid data type"
+msgstr "kiểu dữ liệu không hợp lệ"
+
+#. TRANSLATORS: The following six msgids are data type names in the
+#. form of *direct object*. They are used in place of the first %s
+#. in the sentence 'cannot convert %s %s'
+#: radtest/runtime.c:756
+msgid "undefined"
+msgstr "điều chưa xác định"
+
+#: radtest/runtime.c:758
+msgid "ipaddress"
+msgstr "địa chỉ IP"
+
+#: radtest/runtime.c:760
+msgid "binary string"
+msgstr "chuỗi nhị phân"
+
+#: radtest/runtime.c:761
+msgid "pairlist"
+msgstr "danh sách cặp"
+
+#: radtest/runtime.c:762
+msgid "A/V list"
+msgstr "danh sách A/V"
+
+#. TRANSLATORS: The following six msgids are data type names in the
+#. form of *indirect object*. They are used in place of second %s
+#. in the sentence 'cannot convert %s %s'
+#: radtest/runtime.c:769
+msgid "to undefined"
+msgstr "sang điều chưa xác định"
+
+#: radtest/runtime.c:771
+msgid "to ipaddress"
+msgstr "sang địa chỉ IP"
+
+#: radtest/runtime.c:773
+msgid "to binary string"
+msgstr "sang chuỗi nhị phân"
+
+#: radtest/runtime.c:774
+msgid "to pairlist"
+msgstr "sang danh sách cặp"
+
+#: radtest/runtime.c:775
+msgid "to A/V list"
+msgstr "sang danh sách A/V"
+
+#. TRANSLATORS: First %s is replaced with a type name,
+#. second %s -- with a type name with an appropriate preposition.
+#. For example, in English:
+#. cannot convert integer to string
+#.
+#: radtest/runtime.c:788
+#, c-format
+msgid "cannot convert %s %s"
+msgstr "không thể chuyển đổi %s %s"
+
+#: radtest/runtime.c:1113
+msgid "not a pair list"
+msgstr "không phải là danh sách cặp"
+
+#: radtest/runtime.c:1254
+msgid "invalid data type in send statement (expected A/V list)"
+msgstr "kiểu dữ liệu không hợp lệ trong câu lệnh gởi (ngờ danh sách A/V)"
+
+#: radtest/runtime.c:1270
+#, c-format
+msgid "expect %s\n"
+msgstr "ngờ %s\n"
+
+#: radtest/runtime.c:1271
+#, c-format
+msgid "got    %s\n"
+msgstr "nhận    %s\n"
+
+#: radtest/runtime.c:1281
+msgid "expected A/V pair list"
+msgstr "ngờ danh sách cặp A/V"
+
+#: radtest/runtime.c:1309
+msgid "invalid data type in exit statement"
+msgstr "kiểu dữ liệu không hợp lệ trong câu lệnh thoát"
+
+#: radtest/runtime.c:1524
+msgid "invalid data type in `shift'"
+msgstr "kiểu dữ liệu không hợp lệ trong « shift » (dời)"
+
+#: radtest/runtime.c:1531
+msgid "not enough arguments to shift"
+msgstr "không có đủ đối số để dời"
+
+#: radwho/radwho.c:125
+msgid "display who is logged on by Radius"
+msgstr "hiển thị sai đã được đăng nhập bởi Radius"
+
+#: radwho/radwho.c:129
+msgid "radwho specific switches:"
+msgstr "cái chuyển đặc trưng cho radwho :"
+
+#: radwho/radwho.c:131
+msgid "print all entries, not only active ones"
+msgstr "in ra mọi mục nhập, không phải chỉ điều hoạt động"
+
+#: radwho/radwho.c:133
+msgid "display CLID in second column"
+msgstr "hiển thị CLID trong cột thứ hai"
+
+#: radwho/radwho.c:134
+msgid "DATEFMT"
+msgstr "DẠNG_NGÀY"
+
+#: radwho/radwho.c:135
+msgid "change date representation format"
+msgstr "thay đổi định dạng đại diện ngày tháng"
+
+#: radwho/radwho.c:136
+msgid "STRING"
+msgstr "CHUỖI"
+
+#: radwho/radwho.c:137
+msgid "print STRING instead of an empty column"
+msgstr "in ra CHUỖI thay cho cột trống"
+
+#: radwho/radwho.c:139
+msgid "Use FILE instead of /var/log/radutmp"
+msgstr "Dùng TẬP TIN thay cho « /var/log/radutmp »"
+
+#: radwho/radwho.c:141
+msgid "act as a finger daemon"
+msgstr "hoạt động như là trình nền finger"
+
+#: radwho/radwho.c:143
+msgid "do not display header line"
+msgstr "không hiển thị dòng phần đầu"
+
+#: radwho/radwho.c:145
+msgid "display session ID in the second column"
+msgstr "hiển thị mã nhận diện phiên chạy trong cột thứ hai"
+
+#: radwho/radwho.c:147
+msgid "display hostnames without domain part"
+msgstr "hiển thị các tên máy không có phần miền"
+
+#: radwho/radwho.c:149
+msgid "Long output. All fields will be printed."
+msgstr "Xuất dài. Mọi trường sẽ được in."
+
+#: radwho/radwho.c:152
+msgid "display also local users"
+msgstr "cũng hiển thị các người dùng cục bộ"
+
+#: radwho/radwho.c:154
+msgid "do not resolve hostnames."
+msgstr "không quyết định các tên máy."
+
+#: radwho/radwho.c:155
+msgid "FORMAT"
+msgstr "ĐỊNH_DẠNG"
+
+#: radwho/radwho.c:156
+msgid "change output format"
+msgstr "thay đổi định dạng xuất"
+
+#: radwho/radwho.c:158
+msgid "secure mode: requires that the username be specified"
+msgstr "chế độ bảo mật: cần thiết ghi rõ tên người dùng"
+
+#: radwho/radwho.c:287
+#, c-format
+msgid "must provide username\n"
+msgstr "phải ghi rõ tên người dùng\n"
+
+#: radwho/radwho.c:323
+#, c-format
+msgid "can't open file: %s"
+msgstr "không thể mở tập tin: %s"
+
+#: radzap/radzap.c:49
+msgid "delete Radius login records"
+msgstr "xoá các mục ghi đăng nhập Radius"
+
+#: radzap/radzap.c:53
+msgid "radzap specific switches:"
+msgstr "các cái chuyển đặc trưng cho radzap:"
+
+#: radzap/radzap.c:55
+msgid "ask for confirmation before zapping"
+msgstr "yêu cầu xác nhận trước khi sửa chữa"
+
+#: radzap/radzap.c:57
+msgid "set logging directory"
+msgstr "đặt thư mục ghi lưu"
+
+#: radzap/radzap.c:59
+msgid "operate on FILE instead of /var/log/radutmp"
+msgstr "thao tác TẬP TIN thay cho « /var/log/radutmp »"
+
+#: radzap/radzap.c:61
+msgid "zap user from given NAS"
+msgstr "sửa chữa người dùng từ NAS đã cho"
+
+#: radzap/radzap.c:63
+msgid "zap user coming from given port"
+msgstr "sửa chữa người dùng từ cổng đã cho"
+
+#: radzap/radzap.c:65
+msgid "do not ask for confirmation before zapping"
+msgstr "không yêu cầu xác nhận trước khi sửa chữa"
+
+#: radzap/radzap.c:101
+#, c-format
+msgid "at least one port, nas or user must be specified"
+msgstr "phải ghi rõ ít nhất một cổng, NAS hoặc người dùng"
+
+#: radzap/radzap.c:176
+#, c-format
+msgid "radzap: zapping %s from %s, port %d"
+msgstr "radzap: đang sửa chữa %s từ %s, cổng %d"
+
+#: radzap/radzap.c:184
+#, c-format
+msgid "Not confirmed\n"
+msgstr "Chưa xác nhận\n"
+
+#: radzap/radzap.c:240
+#, c-format
+msgid "%s: host not found.\n"
+msgstr "%s: không tìm thấy mấy.\n"
+
+#: sql/disp.c:139
+msgid "Failed query was"
+msgstr "Truy vấn đã thật bái là"
+
+#: sql/mysql.c:80
+msgid "gave up on connect"
+msgstr "đã chịu thua việc kết nối"
+
+#: sql/mysql.c:108
+#, c-format
+msgid "[MYSQL] cannot connect to %s as %s: %s"
+msgstr "[MYSQL] không thể kết nối tới %s như là %s: %s"
+
+#: sql/mysql.c:164
+#, c-format
+msgid "[MYSQL]: can't get result"
+msgstr "[MYSQL]: không thể lấy kết quả"
+
+#: sql/odbc.c:230
+#, c-format
+msgid "query returned more tuples: %s"
+msgstr "truy vấn đã trả về đối tượng dữ liệu chứa nhiều thành phần thêm nữa: %s"
+
+#: sql/odbc.c:342
+#, c-format
+msgid "too few columns returned (%d req'd)"
+msgstr "trả về quá ít cột (cần %d)"
+
+#: sql/postgres.c:71
+#, c-format
+msgid "PQconnectStart failed: %s"
+msgstr "PQconnectStart bị lỗi: %s"
+
+#: sql/postgres.c:153 sql/postgres.c:203 sql/postgres.c:270
+#, c-format
+msgid "PQexec returned %s"
+msgstr "PQexec đã trả về %s"
+
+#: sql/postgres.c:194
+#, c-format
+msgid "query returned %d tuple: %s"
+msgid_plural "query returned %d tuples: %s"
+msgstr[0] "truy vấn đã trả về %d đối tượng dữ liệu chứa nhiều thành phần thêm nữa: %s"

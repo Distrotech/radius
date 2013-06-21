@@ -1,0 +1,1 @@
+../../gnulib/build-aux/snippet/_Noreturn.h

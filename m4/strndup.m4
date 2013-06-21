@@ -1,0 +1,1 @@
+../gnulib/m4/strndup.m4

@@ -1,0 +1,1 @@
+../gnulib/m4/intdiv0.m4
