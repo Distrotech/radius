@@ -92,7 +92,7 @@ atconfig: $(top_builddir)/config.status
 	cd $(top_builddir) && ./config.status tests/$@
 
 clean-local:
-	$(SHELL) $(TESTSUITE) --clean
+	$(SHELL) $(TESTSUITE) --clean || true
 
 check-local: atconfig atlocal $(TESTSUITE)
 	$(SHELL) $(TESTSUITE)
