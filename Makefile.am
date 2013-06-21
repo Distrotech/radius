@@ -22,7 +22,7 @@ ACLOCAL_AMFLAGS = -I m4 -I am
 
 SUBDIRS= scripts include lib gnu sql snmplib radscm radiusd radwho \
          radzap radlast radscripts elisp raddb db client radtest \
-         examples tests doc po\
+         examples tests po\
          mibs contrib 
 
 update-dictionary:
